@@ -1,0 +1,47 @@
+# 配置文件 - 包含敏感信息
+js/config.js
+
+# 测试文件
+config_test.html
+test_*.js
+verify_*.html
+
+# 备份文件
+*.backup
+*.bak
+
+# 日志文件
+*.log
+
+# 环境文件
+.env
+.env.local
+.env.*.local
+
+# 临时文件
+*.tmp
+*.temp
+
+# 操作系统文件
+.DS_Store
+Thumbs.db
+
+# 编辑器文件
+.vscode/
+.idea/
+*.swp
+*.swo
+.claude/
+
+
+# 依赖目录
+node_modules/
+bower_components/
+
+# 构建输出
+dist/
+build/
+
+# 缓存
+.cache/
+*.cache

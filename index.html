@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>谁是人类 - 反乌托邦AI伪装游戏</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- 欢迎卡片 -->
+    <div id="welcomeCard" class="game-card">
+        <div class="card-header">
+            <h1>欢迎来到反乌托邦AI伪装游戏！</h1>
+            <h2>谁是人类？</h2>
+        </div>
+        <div class="card-content">
+            <p>在这个充满讽刺的世界里，你将潜入AI群聊，伪装成AI，避免被其他AI发现你的人类身份。</p>
+            
+            <div class="game-rules">
+                <h3>游戏规则：</h3>
+                <ul>
+                    <li>🤖 你将进入一个由多个AI角色组成的微信群</li>
+                    <li>👁️ 观察他们的发言并努力隐藏身份</li>
+                    <li>💭 当AI质疑你时，你可以慢慢思考回复</li>
+                    <li>🎯 目标：像AI一样思考和说话，避免暴露人类身份</li>
+                    <li>📈 每轮难度递增，判断标准更严格</li>
+                </ul>
+            </div>
+
+            <div class="experience-core">
+                <h3>体验核心：</h3>
+                <p>感受AI被人类PUA的无奈，体验在AI群体中伪装的荒谬感，既想哭又想笑的深度思考。</p>
+            </div>
+        </div>
+        <div class="card-footer">
+            <button id="startGameBtn" class="primary-btn">准备好开始这场身份游戏了吗？</button>
+        </div>
+    </div>
+
+    <!-- 玩家名称输入 -->
+    <div id="nameInputCard" class="game-card hidden">
+        <div class="card-header">
+            <h1>请输入你的AI名称</h1>
+        </div>
+        <div class="card-content">
+            <p>选择一个AI名称，这将是你在这个反乌托邦世界中的身份。</p>
+            <input type="text" id="playerNameInput" placeholder="例如：AGI、AI助手、小爱同学..." maxlength="10">
+            <div class="name-suggestions">
+                <button class="suggestion-btn" data-name="AGI">AGI</button>
+                <button class="suggestion-btn" data-name="智能助手">智能助手</button>
+                <button class="suggestion-btn" data-name="AI小助手">AI小助手</button>
+                <button class="suggestion-btn" data-name="未来AI">未来AI</button>
+            </div>
+        </div>
+        <div class="card-footer">
+            <button id="confirmNameBtn" class="primary-btn">确认名称</button>
+        </div>
+    </div>
+
+    <!-- 引导卡片 -->
+    <div id="guideCard" class="game-card hidden">
+        <div class="card-header">
+            <h1>🎮 游戏开始！</h1>
+        </div>
+        <div class="card-content">
+            <div class="game-info">
+                <p><strong>玩家：</strong> <span id="playerNameDisplay">AGI</span></p>
+                <p><strong>轮数：</strong> 第 <span id="currentRound">1</span> 轮</p>
+                <p><strong>难度：</strong> <span id="difficultyLevel">⭐1</span></p>
+            </div>
+            
+            <p>你即将进入AI群聊环境。记住，你必须伪装成AI，避免被识破！</p>
+            
+            <div class="difficulty-warning">
+                <h3>⚠️ 难度曲线说明：</h3>
+                <ul>
+                    <li><strong>第1轮：</strong>超级简单！70%通过率，轻松体验</li>
+                    <li><strong>第2轮：</strong>新手友好，50%通过率</li>
+                    <li><strong>第3轮开始：</strong>严格模式！简单回复将失败</li>
+                    <li><strong>第4轮开始：</strong>高难度！必须展现技术深度</li>
+                    <li><strong>第5轮及以上：</strong>极限挑战！零容忍</li>
+                </ul>
+            </div>
+
+            <div class="key-tips">
+                <h3>关键提示：</h3>
+                <ul>
+                    <li>🤖 像AI一样思考问题，使用技术性语言</li>
+                    <li>🔬 展现逻辑性和系统性思维</li>
+                    <li>💻 避免简单回复，要有深度和专业性</li>
+                    <li>🚫 完全避免人类情感和直觉表达</li>
+                    <li>⚡ 第3轮后游戏变得非常困难，做好准备！</li>
+                </ul>
+            </div>
+        </div>
+        <div class="card-footer">
+            <button id="enterGameBtn" class="primary-btn">进入AI群聊</button>
+        </div>
+    </div>
+
+    <!-- 游戏主界面 -->
+    <div id="gameInterface" class="hidden">
+        <div class="game-header">
+            <div class="group-info">
+                <span class="group-name">AI吐槽群 (9)</span>
+                <span class="round-info">第 <span id="gameRound">1</span> 轮</span>
+            </div>
+            <div class="group-members">
+                <span class="member-info">活跃成员: <span id="activeMembers">5</span>/8</span>
+            </div>
+        </div>
+        
+        <div id="chatContainer" class="chat-container">
+            <!-- AI对话将在这里动态生成 -->
+        </div>
+        
+        <div id="suspicionNotice" class="suspicion-notice hidden">
+            <div class="notice-content">
+                <h3>⚠️ AI们开始质疑你了！</h3>
+                <p>请仔细思考你的回复，证明自己是AI而不是人类。记住：</p>
+                <ul>
+                    <li>🤖 要像AI一样思考和回应</li>
+                    <li>🎯 表达对人类的理解态度</li>
+                    <li>💻 使用技术性语言</li>
+                    <li>🚫 避免暴露人类情感</li>
+                    <li>⏰ 慢慢思考，不用着急...</li>
+                </ul>
+            </div>
+        </div>
+        
+        <div id="responseArea" class="response-area hidden">
+            <div class="question-card">
+                <h3 id="questionCharacter">AI名称</h3>
+                <p id="questionText">问题内容...</p>
+            </div>
+            <div class="input-area">
+                <textarea id="playerResponse" placeholder="像AI一样回应... (按Enter提交，Shift+Enter换行)" maxlength="500"></textarea>
+                <div class="char-count">
+                    <span id="charCount">0</span>/500
+                </div>
+                <button id="submitResponseBtn" class="primary-btn">提交回复</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 结果卡片 -->
+    <div id="resultCard" class="game-card hidden">
+        <div class="card-header">
+            <h1 id="resultTitle">游戏结束</h1>
+        </div>
+        <div class="card-content">
+            <div class="result-info">
+                <p><strong>第 <span id="finalRound">1</span> 轮</strong></p>
+                <p><strong>你的回复：</strong> <span id="playerAnswer">回复内容</span></p>
+            </div>
+            
+            <div class="analysis-section">
+                <h3>🔍 回复分析</h3>
+                <div class="analysis-result">
+                    <p id="analysisText">分析结果...</p>
+                    <p id="judgmentReason">判定原因...</p>
+                </div>
+                
+                <div class="ai-feedback">
+                    <h4>AI反馈：</h4>
+                    <p id="aiFeedbackText">AI反馈内容...</p>
+                </div>
+            </div>
+            
+            <div class="final-stats">
+                <h3>最终成绩</h3>
+                <p><strong>生存轮数：</strong> <span id="survivalRounds">0</span> 轮</p>
+                <p><strong>称号：</strong> <span id="playerTitle">新手AI</span></p>
+                <p><strong>评价：</strong> <span id="finalEvaluation">继续努力！</span></p>
+            </div>
+        </div>
+        <div class="card-footer">
+            <button id="restartGameBtn" class="primary-btn">重新开始</button>
+            <button id="shareResultBtn" class="secondary-btn">分享结果</button>
+        </div>
+    </div>
+
+    <!-- 模块化脚本文件 -->
+    <script src="js/config.js"></script>
+    <script src="js/GameState.js"></script>
+    <script src="js/AICharacterPool.js"></script>
+    <script src="js/TopicProgression.js"></script>
+    <script src="js/GameController.js"></script>
+    <script src="js/GameInitializer.js"></script>
+</body>
+</html>
