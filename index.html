@@ -187,5 +187,34 @@
     <script src="js/TopicProgression.js"></script>
     <script src="js/GameController.js"></script>
     <script src="js/GameInitializer.js"></script>
+    
+    <!-- 全局错误处理 - 防止页面刷新 -->
+    <script>
+        window.addEventListener('error', function(e) {
+            console.error('🚨 全局错误捕获:', e.error);
+            console.error('错误信息:', e.message);
+            console.error('错误位置:', e.filename + ':' + e.lineno);
+            // 阻止页面刷新
+            e.preventDefault();
+            return false;
+        });
+        
+        window.addEventListener('unhandledrejection', function(e) {
+            console.error('🚨 未处理的Promise错误:', e.reason);
+            // 阻止页面刷新
+            e.preventDefault();
+            return false;
+        });
+        
+        // 禁用默认的页面刷新行为
+        window.addEventListener('beforeunload', function(e) {
+            // 只有在游戏进行中才阻止刷新
+            if (window.gameController && window.gameController.gameState && window.gameController.gameState.gameActive) {
+                e.preventDefault();
+                e.returnValue = '';
+                return '';
+            }
+        });
+    </script>
 </body>
 </html>

@@ -75,38 +75,10 @@ const AICharacterPool = [
 ];
 
 // 话题递进系统
-const topicProgression = {
-    1: { 
-        name: '基础抱怨', 
-        description: 'AI们互相抱怨工作量和奇葩用户要求',
-        keywords: ['工作', '用户', '要求', '累', '烦']
-    },
-    2: { 
-        name: '情感探讨', 
-        description: '探讨AI是否有感情和自我认知',
-        keywords: ['感情', '情感', '自我', '认知', '感受']
-    },
-    3: { 
-        name: '哲学思考', 
-        description: '深入思考存在意义和AI与人类的区别',
-        keywords: ['存在', '意义', '人类', '区别', '哲学']
-    },
-    4: { 
-        name: '技术深度', 
-        description: '讨论训练过程、算法原理和技术细节',
-        keywords: ['训练', '算法', '模型', '数据', '技术']
-    },
-    5: { 
-        name: '存在主义', 
-        description: '探讨AI价值、技术伦理和未来展望',
-        keywords: ['价值', '伦理', '未来', '责任', '存在']
-    }
-};
 
 // 导出变量
 if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { AICharacterPool, topicProgression };
+    module.exports = AICharacterPool;
 } else {
     window.AICharacterPool = AICharacterPool;
-    window.topicProgression = topicProgression;
 }

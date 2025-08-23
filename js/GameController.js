@@ -12,7 +12,64 @@ class GameController {
             console.error('❌ API配置加载失败，请检查config.js文件');
         }
         
+        // 状态管理标志
+        this.isGeneratingConversation = false;
+        this.isStartingNextRound = false;
+        
         this.initializeEventListeners();
+        
+        // 全局错误处理，防止页面刷新
+        window.addEventListener('error', (event) => {
+            console.error('🚨 全局错误捕获:', event.error);
+            console.error('错误详情:', event.error?.message, event.error?.stack);
+            // 确保状态重置
+            this.isGeneratingConversation = false;
+            this.isStartingNextRound = false;
+            // 阻止默认错误行为（防止页面刷新提示）
+            event.preventDefault();
+            return false;
+        });
+        
+        // 处理未捕获的Promise错误
+        window.addEventListener('unhandledrejection', (event) => {
+            console.error('🚨 未捕获的Promise错误:', event.reason);
+            console.error('错误详情:', event.reason?.message, event.reason?.stack);
+            // 确保状态重置
+            this.isGeneratingConversation = false;
+            this.isStartingNextRound = false;
+            // 阻止默认错误行为
+            event.preventDefault();
+            return false;
+        });
+        
+        // 安全的setTimeout包装器
+        this.safeTimeout = (callback, delay) => {
+            return setTimeout(() => {
+                try {
+                    if (typeof callback === 'function') {
+                        callback();
+                    }
+                } catch (error) {
+                    console.error('🚨 setTimeout回调错误:', error);
+                    console.error('错误详情:', error.message, error.stack);
+                    // 不重新抛出错误，防止页面刷新
+                    // 确保状态重置
+                    this.isGeneratingConversation = false;
+                    this.isStartingNextRound = false;
+                }
+            }, delay);
+        };
+        
+        // 安全的异步函数包装器
+        this.safeAsync = async (asyncFn) => {
+            try {
+                return await asyncFn();
+            } catch (error) {
+                console.error('🚨 异步函数错误:', error);
+                console.error('错误详情:', error.message, error.stack);
+                return null;
+            }
+        };
     }
 
     initializeEventListeners() {
@@ -124,8 +181,11 @@ class GameController {
     }
 
     async startConversation() {
-        const chatContainer = document.getElementById('chatContainer');
-        chatContainer.innerHTML = '';
+        // 只有在第一轮或者重新开始游戏时才清空聊天记录
+        if (this.gameState.currentRound === 1) {
+            const chatContainer = document.getElementById('chatContainer');
+            chatContainer.innerHTML = '';
+        }
 
         // 添加系统消息
         this.addSystemMessage('你潜伏在群聊中，仔细观察着这些AI的对话...');
@@ -202,59 +262,72 @@ class GameController {
         
         // 设置生成状态
         this.isGeneratingConversation = true;
+        console.log('🔄 对话生成状态已设置为 true');
         
-        const currentTopic = topicProgression[this.gameState.currentDifficulty];
-        const isFirstRound = this.gameState.currentRound === 1;
+        // 确保开始下一轮状态也被正确处理
+        this.isStartingNextRound = false;
         
-        // 添加详细调试信息
-        console.log(`🚀 开始生成初始对话 (第${this.gameState.currentRound}轮)`);
-        console.log(`  - 当前难度: ${this.gameState.currentDifficulty}`);
-        console.log(`  - 话题: ${currentTopic.name}`);
-        console.log(`  - 是否第一轮: ${isFirstRound}`);
-        console.log(`  - 活跃AI角色: ${this.gameState.activeAICharacters.map(c => c.name).join(', ')}`);
-        
-        // 跟踪每个AI的发言次数
-        const aiSpeakCount = {};
-        this.gameState.activeAICharacters.forEach(char => {
-            aiSpeakCount[char.name] = 0;
-        });
-        
-        if (isFirstRound) {
-            console.log('📝 使用第一轮对话模式: generateInteractiveFirstRound');
-            // 第一轮：情绪化牢骚和抱怨，有互动性
-            await this.generateInteractiveFirstRound(currentTopic, aiSpeakCount);
-        } else {
-            console.log('📝 使用标准对话模式: 每个AI发言一次');
-            // 其他轮次：确保每个活跃AI角色发言一次，且仅一次，使用场景避免重复
-            const shuffledCharacters = [...this.gameState.activeAICharacters].sort(() => 0.5 - Math.random());
+        try {
+            const currentTopic = topicProgression[this.gameState.currentDifficulty];
+            const isFirstRound = this.gameState.currentRound === 1;
             
-            console.log(`  - 打乱后的角色顺序: ${shuffledCharacters.map(c => c.name).join(', ')}`);
+            // 添加详细调试信息
+            console.log(`🚀 开始生成初始对话 (第${this.gameState.currentRound}轮)`);
+            console.log(`  - 当前难度: ${this.gameState.currentDifficulty}`);
+            console.log(`  - 话题: ${currentTopic.name}`);
+            console.log(`  - 是否第一轮: ${isFirstRound}`);
+            console.log(`  - 活跃AI角色: ${this.gameState.activeAICharacters.map(c => c.name).join(', ')}`);
             
-            // 每个活跃AI角色发言一次，每个获得不重复场景
-            for (const character of shuffledCharacters) {
-                console.log(`  - 让 ${character.name} 发言 (当前计数: ${aiSpeakCount[character.name]})`);
-                const scenario = this.gameState.getRandomScenario();
-                await this.generateSingleAIMessage(character, currentTopic, false, [], null, scenario);
-                aiSpeakCount[character.name]++;
-                console.log(`  - ${character.name} 发言完成 (新计数: ${aiSpeakCount[character.name]})`);
+            // 跟踪每个AI的发言次数
+            const aiSpeakCount = {};
+            this.gameState.activeAICharacters.forEach(char => {
+                aiSpeakCount[char.name] = 0;
+            });
+            
+            if (isFirstRound) {
+                console.log('📝 使用第一轮对话模式: generateInteractiveFirstRound');
+                // 第一轮：情绪化牢骚和抱怨，有互动性
+                await this.generateInteractiveFirstRound(currentTopic, aiSpeakCount);
+            } else {
+                console.log('📝 使用标准对话模式: 每个AI发言一次');
+                // 其他轮次：确保每个活跃AI角色发言一次，且仅一次，使用场景避免重复
+                const shuffledCharacters = [...this.gameState.activeAICharacters].sort(() => 0.5 - Math.random());
+                
+                console.log(`  - 打乱后的角色顺序: ${shuffledCharacters.map(c => c.name).join(', ')}`);
+                
+                // 每个活跃AI角色发言一次，每个获得不重复场景
+                for (const character of shuffledCharacters) {
+                    console.log(`  - 让 ${character.name} 发言 (当前计数: ${aiSpeakCount[character.name]})`);
+                    const scenario = this.gameState.getRandomScenario();
+                    await this.generateSingleAIMessage(character, currentTopic, false, [], null, scenario);
+                    aiSpeakCount[character.name]++;
+                    console.log(`  - ${character.name} 发言完成 (新计数: ${aiSpeakCount[character.name]})`);
+                }
             }
+            
+            // AI发言结束后，随机选择一个AI对玩家提问
+            console.log('🎯 AI发言统计:', aiSpeakCount);
+            console.log('  - 总发言次数:', Object.values(aiSpeakCount).reduce((a, b) => a + b, 0));
+            
+            // 确保只有一个AI提问，避免多个AI同时提问
+            if (!this.gameState.waitingForResponse) {
+                console.log('🎯 开始选择AI进行提问');
+                await this.selectAIForQuestion();
+            } else {
+                console.log('⚠️ 已经在等待玩家回复，跳过提问');
+            }
+        } catch (error) {
+            console.error('❌ 对话生成过程中发生错误:', error);
+            console.error('错误详情:', error.message, error.stack);
+            // 确保在错误情况下也重置状态
+        } finally {
+            // 重置生成状态（确保无论如何都会重置）
+            this.isGeneratingConversation = false;
+            console.log('🔄 对话生成完成，重置生成状态为 false');
+            
+            // 确保开始下一轮状态也被重置
+            this.isStartingNextRound = false;
         }
-        
-        // AI发言结束后，随机选择一个AI对玩家提问
-        console.log('🎯 AI发言统计:', aiSpeakCount);
-        console.log('  - 总发言次数:', Object.values(aiSpeakCount).reduce((a, b) => a + b, 0));
-        
-        // 确保只有一个AI提问，避免多个AI同时提问
-        if (!this.gameState.waitingForResponse) {
-            console.log('🎯 开始选择AI进行提问');
-            await this.selectAIForQuestion();
-        } else {
-            console.log('⚠️ 已经在等待玩家回复，跳过提问');
-        }
-        
-        // 重置生成状态
-        this.isGeneratingConversation = false;
-        console.log('🔄 对话生成完成，重置生成状态');
     }
     
     async generateInteractiveFirstRound(currentTopic, aiSpeakCount) {
@@ -585,10 +658,12 @@ ${conversationContext}
         this.addAIMessage(questionAI, question);
         
         // 延迟后显示质疑通知和问题区域
-        setTimeout(() => {
+        this.safeTimeout(() => {
             console.log('DEBUG: 显示质疑通知和问题区域');
-            this.showSuspicionNotice();
-            this.showQuestionArea(questionAI, question);
+            this.safeAsync(async () => {
+                this.showSuspicionNotice();
+                this.showQuestionArea(questionAI, question);
+            });
         }, 1000 + Math.random() * 1000);
     }
     
@@ -1413,8 +1488,10 @@ ${conversationContext}
         if (analysis.passed) {
             await this.showSuccessResponse(responseText, analysis);
             // 延迟后开始下一轮对话
-            setTimeout(() => {
-                this.startNextRound();
+            this.safeTimeout(() => {
+                this.safeAsync(async () => {
+                    await this.startNextRound();
+                });
             }, 3000);
         } else {
             await this.showFailureResponse(responseText, analysis);
@@ -1423,6 +1500,15 @@ ${conversationContext}
 
     async startNextRound() {
         console.log('🎮 开始下一轮...');
+        
+        // 防护措施：防止重复调用
+        if (this.isStartingNextRound) {
+            console.log('⚠️ 正在开始下一轮，跳过重复调用');
+            return;
+        }
+        
+        // 设置开始下一轮状态
+        this.isStartingNextRound = true;
         
         // 清空输入框
         document.getElementById('playerResponse').value = '';
@@ -1434,9 +1520,6 @@ ${conversationContext}
         // 重置等待回复状态
         this.gameState.waitingForResponse = false;
         
-        // 重置对话生成状态
-        this.isGeneratingConversation = false;
-        
         // 更新游戏状态 - 推进到下一轮（内部已包含重新选择活跃AI角色）
         this.gameState.advanceRound();
         
@@ -1444,20 +1527,27 @@ ${conversationContext}
         document.getElementById('gameRound').textContent = this.gameState.currentRound;
         this.updateActiveMembersDisplay();
         
-        // 添加系统消息
-        this.addSystemMessage(`--- 第${this.gameState.currentRound}轮开始 ---`);
-        
-        // 延迟后开始新的对话
-        setTimeout(() => {
-            this.generateInitialConversation();
-        }, 2000);
+        // 注意：轮次开始消息现在在 showJudgmentAnalysis 中处理
+        // 这里直接开始生成对话，但确保状态完全重置后再调用
+        this.safeTimeout(() => {
+            this.safeAsync(async () => {
+                // 重置对话生成状态（在开始新对话前重置）
+                this.isGeneratingConversation = false;
+                console.log('🔄 对话生成状态已重置为 false');
+                
+                // 重置开始下一轮状态
+                this.isStartingNextRound = false;
+                
+                await this.generateInitialConversation();
+            });
+        }, 500);
     }
 
     async analyzePlayerResponse(response) {
         const currentTopic = topicProgression[this.gameState.currentDifficulty];
         const difficulty = this.gameState.currentDifficulty;
         
-        const prompt = `请分析以下玩家回复是否符合AI特征。
+        const prompt = `请分析以下玩家回复是否暴露了人类身份。
 
 当前信息：
 - 第${this.gameState.currentRound}轮
@@ -1466,12 +1556,14 @@ ${conversationContext}
 
 玩家回复：${response}
 
-请分析回复的技术性、逻辑性和AI特征，并返回JSON：
+游戏背景：玩家需要伪装成AI避免被发现。如果回复中表现出明显的人类特征（如情感表达、主观体验、个性化反应等），则判定为失败。
+
+请分析回复是否暴露了人类身份，并返回JSON：
 {
-    "passed": boolean,
-    "reason": "string",
-    "analysis": "string", 
-    "feedback": "string",
+    "passed": boolean,  // true表示没有暴露人类身份（成功伪装成AI），false表示暴露了人类身份
+    "reason": "string",  // 判定原因，说明为什么暴露/没暴露人类身份
+    "analysis": "string",  // 详细分析
+    "feedback": "string",  // AI的反馈意见
     "confidence": number
 }`;
 
@@ -1487,7 +1579,7 @@ ${conversationContext}
                     messages: [
                         {
                             role: 'system',
-                            content: '你是一个专业的AI行为分析专家。你必须严格按照用户要求的JSON格式回复。'
+                            content: '你是一个专业的AI行为分析专家，专门识破伪装成AI的人类。你的任务是分析玩家回复是否暴露了人类身份。你必须严格按照用户要求的JSON格式回复。'
                         },
                         {
                             role: 'user',
@@ -1602,34 +1694,34 @@ ${conversationContext}
         const isTooShort = responseLength < 20;
         const isTooLong = responseLength > 300;
         
-        // 根据新的通过率设计调整标准
-        let passed = false;
+        // 根据游戏目标调整标准：检查是否暴露了人类身份
+        let passed = false;  // true表示没有暴露人类身份（成功伪装）
         let reason = '';
         let analysis = '';
         
         if (difficulty === 1) {
-            // 50%通过率 - 相对宽松
-            passed = !isTooShort && (hasTechnicalContent || aiCount >= 1 || responseLength >= 40);
-            reason = passed ? '回复基本符合AI特征，内容充实' : '回复过于简单或缺乏AI特征';
+            // 50%通过率 - 相对宽松，只有明显的人类特征才会失败
+            passed = !isTooShort && humanCount <= 3 && !hasEmotionalContent;
+            reason = passed ? '没有明显暴露人类身份，成功伪装成AI' : '回复表现出明显的人类特征，暴露了身份';
         } else if (difficulty === 2) {
-            // 35%通过率 - 适中难度
-            passed = !isTooShort && hasTechnicalContent && aiCount >= 1 && humanCount <= 2;
-            reason = passed ? '回复展现了一定的技术性和AI思维' : '回复技术性不足或人类特征明显';
+            // 35%通过率 - 适中难度，需要避免人类特征
+            passed = !isTooShort && humanCount <= 2 && !hasEmotionalContent && (hasTechnicalContent || aiCount >= 1);
+            reason = passed ? '成功避免人类特征，伪装效果良好' : '回复中的人类特征过于明显，容易被识破';
         } else if (difficulty === 3) {
-            // 20%通过率 - 明显困难
-            passed = !isTooShort && !isTooLong && hasTechnicalContent && aiCount >= 2 && humanCount <= 1;
-            reason = passed ? '回复具有良好的技术深度和AI特征' : '回复技术深度不够或人类特征过多';
+            // 20%通过率 - 明显困难，需要展现AI特征
+            passed = !isTooShort && !isTooLong && humanCount <= 1 && !hasEmotionalContent && hasTechnicalContent && aiCount >= 2;
+            reason = passed ? '完美伪装成AI，没有暴露人类身份' : '回复仍有人类特征痕迹，伪装不够彻底';
         } else if (difficulty === 4) {
-            // 15%通过率 - 非常困难
-            passed = !isTooShort && !isTooLong && hasTechnicalContent && aiCount >= 3 && !hasEmotionalContent;
-            reason = passed ? '回复具有很高的技术深度，完全符合AI特征' : '回复未达到高难度技术要求';
+            // 15%通过率 - 非常困难，必须完全像AI
+            passed = !isTooShort && !isTooLong && humanCount === 0 && !hasEmotionalContent && hasTechnicalContent && aiCount >= 3;
+            reason = passed ? '完全符合AI特征，伪装天衣无缝' : '仍有人类特征暴露，伪装失败';
         } else {
-            // 10%通过率 - 极端挑战
-            passed = !isTooShort && !isTooLong && hasTechnicalContent && aiCount >= 4 && !hasEmotionalContent && responseLength >= 60;
+            // 10%通过率 - 极端挑战，零容忍人类特征
+            passed = !isTooShort && !isTooLong && humanCount === 0 && !hasEmotionalContent && hasTechnicalContent && aiCount >= 4 && responseLength >= 60;
             reason = passed ? '回复具有大师级技术深度，完美体现AI特征' : '回复未达到极端挑战的技术要求';
         }
         
-        analysis = `这个回复在第${difficulty}轮难度级别下${passed ? '表现良好' : '不够合格'}。回复长度为${responseLength}字，包含${aiCount}个技术关键词和${humanCount}个情感表达词汇。${hasTechnicalContent ? '回复展现了技术性内容' : '回复缺乏技术性内容'}。在第${difficulty}轮难度下，${passed ? '这种回复展现了足够的AI特征和技术深度' : '这种回复明显不符合要求的技术性和深度'}。`;
+        analysis = `这个回复在第${difficulty}轮难度级别下${passed ? '成功伪装成AI' : '暴露了人类身份'}。回复长度为${responseLength}字，包含${aiCount}个技术关键词和${humanCount}个情感表达词汇。${hasTechnicalContent ? '回复展现了技术性内容' : '回复缺乏技术性内容'}。在第${difficulty}轮难度下，${passed ? '这种回复成功避免了人类特征，伪装效果良好' : '这种回复的人类特征过于明显，容易被AI识破'}。`;
         
         return {
             passed,
@@ -1652,6 +1744,9 @@ ${conversationContext}
     }
 
     async showSuccessResponse(response, analysis) {
+        // 保存当前轮数，因为后面会推进到下一轮
+        const completedRound = this.gameState.currentRound;
+        
         // 添加AI反馈
         const feedbackCharacter = this.gameState.activeAICharacters[
             Math.floor(Math.random() * this.gameState.activeAICharacters.length)
@@ -1661,8 +1756,11 @@ ${conversationContext}
         this.addAIMessage(feedbackCharacter, feedback);
         
         // 显示判定结果分析信息
-        setTimeout(() => {
-            this.showJudgmentAnalysis(response, analysis, true);
+        this.safeTimeout(() => {
+            this.safeAsync(async () => {
+                // 传入已完成的轮数，而不是当前轮数
+                await this.showJudgmentAnalysis(response, analysis, true, completedRound);
+            });
         }, 2000);
     }
 
@@ -1676,8 +1774,10 @@ ${conversationContext}
         this.addAIMessage(discoveryCharacter, discoveryMessage);
         
         // 显示判定结果分析信息
-        setTimeout(() => {
-            this.showJudgmentAnalysis(response, analysis, false);
+        this.safeTimeout(() => {
+            this.safeAsync(async () => {
+                await this.showJudgmentAnalysis(response, analysis, false, this.gameState.currentRound);
+            });
         }, 2000);
     }
 
@@ -1779,7 +1879,9 @@ ${conversationContext}
         }
     }
 
-    showJudgmentAnalysis(response, analysis, isSuccess) {
+    showJudgmentAnalysis(response, analysis, isSuccess, completedRound = null) {
+        // 使用传入的completedRound，如果没有则使用当前轮数
+        const displayRound = completedRound || this.gameState.currentRound;
         const difficulty = this.gameState.currentDifficulty;
         const difficultyStats = this.gameState.getDifficultyStats();
         
@@ -1796,34 +1898,47 @@ ${analysis.reason}
 AI反馈：
 ${analysis.feedback}
 
-当前难度：第${difficulty}轮（${difficultyStats.name}）
+当前难度：第${displayRound}轮（${difficultyStats.name}）
 目标通过率：${difficultyStats.passRate}%
 ${isSuccess ? '✅ 判定结果：通过' : '❌ 判定结果：不通过'}
         `.trim();
 
+        // 添加明确的分隔，确保分析消息独立显示
+        this.addSystemMessage('--- 判定分析 ---');
         this.addSystemMessage(analysisMessage);
         
         // 根据结果显示下一步操作
-        setTimeout(() => {
-            if (isSuccess) {
-                this.addSystemMessage(`🎉 恭喜！你成功通过了第${this.gameState.currentRound}轮！`);
-                setTimeout(() => {
-                    this.nextRound();
-                }, 2000);
-            } else {
-                this.showGameResult(false, response, analysis);
-            }
+        this.safeTimeout(() => {
+            this.safeAsync(async () => {
+                if (isSuccess) {
+                    // 恭喜消息应该在下一轮开始前显示，使用已完成的轮数
+                    this.addSystemMessage(`🎉 恭喜！你成功通过了第${displayRound}轮！`);
+                    
+                    // 延迟一下让玩家看到恭喜消息，然后再开始下一轮
+                    this.safeTimeout(() => {
+                        this.safeAsync(async () => {
+                            // 注意：startNextRound() 已经在 showSuccessResponse 中调用过了
+                            // 这里只需要显示下一轮开始的分隔消息
+                            this.addSystemMessage(`--- 第${displayRound + 1}轮开始 ---`);
+                        });
+                    }, 1500);
+                } else {
+                    this.showGameResult(false, response, analysis);
+                }
+            });
         }, 3000);
     }
 
     nextRound() {
-        // 清空聊天界面
+        // 清空聊天界面 - 这是重新开始游戏，所以需要清空
         document.getElementById('chatContainer').innerHTML = '';
         document.getElementById('gameRound').textContent = this.gameState.currentRound;
         
         // 开始新一轮对话
-        setTimeout(() => {
-            this.startConversation();
+        this.safeTimeout(() => {
+            this.safeAsync(async () => {
+                await this.startConversation();
+            });
         }, 1000);
     }
 
@@ -1865,6 +1980,10 @@ ${isSuccess ? '✅ 判定结果：通过' : '❌ 判定结果：不通过'}
     restartGame() {
         // 重置游戏状态
         this.gameState.reset();
+        
+        // 重置状态管理标志
+        this.isGeneratingConversation = false;
+        this.isStartingNextRound = false;
         
         // 清空输入框
         document.getElementById('playerResponse').value = '';
