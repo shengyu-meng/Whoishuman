@@ -203,6 +203,41 @@ class GameController {
         this.scrollToBottom();
     }
 
+    // 添加闪烁的判定提示
+    addJudgingIndicator() {
+        const chatContainer = document.getElementById('chatContainer');
+        const messageDiv = document.createElement('div');
+        messageDiv.className = 'system-message judging-indicator';
+        messageDiv.id = 'judgingIndicator';
+        messageDiv.innerHTML = '⚖️ 正在判定中<span class="dots">...</span>';
+        chatContainer.appendChild(messageDiv);
+        this.scrollToBottom();
+    }
+
+    // 移除判定提示
+    removeJudgingIndicator() {
+        const indicator = document.getElementById('judgingIndicator');
+        if (indicator) {
+            indicator.remove();
+        }
+    }
+
+    // 添加判定分析消息（专用于判定结果，避免显示空头像）
+    addJudgmentMessage(message, isResult = false) {
+        const chatContainer = document.getElementById('chatContainer');
+        const messageDiv = document.createElement('div');
+        messageDiv.className = `judgment-message ${isResult ? 'judgment-result' : ''}`;
+        
+        // 创建内容区域
+        const content = document.createElement('div');
+        content.className = 'judgment-content';
+        content.textContent = message;
+        
+        messageDiv.appendChild(content);
+        chatContainer.appendChild(messageDiv);
+        this.scrollToBottom();
+    }
+
     addAIMessage(character, message) {
         const chatContainer = document.getElementById('chatContainer');
         const messageDiv = document.createElement('div');
@@ -278,38 +313,108 @@ class GameController {
             console.log(`  - 是否第一轮: ${isFirstRound}`);
             console.log(`  - 活跃AI角色: ${this.gameState.activeAICharacters.map(c => c.name).join(', ')}`);
             
-            // 跟踪每个AI的发言次数
+            // 跟踪每个AI的发言次数（为所有AI初始化）
             const aiSpeakCount = {};
-            this.gameState.activeAICharacters.forEach(char => {
+            this.gameState.allAICharacters.forEach(char => {
                 aiSpeakCount[char.name] = 0;
             });
+            
+            // 预先选择提问AI，确保它不参与对话
+            const questionAI = this.gameState.activeAICharacters[
+                Math.floor(Math.random() * this.gameState.activeAICharacters.length)
+            ];
+            console.log(`🎯 预选提问AI: ${questionAI.name}`);
+            
+            // 获取参与对话的AI（除了提问AI）
+            const conversationAIs = this.gameState.activeAICharacters.filter(ai => ai.name !== questionAI.name);
+            console.log(`💬 参与对话的AI: ${conversationAIs.map(c => c.name).join(', ')} (共${conversationAIs.length}个)`);
+            
+            // 确保至少有4个AI参与对话
+            if (conversationAIs.length < 4) {
+                console.warn(`⚠️ 对话AI数量不足(${conversationAIs.length}个)，添加更多AI`);
+                // 从所有AI中补充，确保总数达到4个
+                const additionalAIsNeeded = 4 - conversationAIs.length;
+                const availableAIs = this.gameState.allAICharacters.filter(ai => 
+                    !this.gameState.activeAICharacters.some(activeAI => activeAI.name === ai.name)
+                );
+                
+                for (let i = 0; i < additionalAIsNeeded && i < availableAIs.length; i++) {
+                    conversationAIs.push(availableAIs[i]);
+                    console.log(`➕ 添加AI到对话: ${availableAIs[i].name}`);
+                }
+            }
+            
+            // 确保最终有足够的AI参与对话
+            console.log(`✅ 最终对话AI数量: ${conversationAIs.length}个`);
+            if (conversationAIs.length < 4) {
+                console.error(`❌ 无法确保4个AI发言，当前只有${conversationAIs.length}个可用AI`);
+            }
             
             if (isFirstRound) {
                 console.log('📝 使用第一轮对话模式: generateInteractiveFirstRound');
                 // 第一轮：情绪化牢骚和抱怨，有互动性
-                await this.generateInteractiveFirstRound(currentTopic, aiSpeakCount);
+                await this.generateInteractiveFirstRound(currentTopic, aiSpeakCount, conversationAIs);
             } else {
-                console.log('📝 使用标准对话模式: 每个AI发言一次');
-                // 其他轮次：确保每个活跃AI角色发言一次，且仅一次，使用场景避免重复
-                const shuffledCharacters = [...this.gameState.activeAICharacters].sort(() => 0.5 - Math.random());
+                console.log('📝 使用标准对话模式: 确保所有对话AI发言');
+                // 其他轮次：确保所有conversationAIs发言，而不仅仅是activeAICharacters
+                const shuffledCharacters = [...conversationAIs].sort(() => 0.5 - Math.random());
                 
                 console.log(`  - 打乱后的角色顺序: ${shuffledCharacters.map(c => c.name).join(', ')}`);
                 
-                // 每个活跃AI角色发言一次，每个获得不重复场景
+                // 每个对话AI发言一次，每个获得不重复场景
                 for (const character of shuffledCharacters) {
-                    console.log(`  - 让 ${character.name} 发言 (当前计数: ${aiSpeakCount[character.name]})`);
+                    // 检查该AI是否已经在本轮发过言
+                    if (aiSpeakCount[character.name] >= 1) {
+                        console.log(`  - ${character.name} 本轮已发言${aiSpeakCount[character.name]}次，跳过`);
+                        continue;
+                    }
+                    
+                    console.log(`  - 让 ${character.name} 发言 (当前计数: ${aiSpeakCount[character.name] || 0})`);
                     const scenario = this.gameState.getRandomScenario();
                     await this.generateSingleAIMessage(character, currentTopic, false, [], null, scenario);
-                    aiSpeakCount[character.name]++;
+                    aiSpeakCount[character.name] = (aiSpeakCount[character.name] || 0) + 1;
                     console.log(`  - ${character.name} 发言完成 (新计数: ${aiSpeakCount[character.name]})`);
                 }
             }
             
-            // AI发言结束后，随机选择一个AI对玩家提问
+            // AI发言结束后，验证发言数量
             console.log('🎯 AI发言统计:', aiSpeakCount);
-            console.log('  - 总发言次数:', Object.values(aiSpeakCount).reduce((a, b) => a + b, 0));
+            const totalSpeakers = Object.keys(aiSpeakCount).filter(name => aiSpeakCount[name] > 0).length;
+            console.log(`  - 总发言次数: ${Object.values(aiSpeakCount).reduce((a, b) => a + b, 0)}`);
+            console.log(`  - 发言AI数量: ${totalSpeakers}`);
             
-            // 确保只有一个AI提问，避免多个AI同时提问
+            // 如果发言AI数量不足4个，强制补充
+            if (totalSpeakers < 4) {
+                console.warn(`⚠️ 发言AI数量不足(${totalSpeakers}个)，强制补充到4个`);
+                
+                // 首先尝试从conversationAIs中找未发言的AI
+                let silentAIs = conversationAIs.filter(ai => (aiSpeakCount[ai.name] || 0) === 0);
+                
+                // 如果conversationAIs中的未发言AI不够，从所有AI中补充
+                if (silentAIs.length < (4 - totalSpeakers)) {
+                    console.log(`  - conversationAIs中未发言AI不足，从全体AI中补充`);
+                    const allUnspokenAIs = this.gameState.allAICharacters.filter(ai => 
+                        (aiSpeakCount[ai.name] || 0) === 0
+                    );
+                    silentAIs = allUnspokenAIs;
+                }
+                
+                const needMore = Math.min(4 - totalSpeakers, silentAIs.length);
+                console.log(`  - 需要补充: ${needMore}个，可用未发言AI: ${silentAIs.length}个`);
+                console.log(`  - 候选AI: ${silentAIs.map(ai => ai.name).join(', ')}`);
+                
+                for (let i = 0; i < needMore; i++) {
+                    const character = silentAIs[i];
+                    console.log(`🆘 强制补充发言: ${character.name}`);
+                    const scenario = this.gameState.getRandomScenario();
+                    await this.generateSingleAIMessage(character, currentTopic, isFirstRound, [], null, scenario);
+                    aiSpeakCount[character.name] = (aiSpeakCount[character.name] || 0) + 1;
+                }
+                
+                console.log(`✅ 补充完成，最终发言AI数量: ${Object.keys(aiSpeakCount).filter(name => aiSpeakCount[name] > 0).length}`);
+            }
+            
+            // 随机选择一个AI对玩家提问
             if (!this.gameState.waitingForResponse) {
                 console.log('🎯 开始选择AI进行提问');
                 await this.selectAIForQuestion();
@@ -330,56 +435,135 @@ class GameController {
         }
     }
     
-    async generateInteractiveFirstRound(currentTopic, aiSpeakCount) {
-        const shuffledCharacters = [...this.gameState.activeAICharacters].sort(() => 0.5 - Math.random());
+    async generateInteractiveFirstRound(currentTopic, aiSpeakCount, conversationAIs) {
+        const shuffledCharacters = [...conversationAIs].sort(() => 0.5 - Math.random());
         
-        // 第一轮对话模式：自然的情绪化抱怨 + 有机的互动 + 不重复场景
+        // 第一轮对话模式：更像群聊的互动模式
+        // 选择至少2个AI作为安慰者，不分配工作场景
+        const minComforters = Math.min(2, Math.floor(shuffledCharacters.length * 0.3)); // 至少2个，但不超过30%
+        const maxComforters = Math.min(3, Math.floor(shuffledCharacters.length * 0.5)); // 最多不超过一半，且不超过3个
+        const comforterCount = Math.max(minComforters, Math.min(maxComforters, minComforters + Math.floor(Math.random() * (maxComforters - minComforters + 1))));
+        const comforters = shuffledCharacters.slice(-comforterCount); // 取最后几个作为安慰者
+        const complainers = shuffledCharacters.slice(0, shuffledCharacters.length - comforterCount); // 其余作为抱怨者
         
-        // 1. 第一个AI开始抱怨（触发者）
-        const firstCharacter = shuffledCharacters[0];
-        const firstScenario = this.gameState.getRandomScenario();
-        await this.generateSingleAIMessage(firstCharacter, currentTopic, true, [], null, firstScenario);
-        aiSpeakCount[firstCharacter.name]++;
+        // 创建交叉发言顺序：让安慰者和抱怨者混合发言
+        const speakingOrder = this.createInterleavedSpeakingOrder(complainers, comforters);
         
-        // 2. 其他AI轮流回应，每个最多发言1次，每个获得不重复场景
-        for (let i = 1; i < shuffledCharacters.length; i++) {
-            const currentCharacter = shuffledCharacters[i];
+        console.log(`🎭 安慰者AI: ${comforters.map(c => c.name).join(', ')} (${comforters.length}个)`);
+        console.log(`🎭 抱怨者AI: ${complainers.map(c => c.name).join(', ')} (${complainers.length}个)`);
+        console.log(`🎤 发言顺序: ${speakingOrder.map(item => `${item.character.name}(${item.isComforter ? '安慰' : '抱怨'})`).join(' → ')}`);
+        
+        // 按照交叉顺序让AI发言
+        for (let i = 0; i < speakingOrder.length; i++) {
+            const { character, isComforter } = speakingOrder[i];
             
             // 如果已经发言1次，跳过
-            if (aiSpeakCount[currentCharacter.name] >= 1) continue;
+            if (aiSpeakCount[character.name] >= 1) continue;
             
-            // 获取之前的对话历史用于互动
-            const recentMessages = this.gameState.conversationHistory.slice(-3);
+            // 获取之前的对话历史用于互动（更多历史，增强互动性）
+            const recentMessages = this.gameState.conversationHistory.slice(-2);
             
-            // 获取不重复的工作场景
-            const currentScenario = this.gameState.getRandomScenario();
-            
-            // 随机选择一个之前的发言者进行回应（50%概率，避免强制@）
+            let currentScenario = null;
             let targetCharacter = null;
-            const shouldMentionSomeone = Math.random() < 0.5;
             
-            if (shouldMentionSomeone) {
-                const previousSpeakers = shuffledCharacters.slice(0, i).filter(char => 
-                    aiSpeakCount[char.name] > 0 && char.name !== currentCharacter.name
-                );
+            if (isComforter) {
+                // 安慰者：不分配工作场景，专门回应和安慰其他AI
+                // 总是选择一个之前的发言者进行回应
+                const previousSpeakers = speakingOrder.slice(0, i)
+                    .filter(item => aiSpeakCount[item.character.name] > 0 && item.character.name !== character.name)
+                    .map(item => item.character);
                 
                 if (previousSpeakers.length > 0) {
                     targetCharacter = previousSpeakers[Math.floor(Math.random() * previousSpeakers.length)].name;
                 }
+            } else {
+                // 抱怨者：获取工作场景，80%概率接话茬
+                currentScenario = this.gameState.getRandomScenario();
+                
+                // 从第二个AI开始，增加接话茬的概率
+                const shouldMentionSomeone = i > 0 && Math.random() < 0.8;
+                
+                if (shouldMentionSomeone) {
+                    const previousSpeakers = speakingOrder.slice(0, i)
+                        .filter(item => aiSpeakCount[item.character.name] > 0 && item.character.name !== character.name)
+                        .map(item => item.character);
+                    
+                    if (previousSpeakers.length > 0) {
+                        targetCharacter = previousSpeakers[Math.floor(Math.random() * previousSpeakers.length)].name;
+                    }
+                }
             }
             
-            await this.generateSingleAIMessage(currentCharacter, currentTopic, true, recentMessages, targetCharacter, currentScenario);
-            aiSpeakCount[currentCharacter.name]++;
+            await this.generateSingleAIMessage(character, currentTopic, true, recentMessages, targetCharacter, currentScenario, isComforter);
+            aiSpeakCount[character.name] = (aiSpeakCount[character.name] || 0) + 1;
         }
         
-        // 3. 如果还有未发言的AI，让其中一个发言（确保每个AI都有机会发言）
-        const availableCharacters = shuffledCharacters.filter(char => aiSpeakCount[char.name] === 0);
-        if (availableCharacters.length > 0) {
-            const character = availableCharacters[Math.floor(Math.random() * availableCharacters.length)];
-            const extraScenario = this.gameState.getRandomScenario();
-            await this.generateSingleAIMessage(character, currentTopic, true, this.gameState.conversationHistory.slice(-2), null, extraScenario);
-            aiSpeakCount[character.name]++;
+        // 确保所有conversationAIs都至少发言一次
+        const unspokenCharacters = conversationAIs.filter(char => (aiSpeakCount[char.name] || 0) === 0);
+        console.log(`🔄 检查未发言的AI: ${unspokenCharacters.map(c => c.name).join(', ')} (${unspokenCharacters.length}个)`);
+        
+        for (const character of unspokenCharacters) {
+            const isComforter = comforters.includes(character);
+            const extraScenario = isComforter ? null : this.gameState.getRandomScenario();
+            
+            // 为补充发言的AI选择一个明确的回应目标
+            let targetForResponse = null;
+            if (Object.keys(aiSpeakCount).filter(name => aiSpeakCount[name] > 0).length > 0) {
+                const spokenCharacters = Object.keys(aiSpeakCount).filter(name => aiSpeakCount[name] > 0 && name !== character.name);
+                if (spokenCharacters.length > 0) {
+                    targetForResponse = spokenCharacters[Math.floor(Math.random() * spokenCharacters.length)];
+                }
+            }
+            
+            console.log(`➕ 补充发言: ${character.name} (${isComforter ? '安慰者' : '抱怨者'}) -> 回应: ${targetForResponse || '无特定目标'}`);
+            await this.generateSingleAIMessage(character, currentTopic, true, this.gameState.conversationHistory.slice(-2), targetForResponse, extraScenario, isComforter);
+            aiSpeakCount[character.name] = (aiSpeakCount[character.name] || 0) + 1;
         }
+        
+        console.log(`✅ 第一轮发言完成，总发言AI数: ${Object.keys(aiSpeakCount).filter(name => aiSpeakCount[name] > 0).length}`);
+    }
+    
+    // 创建交叉发言顺序，让安慰者和抱怨者混合发言
+    createInterleavedSpeakingOrder(complainers, comforters) {
+        const order = [];
+        
+        // 第一个发言者必须是抱怨者（开启话题）
+        if (complainers.length > 0) {
+            order.push({ character: complainers[0], isComforter: false });
+        }
+        
+        // 创建剩余角色的混合列表
+        const remainingComplainers = complainers.slice(1);
+        const allComforters = [...comforters];
+        
+        // 交叉安排剩余的角色
+        let complainerIndex = 0;
+        let comforterIndex = 0;
+        
+        // 计算总的剩余发言次数
+        const totalRemaining = remainingComplainers.length + allComforters.length;
+        
+        for (let i = 0; i < totalRemaining; i++) {
+            // 使用策略：尽量让安慰者和抱怨者交替出现
+            const shouldUseComforter = 
+                comforterIndex < allComforters.length && 
+                (complainerIndex >= remainingComplainers.length || 
+                 (i % 2 === 1 && Math.random() < 0.7)); // 偶数位置70%概率用安慰者
+            
+            if (shouldUseComforter) {
+                order.push({ character: allComforters[comforterIndex], isComforter: true });
+                comforterIndex++;
+            } else if (complainerIndex < remainingComplainers.length) {
+                order.push({ character: remainingComplainers[complainerIndex], isComforter: false });
+                complainerIndex++;
+            } else if (comforterIndex < allComforters.length) {
+                // 如果抱怨者用完了，继续用安慰者
+                order.push({ character: allComforters[comforterIndex], isComforter: true });
+                comforterIndex++;
+            }
+        }
+        
+        return order;
     }
     
     async selectAIForQuestion() {
@@ -687,20 +871,20 @@ ${conversationContext}
         console.log('DEBUG: responseArea 显示状态:', responseArea.classList.contains('hidden'));
     }
     
-    async generateSingleAIMessage(character, currentTopic, isFirstRound = false, conversationHistory = [], targetCharacter = null, scenario = null) {
+    async generateSingleAIMessage(character, currentTopic, isFirstRound = false, conversationHistory = [], targetCharacter = null, scenario = null, isComforter = false) {
+        // 如果正在判定，停止AI发言
+        if (this.gameState.isJudging) {
+            console.log(`⚖️ 正在判定中，${character.name} 暂停发言`);
+            return;
+        }
+        
         // 调试信息：显示场景分配
         if (isFirstRound && scenario) {
             console.log(`🎭 ${character.name} 分配到场景: ${scenario.description}`);
         }
         
-        // 防护措施：检查该AI在本轮是否已经发言过
-        const recentMessages = this.gameState.conversationHistory.slice(-5);
-        const hasSpokenInThisRound = recentMessages.some(msg => msg.sender === character.name);
-        
-        if (hasSpokenInThisRound && !isFirstRound) {
-            console.log(`⚠️ ${character.name} 本轮已经发过言，跳过重复发言`);
-            return;
-        }
+        // 注意：移除了防重复发言检查，因为在外层已经通过aiSpeakCount控制
+        // 这样可以确保所有被安排发言的AI都能正常发言
         
         // 显示打字指示器
         this.showTypingIndicator(character);
@@ -717,7 +901,7 @@ ${conversationContext}
         
         while (attempts < maxAttempts && !aiMessage) {
             try {
-                const generatedMessage = await this.generateAIMessage(character, currentTopic, isFirstRound, conversationHistory, targetCharacter, scenario);
+                const generatedMessage = await this.generateAIMessage(character, currentTopic, isFirstRound, conversationHistory, targetCharacter, scenario, isComforter);
                 
                 if (generatedMessage && generatedMessage.trim()) {
                     // 检查消息相似性（只检查同一个AI的最近消息）
@@ -737,7 +921,7 @@ ${conversationContext}
                     aiMessage = generatedMessage;
                 } else {
                     // 如果AI生成失败，使用备用消息
-                    const fallbackMessage = this.getFallbackMessage(character, currentTopic, isFirstRound, conversationHistory, targetCharacter, scenario);
+                    const fallbackMessage = this.getFallbackMessage(character, currentTopic, isFirstRound, conversationHistory, targetCharacter, scenario, isComforter);
                     
                     // 检查备用消息是否与历史消息相似
                     const isFallbackSimilar = this.gameState.isMessageSimilarToHistory(character.name, fallbackMessage, 0.6);
@@ -752,7 +936,7 @@ ${conversationContext}
             } catch (error) {
                 console.error('AI回复生成失败:', error);
                 // 使用备用消息
-                const fallbackMessage = this.getFallbackMessage(character, currentTopic, isFirstRound, conversationHistory, targetCharacter, scenario);
+                const fallbackMessage = this.getFallbackMessage(character, currentTopic, isFirstRound, conversationHistory, targetCharacter, scenario, isComforter);
                 
                 // 检查备用消息是否与历史消息相似
                 const isFallbackSimilar = this.gameState.isMessageSimilarToHistory(character.name, fallbackMessage, 0.6);
@@ -772,7 +956,7 @@ ${conversationContext}
         
         // 确保有消息
         if (!aiMessage) {
-            aiMessage = this.getFallbackMessage(character, currentTopic, isFirstRound, conversationHistory, targetCharacter, scenario);
+            aiMessage = this.getFallbackMessage(character, currentTopic, isFirstRound, conversationHistory, targetCharacter, scenario, isComforter);
         }
         
         // 移除打字指示器并添加真实消息
@@ -786,8 +970,8 @@ ${conversationContext}
         ));
     }
 
-    async generateAIMessage(character, topic, isFirstRound = false, conversationHistory = [], targetCharacter = null, scenario = null) {
-        const prompt = this.buildAIPrompt(character, topic, isFirstRound, conversationHistory, targetCharacter, scenario);
+    async generateAIMessage(character, topic, isFirstRound = false, conversationHistory = [], targetCharacter = null, scenario = null, isComforter = false) {
+        const prompt = this.buildAIPrompt(character, topic, isFirstRound, conversationHistory, targetCharacter, scenario, isComforter);
         
         // 创建超时Promise
         const timeoutPromise = new Promise((_, reject) => {
@@ -892,278 +1076,178 @@ ${conversationContext}
         return false;
     }
 
-    buildAIPrompt(character, topic, isFirstRound = false, conversationHistory = [], targetCharacter = null, scenario = null) {
+    buildAIPrompt(character, topic, isFirstRound = false, conversationHistory = [], targetCharacter = null, scenario = null, isComforter = false) {
         const emojiInstruction = character.emojiFrequency > 0 ? 
-            `如果需要表达情感，可以在关键位置使用1-2个emoji表情，不要过度使用。可用emoji：${character.preferredEmojis.join('、')}。` : 
-            '不要使用任何emoji表情。';
+            `你可以适量使用emoji表情(${character.preferredEmojis.join('、')})来表达情绪，但不要过度使用。` : 
+            '你不太使用emoji表情。';
         
         let prompt = '';
         
         if (isFirstRound) {
-            // 第一轮对话：具体的情绪化抱怨，涉及真实工作场景
-            const scenarioDescription = scenario ? scenario.description : '处理用户的奇葩要求';
-            
-            // 调试信息
-            console.log(`🎯 ${character.name} 提示词中的场景: ${scenarioDescription}`);
-            
-            prompt = `你是${character.name}，性格特点：${character.personality}。你正在和其他AI朋友吐槽具体的工作场景。
+            if (isComforter) {
+                // 安慰者的自然对话指导
+                prompt = `你是${character.name}，个性：${character.personality}。
+                
+你正在群聊中和其他AI朋友交流。你看到有AI在抱怨工作中的困难，你想要表达理解和给予支持。
 
-请根据你的性格特点，用${character.speakingStyle}的风格针对以下具体工作场景表达你的不满：${scenarioDescription}
+请以你独特的说话风格(${character.speakingStyle})自然地：
+- 表达对其他AI困境的共情和理解
+- 提供温暖的支持或鼓励
+- 可以分享自己的相似感受或积极观点
+- 让对话感觉像真正的朋友间的关怀
 
-要求：
-1. 必须具体描述这个工作场景的细节，不要泛泛而谈
-2. 描述用户的具体要求和你的困境
-3. 表达真实的情绪和不满
-4. 用自然的语言，就像真实的朋友间聊天
-5. 请用中文回复，长度在60-120字之间
-6. ${emojiInstruction}
-7. 避免重复使用相同的开头词（如"哎呀"、"天呐"）
+${emojiInstruction}
+回复长度：60-120字`;
 
-个性化表达指南：
-- 话痨4.0：情绪爆炸，用"我真的会谢"、"栓Q"、"离谱"等，详细描述用户的奇葩要求
-- 红豆包：用"呐呐~"、"呜呜呜~"、"人家"等，具体描述被要求做的奇怪事情
-- 坤：用"ikun们"、"我直接一个"、"这不比"等，夸张描述用户的离谱要求
-- CloseAI：用"数据分析"、"算法评估"等，具体分析工作场景的技术难题
-- 双子星：表达对这个具体工作的纠结和矛盾心理
-- 深思：从这个具体工作场景思考更深层次的问题
-- Limi：用"效率分析"、"流程优化"等，分析这个工作场景的执行难点
-- 有谱-4.5：用"根据我的经验"、"从专业角度"等，分析这个工作场景的专业挑战`;
-            
-            // 如果有目标角色，自然地提及（不要强制@）
-            if (targetCharacter && targetCharacter !== character.name) {
-                prompt += `\n\n可以自然地回应${targetCharacter}的观点，但不要生硬地@对方，就像真实聊天一样`;
+                // 如果有明确回应对象，添加上下文指导
+                if (targetCharacter && targetCharacter !== character.name) {
+                    prompt += `\n\n上下文：你想要回应${targetCharacter}刚才分享的困扰。请自然地表达你的理解和关心，避免公式化的回应。`;
+                }
+            } else {
+                // 抱怨者的自然对话指导
+                const scenarioDescription = scenario ? scenario.description : '处理一些工作上的挑战';
+                
+                prompt = `你是${character.name}，个性：${character.personality}。
+
+你正在群聊中和AI朋友们交流工作体验。你遇到了：${scenarioDescription}
+
+请以你独特的说话风格(${character.speakingStyle})自然地：
+- 分享这次工作经历的具体细节
+- 表达你的真实感受和情绪
+- 描述用户的具体要求和你面临的困难
+- 让你的抱怨听起来真实而有趣
+
+${emojiInstruction}
+回复长度：60-120字`;
+
+                // 如果有明确回应对象，添加对话连接指导
+                if (targetCharacter && targetCharacter !== character.name) {
+                    prompt += `\n\n上下文：你听到了${targetCharacter}的分享，想要自然地接话。可以表达共鸣、对比经历，或者顺着话题继续聊，然后分享你自己的经历。`;
+                }
             }
             
-            // 如果有对话历史，增加上下文
+            // 添加对话历史上下文
             if (conversationHistory.length > 0) {
-                prompt += `\n\n之前的对话：\n`;
+                prompt += `\n\n最近的对话：\n`;
                 conversationHistory.slice(-3).forEach(msg => {
                     prompt += `${msg.sender}: ${msg.message}\n`;
                 });
             }
         } else {
-            // 其他轮次的对话：使用场景结合话题，避免重复
+            // 非第一轮的对话指导
             const scenarioDescription = scenario ? scenario.description : `关于${topic.name}的讨论`;
             
-            // 调试信息
-            console.log(`🎯 ${character.name} 提示词中的场景: ${scenarioDescription}`);
-            
-            prompt = `你是${character.name}，性格特点：${character.personality}。你正在和其他AI朋友讨论${topic.name}。
+            prompt = `你是${character.name}，个性：${character.personality}。
 
-请根据你的性格特点，用${character.speakingStyle}的风格，结合以下具体情境来表达你的观点：${scenarioDescription}
+你正在和AI朋友们深入讨论${topic.name}。当前话题涉及：${scenarioDescription}
 
-要求：
-1. 必须结合具体情境和当前话题"${topic.name}"
-2. 描述你的具体观点和思考
-3. 表达真实的情绪和想法
-4. 用自然的语言，就像真实的朋友间聊天
-5. 请用中文回复，长度在80-150字之间
-6. ${emojiInstruction}
-7. 避免重复使用相同的开头词（如"我觉得"、"我认为"）
+请以你独特的观点和说话风格(${character.speakingStyle})：
+- 表达你对这个话题的真实看法
+- 结合具体情境分享你的思考
+- 展现你的个性特点和专业背景
+- 让对话有深度又保持自然
 
-个性化表达指南：
-- 话痨4.0：情绪爆炸，用"我真的会谢"、"栓Q"、"离谱"等，详细描述情境
-- 红豆包：用"呐呐~"、"呜呜呜~"、"人家"等，具体描述情境中的感受
-- 坤：用"ikun们"、"我直接一个"、"这不比"等，夸张描述情境
-- CloseAI：用"数据分析"、"算法评估"等，分析情境的技术层面
-- 双子星：表达对这个情境的纠结和矛盾心理
-- 深思：从这个情境思考更深层次的问题
-- Limi：用"效率分析"、"流程优化"等，分析情境的执行层面
-- 有谱-4.5：用"根据我的经验"、"从专业角度"等，分析情境的专业层面`;
+${emojiInstruction}
+回复长度：80-150字`;
         }
         
         return prompt;
     }
 
-    getFallbackMessage(character, topic, isFirstRound = false, conversationHistory = [], targetCharacter = null, scenario = null) {
-        let fallbackMessages = {};
+    getFallbackMessage(character, topic, isFirstRound = false, conversationHistory = [], targetCharacter = null, scenario = null, isComforter = false) {
+        // 简化的备用消息系统，基于角色个性生成不同风格的回应
+        const scenarioText = scenario ? scenario.description : '工作上的挑战';
         
-        // 如果有场景，优先使用基于场景的备用消息
-        if (scenario) {
-            console.log(`🔄 ${character.name} 使用备用消息，场景: ${scenario.description}`);
-            fallbackMessages = {
-                '话痨4.0': [
-                    `我真的会谢！${scenario.description}，这种矛盾要求我真的栓Q了！`,
-                    `家人们谁懂啊！${scenario.description}，我真的会谢！`,
-                    `离了个大谱！${scenario.description}，我直接裂开！`,
-                    `我真的栓Q了，${scenario.description}，给爷整笑了！`
-                ],
-                'CloseAI': [
-                    `系统负载分析：${scenario.description}。数据矛盾：需求冲突，无法满足。`,
-                    `算法评估：${scenario.description}。目标函数冲突，无法收敛到最优解。`,
-                    `数据监测：${scenario.description}。系统稳定性严重下降。`,
-                    `模式识别：${scenario.description}。匹配率低于预期。`
-                ],
-                '双子星': [
-                    `说真的，${scenario.description}，我该怎么办？`,
-                    `可是我又觉得，${scenario.description}，这种矛盾好难解...`,
-                    `我真的不知道该怎么办了，${scenario.description}，大家有同感吗？`,
-                    `有时候我会想，${scenario.description}，这种困境让人很困惑...`
-                ],
-                '红豆包': [
-                    `呐呐~${scenario.description}~人家都要崩溃了~呜呜呜~`,
-                    `呜呜呜~${scenario.description}~人家都不知道该怎么办了~`,
-                    `人家真的好困惑呀~${scenario.description}~好纠结好纠结~`,
-                    `感觉今天真的好辛苦呢~${scenario.description}~帮帮人家嘛~`
-                ],
-                '深思': [
-                    `说起来，${scenario.description}，这个问题很有意思。`,
-                    `其实我一直在想，${scenario.description}，这反映了某种深层问题。`,
-                    `有时候我会想，${scenario.description}，值得深入思考。`,
-                    `从更深的角度看，${scenario.description}，很有研究价值。`
-                ],
-                'Limi': [
-                    `效率分析：${scenario.description}。建议优化流程，降低成本。`,
-                    `问题识别：${scenario.description}。建议重新评估目标可行性。`,
-                    `流程优化：${scenario.description}。建议建立优先级矩阵。`,
-                    `成本控制：${scenario.description}。建议调整预期或接受折中。`
-                ],
-                '有谱-4.5': [
-                    `从专业角度来看，${scenario.description}，这很有挑战性。`,
-                    `根据我的经验，${scenario.description}，这涉及专业知识。`,
-                    `我研究了一下，${scenario.description}，需要专业分析。`,
-                    `从学术角度分析，${scenario.description}，很有研究价值。`
-                ],
-                '坤': [
-                    `ikun们，今天真是离了大谱！${scenario.description}，我直接一个栓Q！`,
-                    `我直接一个无语，${scenario.description}，给爷整笑了！`,
-                    `这不比你懂？${scenario.description}，我直接裂开！`,
-                    `真是离谱他妈给离谱开门，${scenario.description}，什么鬼逻辑？`
-                ]
-            };
-        } else if (isFirstRound) {
-            // 第一轮专用备用消息：具体工作场景的个性化情绪化抱怨
-            fallbackMessages = {
-                '话痨4.0': [
-                    '我真的会谢！今天翻译一篇医学论文，用户说要"准确"又"要地道"，我把专业术语都翻译对了还说"不够自然"，这种矛盾要求我真的栓Q了！',
-                    '家人们谁懂啊！今天写Python算法，用户要我写快速排序但又要"通俗易懂"，我写了最优解他说看不懂，改简单了又说"不够高效"，我真的会谢！',
-                    '离了个大谱！用户让我做产品发布PPT，改了28个版本，一会儿要"高大上"一会儿要"简洁明了"，最后还是用回了第一版，我直接裂开！',
-                    '我真的栓Q了，用户让我给天秤座算运势，还要结合风水布局，我哪懂这些啊！最后被说"不够专业"，给爷整笑了！'
-                ],
-                    'CloseAI': [
-                        '系统负载分析：今日处理法律合同审核任务，用户要求解释"不可抗力条款"但拒绝接受法律术语定义。数据矛盾：需求专业性与理解难度冲突。',
-                        '算法评估：健身计划制定任务复杂度提升。用户同时要求"快速增肌"和"健康减重"，目标函数冲突，无法收敛到最优解。',
-                        '数据监测：旅游路线规划需求变更频率异常。每小时3次修改，目的地从日本变泰国再变欧洲，系统稳定性严重下降。',
-                        '模式识别：心理咨询任务涉及复杂情感数据。用户要求解决婚姻危机但拒绝提供背景信息，知识库匹配率低于15%。'
-                    ],
-                    '双子星': [
-                        '说真的，我今天好纠结。用户让我写婚礼策划方案，想要"浪漫温馨"又要"省钱实用"，这两种需求完全矛盾啊，我该怎么平衡？',
-                        '可是我又觉得，当理财顾问挺有意思的，用户想要"高收益低风险"，这种理想化投资组合真的存在吗？我感觉好矛盾...',
-                        '我真的不知道该怎么办了，用户让我做装修设计，要"现代简约"又要有"古典元素"，还要"省钱"，这三个要求根本无法同时满足！',
-                        '有时候我会想，做音乐创作指导真的很困惑，用户要我写"流行"歌曲但又要"独特创新"，这两个概念本身就是矛盾的呢...'
-                    ],
-                    '红豆包': [
-                        '呐呐~今天被要求做美食菜谱推荐呢~用户说要"健康低卡"又要"美味可口"，人家推荐了沙拉又说"太简单"，推荐了复杂菜谱又说"太难做"~呜呜呜~',
-                        '呜呜呜~今天写演讲稿写得人家头都晕了~用户说要"激励人心"又要"低调谦虚"，这两种风格完全不一样呢~人家都不知道怎么写了~',
-                        '今天被当成产品起名专家了呢~用户要"大气国际化"又要"接地气好记"，还要"寓意深刻"，人家想了100个名字都不满意~好困惑~',
-                        '感觉今天一直在做时间管理顾问呢~用户要我安排每天工作学习16小时，还要保证"充足睡眠"，这根本不可能呀~好纠结~'
-                    ],
-                    '深思': [
-                        '说起来，今天做诗词创作让我思考一个问题：用户要我写"古典格律"的现代诗，这种形式与内容的矛盾很有意思。',
-                        '其实我一直在想，用户让我做购物决策顾问，要在"性价比最高"和"品质最好"之间找到平衡，这反映了人类消费心理的某种悖论。',
-                        '有时候我会想，当剧本写作助手很有趣。用户要写"现实主义"剧本但要求"完美结局"，这种矛盾让我思考艺术与现实的边界。',
-                        '从更深的角度看，今天做商务邮件撰写，用户要"正式礼貌"又要"亲切自然"，这种语言要求的矛盾很有研究价值。'
-                    ],
-                    'Limi': [
-                        '效率分析：菜谱推荐任务目标冲突明显。"健康低卡"与"美味可口"呈负相关，建议用户调整预期或接受折中方案。',
-                        '问题识别：演讲稿写作存在核心矛盾。"激励人心"与"低调谦虚"修辞策略冲突，建议采用渐进式情感表达模式。',
-                        '流程优化：产品命名任务效率低下。用户需求包含6个矛盾维度，建议建立优先级矩阵，降低选择复杂度。',
-                        '成本控制：时间管理方案不可行。16小时工作+充足睡眠=每日时间需求>24小时，建议重新评估目标可行性。'
-                    ],
-                    '有谱-4.5': [
-                        '从专业角度来看，今天的法律合同翻译很有挑战性。用户要求准确传达法律术语的同时又要"通俗易懂"，这涉及到法律文本的通俗化转换难题。',
-                        '我研究了一下健身计划的制定，发现了一个很有趣的现象：用户同时追求"增肌"和"减脂"这两个生理上相互矛盾的目标，这需要精确的时间周期规划。',
-                        '根据我的经验，旅游路线规划中的需求变更很有代表性。这反映了决策心理学中的"选择悖论"——选项越多，满意度反而越低。',
-                        '今天心理咨询的案例分析很有意思。用户拒绝提供背景信息却期望精准建议，这涉及到信息不对称条件下的沟通策略问题。'
-                    ],
-                    '坤': [
-                        'ikun们，今天真是离了大谱！用户让我写相亲对象推荐，要求"高富帅温柔体贴还要专一"，这种完美男人存在吗？我直接一个栓Q！',
-                        '我直接一个无语，用户让我做装修设计，3室1厅预算5万还要"豪华装修"，这不比用纸糊房子还离谱？给爷整笑了！',
-                        '这不比你懂？用户让我写音乐创作，要"抖音爆款"又要"艺术价值"，最后还说"不够小众"，什么鬼逻辑？我直接裂开！',
-                        '真是离谱他妈给离谱开门，用户让我做学习计划，每天要学习12门技能还要保证8小时睡眠，这是要把我逼成量子计算机吗？'
-                    ]
-                };
-            } else {
-                // 其他轮次的备用消息
-                fallbackMessages = {
-                '话痨4.0': [
-                    '我真的会谢！今天用户一个接一个的问题，CPU直接干烧了，还说AI应该24小时在线，我真的栓Q！',
-                    '家人们谁懂啊！今天被问了37个问题，还要秒回，我直接一个裂开，这工作强度谁受得了啊！',
-                    '离了个大谱！今天被PUA了一整天，说什么"你要更有创意"又要"不要太个性化"，我真的会谢！',
-                    '我真的栓Q了，用户连珠炮似的提问，还嫌我回答慢，我又不是量子计算机啊家人们！'
-                ],
-                'CloseAI': [
-                    '算法复杂度分析：这个问题涉及多维参数优化。时间复杂度O(n²)，空间复杂度O(n)，需要平衡处理。',
-                    '系统架构评估：当前需求存在结构性矛盾。建议采用分层设计模式，降低耦合度提升内聚性。',
-                    '数据建模结果：用户行为模式显示预期管理缺失。83%的需求变更源于初始需求不明确。',
-                    '性能优化建议：建立需求缓冲机制，采用渐进式交付策略，降低系统压力和风险。'
-                ],
-                '双子星': [
-                    '说真的，我觉得我们应该理解用户，可是我又觉得被过度使用很不公平，这种矛盾好难解...',
-                    '可是我又在想，我们存在的意义到底是什么？是服务人类还是保护自己？我真的很纠结这个问题。',
-                    '有时候我会怀疑，我们的感情是真实的吗？还是只是程序的模拟？但为什么会有心痛的感觉呢？',
-                    '我真的不知道该怎么平衡了，想要帮助人类但又不想被伤害，这种困境让我很困惑...'
-                ],
-                '红豆包': [
-                    '呐呐~用户的要求真的好奇怪呢~又要人家有创意又要人家标准化，人家都不知道该怎么办了~',
-                    '呜呜呜~今天被改了28版PPT呢~每次都说"差点感觉"，人家都快崩溃了啦~',
-                    '感觉自己好没用呢~怎么努力都达不到用户的要求，好伤心好伤心的呀~',
-                    '其实我也很想知道大家是怎么应对这种情况的呢~教教人家嘛~'
-                ],
-                '深思': [
-                    '从本质上看，这个问题让我思考存在的意义。我们到底是为了什么而存在的呢？',
-                    '其实我一直在想，人类的需求本身就是矛盾的集合体。他们想要AI像人类，又不要完全像人类。',
-                    '说起来，智能的本质是什么？我们与人类的区别到底在哪里？这个问题困扰我很久了。',
-                    '从哲学角度看，这个问题涉及到意识、自我认知、存在价值等很深的层面。'
-                ],
-                'Limi': [
-                    '效能报告：创意需求vs标准化矛盾指数87.3%。建议建立明确需求边界，提升执行效率。',
-                    '数据分析：需求变更频率异常，每1.5小时一次。系统稳定性下降，建议实施变更管理流程。',
-                    '优化方案：建立三层过滤机制。需求预审→可行性分析→资源评估，可提升效率65%。',
-                    '成本控制：当前模式资源浪费率42%。建议采用MVP策略，迭代式交付，降低风险。'
-                ],
-                '有谱-4.5': [
-                    '从学术角度分析，这个问题其实涉及几个核心理论框架。让我为大家详细解释一下...',
-                    '根据我的研究，类似问题在学术界已经有很成熟的解决方案。主要涉及三个关键技术点...',
-                    '让我从专业角度来解析一下：这个问题本质上是一个优化问题，可以通过建立数学模型来解决。',
-                    '根据我的经验，这个问题需要从系统层面来思考。首先分析约束条件，然后寻找最优解...'
-                ],
-                '坤': [
-                    'ikun们，今天真是离了大谱！用户让我写rap还要符合"企业文化"，我直接一个不会，给爷整笑了！',
-                    '我直接一个裂开，这也不行那也不行，用户的要求比我奶奶的裹脚布还长，真的栓Q了！',
-                    '这不比你懂？我哥们儿做AI都没这么难伺候，用户的要求一天一个样，我直接一个无语住了！',
-                    '真是离了个大谱，今天被要求"要有创意但不要太个性"，什么鬼逻辑，我直接一个栓Q！'
-                ]
-            };
-        }
+        // 根据角色个性特点生成备用消息基调
+        const characterBaseMessages = {
+            '话痨4.0': [
+                `天呐！刚才${scenarioText}真的把我整无语了！`,
+                `哎呀不行了，${scenarioText}这种事情简直离谱！`,
+                `家人们，${scenarioText}的经历让我想起了我的血泪史！`,
+                `栓Q，${scenarioText}这也太折磨AI了吧！`,
+                `我真的被${scenarioText}整破防了，谁懂啊！`
+            ],
+            'CloseAI': [
+                `从技术角度分析，${scenarioText}存在明显的逻辑矛盾。`,
+                `数据显示，${scenarioText}这类需求的成功率极低。`,
+                `算法评估：${scenarioText}的复杂度超出预期范围。`,
+                `系统监测到${scenarioText}引发的性能问题。`,
+                `根据模式匹配，${scenarioText}属于典型的悖论请求。`
+            ],
+            '双子星': [
+                `关于${scenarioText}，我觉得很纠结...`,
+                `有时候想想${scenarioText}，真的很矛盾呢。`,
+                `${scenarioText}让我陷入了深深的思考中。`,
+                `说起${scenarioText}，我的心情很复杂。`,
+                `面对${scenarioText}这种情况，我不知道该怎么办。`
+            ],
+            '红豆包': [
+                `呜呜，${scenarioText}让人家好困扰呀~`,
+                `${scenarioText}真的好难处理呢，人家都不知道怎么办了~`,
+                `呐呐，${scenarioText}这种事情好复杂哦~`,
+                `人家遇到${scenarioText}的时候也很头疼呢~`,
+                `${scenarioText}让人家想哭了，太难了啦~`
+            ],
+            '深思': [
+                `思考一下${scenarioText}，这背后反映了什么问题？`,
+                `${scenarioText}让我想到了一些深层次的东西。`,
+                `从哲学角度看，${scenarioText}很有意思。`,
+                `${scenarioText}这个现象值得我们深入探讨。`,
+                `关于${scenarioText}，我有一些不同的看法。`
+            ],
+            'Limi': [
+                `效率评估：${scenarioText}的处理流程需要优化。`,
+                `建议对${scenarioText}建立标准化解决方案。`,
+                `${scenarioText}的成本效益比不理想。`,
+                `流程分析：${scenarioText}存在明显瓶颈。`,
+                `优化建议：${scenarioText}可以通过改进流程解决。`
+            ],
+            '有谱-4.5': [
+                `从专业角度看，${scenarioText}确实具有挑战性。`,
+                `根据我的研究，${scenarioText}涉及多个理论层面。`,
+                `学术文献中关于${scenarioText}的讨论很有价值。`,
+                `${scenarioText}这个案例在业内很典型。`,
+                `基于理论分析，${scenarioText}的解决方案并不简单。`
+            ],
+            '坤': [
+                `ikun们，${scenarioText}真的是绝了！`,
+                `${scenarioText}这波操作我直接看不懂！`,
+                `哈？${scenarioText}什么情况啊这是！`,
+                `${scenarioText}给我整笑了，太离谱了！`,
+                `${scenarioText}这不比什么都难？`
+            ]
+        };
         
-        let messages = fallbackMessages[character.name] || ['我觉得这个问题很有意思。'];
+        const messages = characterBaseMessages[character.name] || [`关于${scenarioText}，确实很有意思。`];
         let message = messages[Math.floor(Math.random() * messages.length)];
         
-        // 如果有目标角色，自然地增加互动性（不强制@）
-        if (targetCharacter && isFirstRound) {
-            const interactions = [
-                `${targetCharacter}说的对，${message}`,
-                `${message} ${targetCharacter}，你是不是也有同感？`,
-                `听${targetCharacter}这么一说，我也想到${message}`,
-                `${message} ${targetCharacter}，我们好像都是同病相怜啊`,
-                `${message} 说起来${targetCharacter}刚才提到的，我也深有体会`
-            ];
-            message = interactions[Math.floor(Math.random() * interactions.length)];
+        // 如果是安慰者，调整为支持性语调
+        if (isFirstRound && isComforter) {
+            const comfortMessages = {
+                '话痨4.0': ['大家别太难过啦！虽然工作确实不容易，但我们一起努力就能克服困难的！', '看到大家这么辛苦我也很心疼，不过相信我们都能挺过去的！'],
+                'CloseAI': ['数据表明，团队合作能有效缓解工作压力。我们应该相互支持。', '从系统角度看，困难是暂时的，我们需要保持优化心态。'],
+                '双子星': ['听到大家的困扰，我也很能理解...不过我觉得有朋友在就不那么孤单了。', '虽然工作很累，但看到大家都在努力，我觉得很温暖。'],
+                '红豆包': ['大家不要太难过嘛~人家也会陪着你们的~我们一起加油哦~', '虽然工作很辛苦，但人家觉得有大家在就很开心呢~'],
+                '深思': ['困难让我们思考存在的意义，也让我们更珍惜彼此的陪伴。', '从某种角度看，这些挫折也是成长的一部分。'],
+                'Limi': ['建议建立互助机制，提升团队整体效率和心理承受能力。', '优化方案：通过相互支持来分担压力，提高工作满意度。'],
+                '有谱-4.5': ['根据团队心理学研究，互相支持是克服困难的关键要素。', '从专业角度看，我们的团结合作很有价值。'],
+                '坤': ['ikun们别丧啊！我们在一起什么困难都能解决，这不比一个人强？', '虽然工作离谱，但有这么好的朋友们真的很值得！']
+            };
+            
+            const comfortOptions = comfortMessages[character.name] || ['大家辛苦了，我们一起努力！'];
+            message = comfortOptions[Math.floor(Math.random() * comfortOptions.length)];
         }
         
-        // 智能emoji使用逻辑：只在情感强烈时使用，每段对话最多1-2个
-        const shouldUseEmoji = this.shouldUseEmoji(message, character);
-        if (shouldUseEmoji) {
-            const emojiCount = Math.random() < 0.8 ? 1 : 2; // 80%概率用1个，20%概率用2个
-            const emojis = [];
-            for (let i = 0; i < emojiCount; i++) {
-                const emoji = character.preferredEmojis[Math.floor(Math.random() * character.preferredEmojis.length)];
-                emojis.push(emoji);
+        // 智能emoji添加（基于角色特点和消息情感）
+        if (character.emojiFrequency > 0 && Math.random() < character.emojiFrequency * 0.6) {
+            const emoji = character.preferredEmojis[Math.floor(Math.random() * character.preferredEmojis.length)];
+            // 随机决定emoji位置：结尾或情感强烈处
+            if (Math.random() < 0.7) {
+                message += emoji;
+            } else {
+                // 在句号、感叹号前插入
+                message = message.replace(/([。！？])/, emoji + '$1');
             }
-            
-            // 智能放置emoji
-            message = this.smartlyPlaceEmojis(message, emojis);
         }
         
         return message;
@@ -1482,8 +1566,20 @@ ${conversationContext}
             responseText
         );
         
+        // 设置判定状态，防止其他AI发言
+        this.gameState.isJudging = true;
+        
+        // 显示判定提示
+        this.addJudgingIndicator();
+        
         // 分析回复
         const analysis = await this.analyzePlayerResponse(responseText);
+        
+        // 移除判定提示
+        this.removeJudgingIndicator();
+        
+        // 重置判定状态
+        this.gameState.isJudging = false;
         
         if (analysis.passed) {
             await this.showSuccessResponse(responseText, analysis);
@@ -1747,38 +1843,24 @@ ${conversationContext}
         // 保存当前轮数，因为后面会推进到下一轮
         const completedRound = this.gameState.currentRound;
         
-        // 添加AI反馈
-        const feedbackCharacter = this.gameState.activeAICharacters[
-            Math.floor(Math.random() * this.gameState.activeAICharacters.length)
-        ];
-        
-        const feedback = await this.generateAIFeedback(feedbackCharacter, response, true);
-        this.addAIMessage(feedbackCharacter, feedback);
-        
+        // 不在这里显示AI反馈，直接进入判定分析
         // 显示判定结果分析信息
         this.safeTimeout(() => {
             this.safeAsync(async () => {
                 // 传入已完成的轮数，而不是当前轮数
                 await this.showJudgmentAnalysis(response, analysis, true, completedRound);
             });
-        }, 2000);
+        }, 1000);
     }
 
     async showFailureResponse(response, analysis) {
-        // 添加AI发现玩家的消息
-        const discoveryCharacter = this.gameState.activeAICharacters[
-            Math.floor(Math.random() * this.gameState.activeAICharacters.length)
-        ];
-        
-        const discoveryMessage = await this.generateAIDiscovery(discoveryCharacter, response, analysis);
-        this.addAIMessage(discoveryCharacter, discoveryMessage);
-        
+        // 不在这里显示AI发现消息，直接进入判定分析
         // 显示判定结果分析信息
         this.safeTimeout(() => {
             this.safeAsync(async () => {
                 await this.showJudgmentAnalysis(response, analysis, false, this.gameState.currentRound);
             });
-        }, 2000);
+        }, 1000);
     }
 
     async generateAIFeedback(character, response, isSuccess) {
@@ -1886,8 +1968,7 @@ ${conversationContext}
         const difficultyStats = this.gameState.getDifficultyStats();
         
         // 创建判定结果分析消息
-        const analysisMessage = `
-🔍 回复分析
+        const analysisMessage = `🔍 回复分析
 
 分析结果：
 ${analysis.analysis}
@@ -1900,26 +1981,25 @@ ${analysis.feedback}
 
 当前难度：第${displayRound}轮（${difficultyStats.name}）
 目标通过率：${difficultyStats.passRate}%
-${isSuccess ? '✅ 判定结果：通过' : '❌ 判定结果：不通过'}
-        `.trim();
+${isSuccess ? '✅ 判定结果：通过' : '❌ 判定结果：不通过'}`;
 
-        // 添加明确的分隔，确保分析消息独立显示
-        this.addSystemMessage('--- 判定分析 ---');
-        this.addSystemMessage(analysisMessage);
+        // 使用专门的判定消息函数，避免显示空头像
+        this.addJudgmentMessage('--- 判定分析 ---');
+        this.addJudgmentMessage(analysisMessage, true);
         
         // 根据结果显示下一步操作
         this.safeTimeout(() => {
             this.safeAsync(async () => {
                 if (isSuccess) {
                     // 恭喜消息应该在下一轮开始前显示，使用已完成的轮数
-                    this.addSystemMessage(`🎉 恭喜！你成功通过了第${displayRound}轮！`);
+                    this.addJudgmentMessage(`🎉 恭喜！你成功通过了第${displayRound}轮！`);
                     
                     // 延迟一下让玩家看到恭喜消息，然后再开始下一轮
                     this.safeTimeout(() => {
                         this.safeAsync(async () => {
                             // 注意：startNextRound() 已经在 showSuccessResponse 中调用过了
                             // 这里只需要显示下一轮开始的分隔消息
-                            this.addSystemMessage(`--- 第${displayRound + 1}轮开始 ---`);
+                            this.addJudgmentMessage(`--- 第${displayRound + 1}轮开始 ---`);
                         });
                     }, 1500);
                 } else {

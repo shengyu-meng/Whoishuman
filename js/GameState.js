@@ -7,6 +7,7 @@ class GameState {
         this.currentDifficulty = 1;
         this.gameActive = false;
         this.waitingForResponse = false;
+        this.isJudging = false; // 添加判定状态标志
         this.allAICharacters = []; // 所有8个AI角色
         this.activeAICharacters = []; // 当前轮次活跃的4-5个AI角色
         this.conversationHistory = [];
@@ -25,6 +26,7 @@ class GameState {
         this.currentDifficulty = 1;
         this.gameActive = false;
         this.waitingForResponse = false;
+        this.isJudging = false;
         this.allAICharacters = [];
         this.activeAICharacters = [];
         this.conversationHistory = [];
@@ -46,14 +48,15 @@ class GameState {
         this.allAICharacters = characters;
     }
 
-    // 选择当前轮次的活跃AI角色（4-5个）
+    // 选择当前轮次的活跃AI角色（5-6个，确保有足够的AI参与对话）
     selectActiveAICharacters() {
         // 添加调试信息
         console.log(`🔄 重新选择活跃AI角色 (当前轮数: ${this.currentRound})`);
         console.log(`  - 之前活跃角色: ${this.activeAICharacters.map(c => c.name).join(', ')}`);
         
         const shuffled = [...this.allAICharacters].sort(() => 0.5 - Math.random());
-        const activeCount = 4 + Math.floor(Math.random() * 2); // 4-5个
+        // 确保至少5个AI，最多6个，这样除去1个提问AI还有4-5个参与对话
+        const activeCount = 5 + Math.floor(Math.random() * 2); // 5-6个
         this.activeAICharacters = shuffled.slice(0, activeCount);
         
         console.log(`  - 新选择活跃角色: ${this.activeAICharacters.map(c => c.name).join(', ')}`);
