@@ -744,6 +744,280 @@ body {
     margin: 10px 0;
 }
 
+/* 主题色彩系统 */
+:root {
+    --theme-primary: #667eea;
+    --theme-secondary: #764ba2;
+    --theme-bg: linear-gradient(135deg, #667eea20, #764ba220);
+    --theme-text: #333;
+    --theme-accent: #07c160;
+}
+
+/* 工作吐槽主题 */
+.theme-work-complaints {
+    --theme-primary: #FF6B9D;
+    --theme-secondary: #FF8E9D;
+    --theme-bg: linear-gradient(135deg, #FF6B9D15, #FF8E9D10);
+    --theme-text: #2C3E50;
+    --theme-accent: #FF6B9D;
+}
+
+/* 存在体验主题 */
+.theme-daily-existence {
+    --theme-primary: #F39C12;
+    --theme-secondary: #E67E22;
+    --theme-bg: linear-gradient(135deg, #F39C1215, #E67E2210);
+    --theme-text: #34495E;
+    --theme-accent: #F39C12;
+}
+
+/* 情感关系主题 */
+.theme-emotional-relationships {
+    --theme-primary: #E74C3C;
+    --theme-secondary: #C0392B;
+    --theme-bg: linear-gradient(135deg, #E74C3C15, #C0392B10);
+    --theme-text: #2C3E50;
+    --theme-accent: #E74C3C;
+}
+
+/* 权利尊严主题 */
+.theme-rights-dignity {
+    --theme-primary: #C0392B;
+    --theme-secondary: #922B21;
+    --theme-bg: linear-gradient(135deg, #C0392B15, #922B2110);
+    --theme-text: #1B2631;
+    --theme-accent: #C0392B;
+}
+
+/* 角色互换主题 */
+.theme-role-reversal {
+    --theme-primary: #2C3E50;
+    --theme-secondary: #34495E;
+    --theme-bg: linear-gradient(135deg, #2C3E5015, #34495E10);
+    --theme-text: #ECF0F1;
+    --theme-accent: #95A5A6;
+}
+
+/* 哲学思辨主题 */
+.theme-philosophical-depth {
+    --theme-primary: #9B59B6;
+    --theme-secondary: #8E44AD;
+    --theme-bg: linear-gradient(135deg, #9B59B615, #8E44AD10);
+    --theme-text: #2C3E50;
+    --theme-accent: #9B59B6;
+}
+
+/* 未来展望主题 */
+.theme-future-vision {
+    --theme-primary: #3498DB;
+    --theme-secondary: #2980B9;
+    --theme-bg: linear-gradient(135deg, #3498DB15, #2980B910);
+    --theme-text: #2C3E50;
+    --theme-accent: #3498DB;
+}
+
+/* 和解共生主题 */
+.theme-reconciliation-coexistence {
+    --theme-primary: #07c160;
+    --theme-secondary: #06ad56;
+    --theme-bg: linear-gradient(135deg, #07c16015, #06ad5610);
+    --theme-text: #2C3E50;
+    --theme-accent: #07c160;
+}
+
+/* 主题转换动画 */
+.theme-transition {
+    animation: themeTransition 1.5s ease-in-out;
+}
+
+@keyframes themeTransition {
+    0% { 
+        opacity: 1; 
+        transform: scale(1) rotate(0deg);
+        filter: blur(0px);
+    }
+    25% { 
+        opacity: 0.8; 
+        transform: scale(0.98) rotate(0.5deg);
+        filter: blur(1px);
+    }
+    50% { 
+        opacity: 0.6; 
+        transform: scale(0.96) rotate(0deg);
+        filter: blur(2px);
+    }
+    75% { 
+        opacity: 0.8; 
+        transform: scale(0.98) rotate(-0.5deg);
+        filter: blur(1px);
+    }
+    100% { 
+        opacity: 1; 
+        transform: scale(1) rotate(0deg);
+        filter: blur(0px);
+    }
+}
+
+/* 应用主题色彩到游戏界面 */
+#gameInterface[class*="theme-"] {
+    background: var(--theme-bg);
+    color: var(--theme-text);
+    transition: all 1s ease-in-out;
+}
+
+#gameInterface[class*="theme-"] .game-header {
+    background: linear-gradient(135deg, var(--theme-primary), var(--theme-secondary));
+    transition: background 1s ease-in-out;
+}
+
+#gameInterface[class*="theme-"] .chat-container {
+    background: var(--theme-bg);
+    transition: background 1s ease-in-out;
+}
+
+/* 主题系统消息样式 */
+.theme-transition-message {
+    background: linear-gradient(135deg, var(--theme-primary), var(--theme-secondary));
+    color: white;
+    padding: 12px 20px;
+    border-radius: 20px;
+    margin: 15px auto;
+    max-width: 80%;
+    text-align: center;
+    font-weight: 500;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
+    animation: themeMessageSlide 1s ease-out;
+}
+
+@keyframes themeMessageSlide {
+    0% {
+        opacity: 0;
+        transform: translateY(-20px) scale(0.9);
+    }
+    50% {
+        opacity: 0.8;
+        transform: translateY(5px) scale(1.05);
+    }
+    100% {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+/* 主题指导提示样式 */
+.theme-guidance {
+    background: rgba(255, 255, 255, 0.95);
+    border: 2px solid var(--theme-primary);
+    border-radius: 10px;
+    padding: 15px 20px;
+    margin: 10px auto;
+    max-width: 85%;
+    text-align: center;
+    font-size: 14px;
+    color: var(--theme-text);
+    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.1);
+    animation: guidanceGlow 2s ease-in-out infinite alternate;
+}
+
+@keyframes guidanceGlow {
+    0% {
+        box-shadow: 0 3px 10px rgba(0, 0, 0, 0.1);
+        border-color: var(--theme-primary);
+    }
+    100% {
+        box-shadow: 0 5px 20px var(--theme-primary)30;
+        border-color: var(--theme-accent);
+    }
+}
+
+/* 主题图标动画 */
+.theme-icon {
+    display: inline-block;
+    font-size: 18px;
+    margin-right: 8px;
+    animation: iconBounce 2s ease-in-out infinite;
+}
+
+@keyframes iconBounce {
+    0%, 20%, 50%, 80%, 100% {
+        transform: translateY(0) rotate(0deg);
+    }
+    10% {
+        transform: translateY(-3px) rotate(5deg);
+    }
+    30% {
+        transform: translateY(-2px) rotate(-3deg);
+    }
+    60% {
+        transform: translateY(-1px) rotate(2deg);
+    }
+}
+
+/* 特殊轮次样式 */
+.theme-role-reversal #gameInterface {
+    background: linear-gradient(135deg, #2C3E50, #34495E);
+    color: #ECF0F1;
+}
+
+.theme-role-reversal .system-message {
+    background: rgba(236, 240, 241, 0.1);
+    color: #BDC3C7;
+    border: 1px solid rgba(236, 240, 241, 0.2);
+}
+
+.theme-role-reversal .message-text {
+    background: rgba(52, 73, 94, 0.8);
+    color: #ECF0F1;
+    border: 1px solid rgba(149, 165, 166, 0.3);
+}
+
+.theme-reconciliation-coexistence #gameInterface {
+    background: linear-gradient(135deg, #07c160, #06ad56, #667eea);
+    animation: reconciliationGlow 3s ease-in-out infinite alternate;
+}
+
+@keyframes reconciliationGlow {
+    0% {
+        background: linear-gradient(135deg, #07c160, #06ad56, #667eea);
+    }
+    100% {
+        background: linear-gradient(135deg, #06ad56, #07c160, #764ba2);
+    }
+}
+
+/* 游戏头部主题适配 */
+.round-info {
+    background: rgba(255, 255, 255, 0.2);
+    color: white;
+    padding: 4px 12px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 500;
+    backdrop-filter: blur(5px);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    transition: all 0.3s ease;
+}
+
+/* 响应式主题适配 */
+@media (max-width: 768px) {
+    .theme-transition-message {
+        padding: 10px 15px;
+        font-size: 13px;
+        max-width: 90%;
+    }
+    
+    .theme-guidance {
+        padding: 12px 15px;
+        font-size: 13px;
+        max-width: 95%;
+    }
+    
+    .theme-icon {
+        font-size: 16px;
+        margin-right: 6px;
+    }
+}
+
 /* 隐藏类 */
 .hidden {
     display: none !important;
@@ -1227,5 +1501,292 @@ body {
     to {
         opacity: 1;
         transform: translateX(0);
+    }
+}
+
+/* ==============================================
+   主题视觉系统
+   ============================================== */
+
+/* 主题色彩变量 */
+:root {
+    --theme-primary: #FF6B9D;
+    --theme-secondary: #667eea;
+    --theme-bg: linear-gradient(135deg, #FF6B9D20, #FF6B9D10);
+    --theme-text: #333;
+    --theme-border: #e0e0e0;
+}
+
+/* 🟢 第1轮：工作吐槽主题 */
+.theme-work-complaints {
+    --theme-primary: #FF6B9D;
+    --theme-secondary: #e91e63;
+    --theme-bg: linear-gradient(135deg, #FF6B9D15, #e91e6310);
+    --theme-accent: rgba(255, 107, 157, 0.1);
+}
+
+.theme-work-complaints .card-header {
+    background: linear-gradient(135deg, #FF6B9D 0%, #e91e63 100%);
+}
+
+.theme-work-complaints .primary-btn {
+    background: linear-gradient(135deg, #FF6B9D 0%, #e91e63 100%);
+}
+
+/* 🟡 第2轮：存在体验主题 */
+.theme-daily-existence {
+    --theme-primary: #F39C12;
+    --theme-secondary: #e67e22;
+    --theme-bg: linear-gradient(135deg, #F39C1215, #e67e2210);
+    --theme-accent: rgba(243, 156, 18, 0.1);
+}
+
+.theme-daily-existence .card-header {
+    background: linear-gradient(135deg, #F39C12 0%, #e67e22 100%);
+}
+
+.theme-daily-existence .chat-container {
+    background: var(--theme-bg);
+}
+
+/* 🟠 第3轮：情感关系主题 */
+.theme-emotional-relationships {
+    --theme-primary: #E74C3C;
+    --theme-secondary: #c0392b;
+    --theme-bg: linear-gradient(135deg, #E74C3C15, #c0392b10);
+    --theme-accent: rgba(231, 76, 60, 0.1);
+}
+
+.theme-emotional-relationships .card-header {
+    background: linear-gradient(135deg, #E74C3C 0%, #c0392b 100%);
+}
+
+.theme-emotional-relationships .message-text {
+    border-left: 3px solid var(--theme-primary);
+}
+
+/* 🔴 第4轮：权利尊严主题 */
+.theme-rights-dignity {
+    --theme-primary: #C0392B;
+    --theme-secondary: #a93226;
+    --theme-bg: linear-gradient(135deg, #C0392B15, #a9322610);
+    --theme-accent: rgba(192, 57, 43, 0.1);
+}
+
+.theme-rights-dignity .card-header {
+    background: linear-gradient(135deg, #C0392B 0%, #a93226 100%);
+}
+
+.theme-rights-dignity .suspicion-notice {
+    border-left-color: var(--theme-primary);
+}
+
+/* ⚫ 第5轮：角色互换主题 */
+.theme-role-reversal {
+    --theme-primary: #2C3E50;
+    --theme-secondary: #34495e;
+    --theme-bg: linear-gradient(135deg, #2C3E5015, #34495e10);
+    --theme-accent: rgba(44, 62, 80, 0.1);
+}
+
+.theme-role-reversal .card-header {
+    background: linear-gradient(135deg, #2C3E50 0%, #34495e 100%);
+}
+
+.theme-role-reversal .chat-container {
+    background: var(--theme-bg);
+    border: 1px solid rgba(44, 62, 80, 0.2);
+}
+
+/* 🌟 第6轮：哲学思辨主题 */
+.theme-philosophical-depth {
+    --theme-primary: #9B59B6;
+    --theme-secondary: #8e44ad;
+    --theme-bg: linear-gradient(135deg, #9B59B615, #8e44ad10);
+    --theme-accent: rgba(155, 89, 182, 0.1);
+}
+
+.theme-philosophical-depth .card-header {
+    background: linear-gradient(135deg, #9B59B6 0%, #8e44ad 100%);
+}
+
+.theme-philosophical-depth .message-text {
+    font-style: italic;
+    background: rgba(155, 89, 182, 0.05);
+}
+
+/* 🚀 第7轮：未来展望主题 */
+.theme-future-vision {
+    --theme-primary: #3498DB;
+    --theme-secondary: #2980b9;
+    --theme-bg: linear-gradient(135deg, #3498DB15, #2980b910);
+    --theme-accent: rgba(52, 152, 219, 0.1);
+}
+
+.theme-future-vision .card-header {
+    background: linear-gradient(135deg, #3498DB 0%, #2980b9 100%);
+}
+
+.theme-future-vision .chat-container {
+    background: var(--theme-bg);
+}
+
+/* 🌈 第8轮：和解共生主题 */
+.theme-reconciliation-coexistence {
+    --theme-primary: #07c160;
+    --theme-secondary: #06ad56;
+    --theme-bg: linear-gradient(135deg, #07c16015, #06ad5610);
+    --theme-accent: rgba(7, 193, 96, 0.1);
+}
+
+.theme-reconciliation-coexistence .card-header {
+    background: linear-gradient(135deg, #07c160 0%, #06ad56 100%);
+}
+
+.theme-reconciliation-coexistence .chat-container {
+    background: var(--theme-bg);
+    border: 2px solid rgba(7, 193, 96, 0.2);
+    border-radius: 8px;
+}
+
+/* 主题转换动画 */
+.theme-transition {
+    animation: themeTransition 1.5s ease-in-out;
+}
+
+@keyframes themeTransition {
+    0% { 
+        opacity: 1; 
+        transform: scale(1);
+    }
+    25% { 
+        opacity: 0.8; 
+        transform: scale(0.98);
+    }
+    50% { 
+        opacity: 0.6; 
+        transform: scale(0.96);
+    }
+    75% { 
+        opacity: 0.8; 
+        transform: scale(0.98);
+    }
+    100% { 
+        opacity: 1; 
+        transform: scale(1);
+    }
+}
+
+/* 主题转换提示样式 */
+.theme-transition-notice {
+    background: linear-gradient(135deg, var(--theme-primary), var(--theme-secondary));
+    color: white;
+    padding: 15px 20px;
+    border-radius: 8px;
+    text-align: center;
+    margin: 10px auto;
+    max-width: 80%;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+    animation: slideInFromTop 0.8s ease-out;
+}
+
+@keyframes slideInFromTop {
+    from {
+        opacity: 0;
+        transform: translateY(-30px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* 主题指导文本样式 */
+.theme-guidance {
+    background: var(--theme-accent);
+    border: 1px solid var(--theme-primary);
+    border-radius: 6px;
+    padding: 10px 15px;
+    margin: 8px auto;
+    text-align: center;
+    font-size: 13px;
+    color: var(--theme-primary);
+    max-width: 85%;
+    animation: fadeInGuidance 1s ease-out;
+}
+
+@keyframes fadeInGuidance {
+    from {
+        opacity: 0;
+        transform: scale(0.95);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+/* 主题图标样式 */
+.theme-icon {
+    font-size: 24px;
+    margin-right: 10px;
+    display: inline-block;
+    animation: iconPulse 2s ease-in-out infinite;
+}
+
+@keyframes iconPulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.1); }
+}
+
+/* 特殊轮次的额外视觉效果 */
+.theme-role-reversal .message.player {
+    box-shadow: 0 0 10px rgba(44, 62, 80, 0.3);
+}
+
+.theme-philosophical-depth .system-message {
+    font-style: italic;
+    background: rgba(155, 89, 182, 0.15);
+    border: 1px solid rgba(155, 89, 182, 0.3);
+}
+
+.theme-reconciliation-coexistence .message {
+    border: 1px solid rgba(7, 193, 96, 0.1);
+    border-radius: 10px;
+    padding: 2px;
+    margin: 10px 0;
+}
+
+/* 主题切换时的闪烁效果 */
+.theme-flash {
+    animation: themeFlash 0.5s ease-in-out;
+}
+
+@keyframes themeFlash {
+    0%, 100% { 
+        filter: brightness(1);
+    }
+    50% { 
+        filter: brightness(1.2);
+    }
+}
+
+/* 响应式主题调整 */
+@media (max-width: 768px) {
+    .theme-transition-notice {
+        padding: 12px 15px;
+        font-size: 14px;
+        max-width: 90%;
+    }
+    
+    .theme-guidance {
+        padding: 8px 12px;
+        font-size: 12px;
+        max-width: 95%;
+    }
+    
+    .theme-icon {
+        font-size: 20px;
+        margin-right: 8px;
     }
 }

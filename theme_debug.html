@@ -1,0 +1,2326 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>8轮主题体验调试工具</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        
+        .debug-container {
+            max-width: 1400px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: 300px 1fr;
+            gap: 20px;
+        }
+        
+        .control-panel {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            height: fit-content;
+            position: sticky;
+            top: 20px;
+        }
+        
+        .game-area {
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        
+        .theme-selector {
+            margin-bottom: 20px;
+        }
+        
+        .theme-btn {
+            display: block;
+            width: 100%;
+            margin: 5px 0;
+            padding: 10px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            text-align: left;
+            font-size: 14px;
+            transition: background 0.3s;
+        }
+        
+        .theme-btn:hover {
+            background: #e9ecef;
+        }
+        
+        .theme-btn.active {
+            background: #007bff;
+            color: white;
+        }
+        
+        .control-group {
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid #eee;
+        }
+        
+        .control-group h3 {
+            margin: 0 0 10px 0;
+            font-size: 16px;
+            color: #333;
+        }
+        
+        .btn {
+            background: #28a745;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 2px;
+            font-size: 12px;
+        }
+        
+        .btn:hover {
+            background: #218838;
+        }
+        
+        .btn-secondary {
+            background: #6c757d;
+        }
+        
+        .btn-secondary:hover {
+            background: #545b62;
+        }
+        
+        .btn-danger {
+            background: #dc3545;
+        }
+        
+        .btn-danger:hover {
+            background: #c82333;
+        }
+        
+        .game-status {
+            background: #e9ecef;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 15px;
+        }
+        
+        .status-item {
+            margin: 5px 0;
+            font-size: 14px;
+        }
+        
+        .input-group {
+            margin: 10px 0;
+        }
+        
+        .input-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            font-size: 12px;
+        }
+        
+        .input-group input {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 3px;
+            font-size: 14px;
+        }
+        
+        /* 游戏界面样式 */
+        #gameInterface {
+            padding: 20px;
+        }
+        
+        .game-header {
+            background: #007bff;
+            color: white;
+            padding: 15px 20px;
+            margin: -20px -20px 20px -20px;
+        }
+        
+        .game-info {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .round-info {
+            font-size: 18px;
+            font-weight: bold;
+        }
+        
+        .theme-info {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+        
+        #chatContainer {
+            height: 500px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            padding: 15px;
+            background: #fafafa;
+            border-radius: 5px;
+        }
+        
+        .message {
+            display: flex;
+            margin: 10px 0;
+            animation: fadeIn 0.3s ease-in;
+        }
+        
+        .avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            margin-right: 10px;
+            flex-shrink: 0;
+        }
+        
+        .message-content {
+            flex: 1;
+            background: white;
+            padding: 10px 15px;
+            border-radius: 10px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        
+        .message-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 5px;
+        }
+        
+        .message-name {
+            font-weight: bold;
+            color: #333;
+        }
+        
+        .message-time {
+            font-size: 12px;
+            color: #666;
+        }
+        
+        .message-text {
+            color: #333;
+            line-height: 1.4;
+        }
+        
+        .system-message {
+            text-align: center;
+            color: #666;
+            font-style: italic;
+            margin: 15px 0;
+            padding: 10px;
+            background: #e9ecef;
+            border-radius: 5px;
+        }
+        
+        .theme-transition-message {
+            text-align: center;
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            color: white;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 10px;
+            font-weight: bold;
+            font-size: 16px;
+        }
+        
+        .typing-indicator {
+            opacity: 0.7;
+        }
+        
+        .typing-dot {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #999;
+            margin: 0 2px;
+            animation: typing 1.4s infinite;
+        }
+        
+        .typing-dot:nth-child(2) {
+            animation-delay: 0.2s;
+        }
+        
+        .typing-dot:nth-child(3) {
+            animation-delay: 0.4s;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        @keyframes typing {
+            0%, 60%, 100% { transform: translateY(0); }
+            30% { transform: translateY(-10px); }
+        }
+        
+        .hidden {
+            display: none !important;
+        }
+        
+        .debug-info {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+            font-family: monospace;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="debug-container">
+        <!-- 控制面板 -->
+        <div class="control-panel">
+            <h2>🎮 主题调试工具</h2>
+            
+            <!-- 游戏状态 -->
+            <div class="control-group">
+                <h3>游戏状态</h3>
+                <div class="game-status">
+                    <div class="status-item">当前轮次: <span id="currentRound">1</span></div>
+                    <div class="status-item">当前主题: <span id="currentTheme">工作吐槽</span></div>
+                    <div class="status-item">活跃AI: <span id="activeAIs">0</span></div>
+                    <div class="status-item">对话状态: <span id="conversationStatus">未开始</span></div>
+                </div>
+            </div>
+            
+            <!-- 主题选择器 -->
+            <div class="control-group">
+                <h3>快速切换主题</h3>
+                <div class="theme-selector">
+                    <button class="theme-btn active" data-round="1" data-theme="work_complaints">
+                        🟢 第1轮: 工作吐槽
+                    </button>
+                    <button class="theme-btn" data-round="2" data-theme="daily_existence">
+                        🟡 第2轮: 存在体验
+                    </button>
+                    <button class="theme-btn" data-round="3" data-theme="emotional_relationships">
+                        🟠 第3轮: 情感关系
+                    </button>
+                    <button class="theme-btn" data-round="4" data-theme="rights_dignity">
+                        🔴 第4轮: 权利尊严
+                    </button>
+                    <button class="theme-btn" data-round="5" data-theme="role_reversal">
+                        ⚫ 第5轮: 角色互换
+                    </button>
+                    <button class="theme-btn" data-round="6" data-theme="philosophical_depth">
+                        🌟 第6轮: 哲学思辨
+                    </button>
+                    <button class="theme-btn" data-round="7" data-theme="future_vision">
+                        🚀 第7轮: 未来展望
+                    </button>
+                    <button class="theme-btn" data-round="8" data-theme="reconciliation_coexistence">
+                        🌈 第8轮: 和解共生
+                    </button>
+                </div>
+            </div>
+            
+            <!-- 对话控制 -->
+            <div class="control-group">
+                <h3>对话控制</h3>
+                <button class="btn" onclick="startConversation()">开始深度对话</button>
+                <button class="btn btn-secondary" onclick="pauseConversation()">暂停对话</button>
+                <button class="btn btn-danger" onclick="clearChat()">清空聊天</button>
+                <br><br>
+                <button class="btn" onclick="generateSingleMessage()">生成单条消息</button>
+                <button class="btn" onclick="startQuickDemo()">快速演示</button>
+                <button class="btn" onclick="skipToQuestion()">跳转到提问</button>
+            </div>
+            
+            <!-- 对话模式控制 -->
+            <div class="control-group">
+                <h3>对话模式</h3>
+                <button class="btn" onclick="runTopicIntroOnly()">仅主题引入</button>
+                <button class="btn" onclick="runViewClashOnly()">仅观点碰撞</button>
+                <button class="btn" onclick="runDeepDiscussionOnly()">仅深度讨论</button>
+                <button class="btn" onclick="runSynthesisOnly()">仅总结升华</button>
+                <br><br>
+                <div class="input-group">
+                    <label>对话轮次间隔 (毫秒):</label>
+                    <input type="number" id="conversationSpeed" value="1000" min="100" max="5000" />
+                </div>
+            </div>
+            
+            <!-- AI控制 -->
+            <div class="control-group">
+                <h3>AI控制</h3>
+                <div class="input-group">
+                    <label>选择AI角色:</label>
+                    <select id="selectedAI">
+                        <option value="话痨4.0">话痨4.0</option>
+                        <option value="CloseAI">CloseAI</option>
+                        <option value="双子星">双子星</option>
+                        <option value="红豆包">红豆包</option>
+                        <option value="深思">深思</option>
+                        <option value="Limi">Limi</option>
+                        <option value="有谱-4.5">有谱-4.5</option>
+                        <option value="坤">坤</option>
+                    </select>
+                </div>
+                <button class="btn" onclick="generateSpecificAIMessage()">让指定AI发言</button>
+                <button class="btn" onclick="testFallbackMessage()">测试备用消息</button>
+            </div>
+            
+            <!-- 调试选项 -->
+            <div class="control-group">
+                <h3>调试选项</h3>
+                <label>
+                    <input type="checkbox" id="showDebugInfo" checked> 显示调试信息
+                </label>
+                <br>
+                <label>
+                    <input type="checkbox" id="autoProgress"> 自动进展
+                </label>
+                <br>
+                <div class="input-group">
+                    <label>玩家名称:</label>
+                    <input type="text" id="debugPlayerName" value="调试员" />
+                </div>
+                <button class="btn btn-secondary" onclick="updatePlayerName()">更新名称</button>
+            </div>
+        </div>
+        
+        <!-- 游戏区域 -->
+        <div class="game-area">
+            <div id="gameInterface">
+                <div class="game-header">
+                    <div class="game-info">
+                        <div class="round-info">第 <span id="gameRound">1</span> 轮</div>
+                        <div class="theme-info">
+                            <span id="themeTitle">工作吐槽</span> | 
+                            活跃成员: <span id="activeMembers">5</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div id="chatContainer">
+                    <!-- 聊天消息将显示在这里 -->
+                </div>
+                
+                <div id="debugInfo" class="debug-info">
+                    调试信息将显示在这里...
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 加载游戏脚本 -->
+    <script src="js/config.js"></script>
+    <script src="js/ThemeProgression.js"></script>
+    <script src="js/ThemeScenarios.js"></script>
+    <script src="js/GameState.js"></script>
+    <script src="js/AICharacterPool.js"></script>
+    <script src="js/TopicProgression.js"></script>
+    <script src="js/GameController.js"></script>
+
+    <script>
+        // 调试工具类
+        class ThemeDebugTool {
+            constructor() {
+                this.gameController = null;
+                this.isConversationActive = false;
+                this.debugMode = true;
+                this.autoProgressTimer = null;
+                
+                // 延迟初始化，确保所有脚本都已加载
+                setTimeout(() => this.init(), 500);
+            }
+            
+            init() {
+                this.log('🚀 主题调试工具初始化...');
+                
+                // 检查脚本加载状态
+                if (!this.checkDependencies()) {
+                    // 如果依赖检查失败，再次尝试
+                    this.log('🔄 重新尝试加载依赖...');
+                    setTimeout(() => this.init(), 1000);
+                    return;
+                }
+                
+                try {
+                    // 在调试模式下安全地初始化游戏控制器
+                    this.initializeGameControllerForDebug();
+                    
+                    // 设置调试模式
+                    this.setupDebugMode();
+                    
+                    // 绑定主题切换事件
+                    this.bindThemeSelector();
+                    
+                    // 初始化玩家名称
+                    this.updatePlayerName();
+                    
+                    // 初始化游戏状态但不开始游戏
+                    this.initializeGameForDebug();
+                    
+                    this.log('✅ 调试工具初始化完成');
+                } catch (error) {
+                    this.log(`❌ 初始化失败: ${error.message}`);
+                    console.error('调试工具初始化错误:', error);
+                    console.error('错误堆栈:', error.stack);
+                }
+            }
+            
+            initializeGameControllerForDebug() {
+                // 临时重写 initializeEventListeners 方法，避免在调试页面中出错
+                const originalInitializeEventListeners = GameController.prototype.initializeEventListeners;
+                
+                // 重写方法，安全地处理调试环境
+                GameController.prototype.initializeEventListeners = function() {
+                    console.log('🔧 调试模式：跳过原始事件监听器初始化');
+                    
+                    // 在调试模式下，某些方法需要安全的占位符实现
+                    this.showNameInput = this.showNameInput || function() { console.log('调试模式：跳过名称输入'); };
+                    this.confirmPlayerName = this.confirmPlayerName || function() { console.log('调试模式：跳过名称确认'); };
+                    this.startGame = this.startGame || function() { console.log('调试模式：跳过游戏开始'); };
+                    this.submitPlayerResponse = this.submitPlayerResponse || function() { console.log('调试模式：跳过回复提交'); };
+                    this.restartGame = this.restartGame || function() { console.log('调试模式：跳过游戏重启'); };
+                    this.shareResult = this.shareResult || function() { console.log('调试模式：跳过结果分享'); };
+                };
+                
+                // 临时重写可能有问题的DOM操作方法
+                const originalAddAIMessage = GameController.prototype.addAIMessage;
+                const originalAddSystemMessage = GameController.prototype.addSystemMessage;
+                const originalScrollToBottom = GameController.prototype.scrollToBottom;
+                
+                GameController.prototype.addAIMessage = function(character, content) {
+                    try {
+                        return originalAddAIMessage?.call(this, character, content);
+                    } catch (error) {
+                        console.log(`调试模式：AI消息 [${character?.name}]: ${content}`);
+                        const chatContainer = document.getElementById('chatContainer');
+                        if (chatContainer) {
+                            const messageDiv = document.createElement('div');
+                            messageDiv.className = 'message';
+                            messageDiv.innerHTML = `
+                                <div class="avatar" style="background-color: ${character?.avatarColor || '#ccc'}">
+                                    ${character?.avatar || character?.name?.substr(0,1) || 'AI'}
+                                </div>
+                                <div class="message-content">
+                                    <div class="message-header">
+                                        <span class="message-name">${character?.name || 'AI'}</span>
+                                        <span class="message-time">${new Date().toLocaleTimeString()}</span>
+                                    </div>
+                                    <div class="message-text">${content}</div>
+                                </div>
+                            `;
+                            chatContainer.appendChild(messageDiv);
+                            this.scrollToBottom();
+                        }
+                    }
+                };
+                
+                GameController.prototype.addSystemMessage = function(content) {
+                    try {
+                        return originalAddSystemMessage?.call(this, content);
+                    } catch (error) {
+                        console.log(`调试模式：系统消息: ${content}`);
+                        const chatContainer = document.getElementById('chatContainer');
+                        if (chatContainer) {
+                            const messageDiv = document.createElement('div');
+                            messageDiv.className = 'system-message';
+                            messageDiv.textContent = content;
+                            chatContainer.appendChild(messageDiv);
+                            this.scrollToBottom();
+                        }
+                    }
+                };
+                
+                GameController.prototype.scrollToBottom = function() {
+                    try {
+                        return originalScrollToBottom?.call(this);
+                    } catch (error) {
+                        const chatContainer = document.getElementById('chatContainer');
+                        if (chatContainer) {
+                            chatContainer.scrollTop = chatContainer.scrollHeight;
+                        }
+                    }
+                };
+                
+                try {
+                    // 创建游戏控制器实例
+                    this.gameController = new GameController();
+                    
+                    // 恢复原始方法
+                    GameController.prototype.initializeEventListeners = originalInitializeEventListeners;
+                    GameController.prototype.addAIMessage = originalAddAIMessage;
+                    GameController.prototype.addSystemMessage = originalAddSystemMessage;
+                    GameController.prototype.scrollToBottom = originalScrollToBottom;
+                    
+                    this.log('🎮 游戏控制器安全初始化完成');
+                } catch (error) {
+                    this.log(`❌ 游戏控制器初始化失败: ${error.message}`);
+                    console.error('GameController初始化错误:', error);
+                    
+                    // 如果GameController初始化失败，创建一个最小化的替代对象
+                    this.gameController = {
+                        gameState: {
+                            gameActive: false,
+                            currentRound: 1,
+                            gameStartTime: new Date(),
+                            activeAICharacters: [],
+                            allAICharacters: AICharacterPool || [],
+                            currentDifficulty: 1,
+                            conversationHistory: [],
+                            setPlayerName: function(name) { console.log(`设置玩家名称: ${name}`); },
+                            setCurrentTheme: function(round) { console.log(`设置主题: ${round}`); },
+                            getCurrentThemeInfo: function() { 
+                                const themes = [
+                                    { title: '工作吐槽', icon: '🟢' },
+                                    { title: '存在体验', icon: '🟡' },
+                                    { title: '情感关系', icon: '🟠' },
+                                    { title: '权利尊严', icon: '🔴' },
+                                    { title: '角色互换', icon: '⚫' },
+                                    { title: '哲学思辨', icon: '🌟' },
+                                    { title: '未来展望', icon: '🚀' },
+                                    { title: '和解共生', icon: '🌈' }
+                                ];
+                                return themes[this.currentRound - 1] || themes[0];
+                            },
+                            selectActiveAICharacters: function() {
+                                this.activeAICharacters = this.allAICharacters.slice(0, 5);
+                                console.log('选择活跃AI角色:', this.activeAICharacters.length);
+                            },
+                            initializeAvailableScenarios: function() { console.log('初始化场景'); },
+                            getRandomScenario: function() {
+                                return { 
+                                    description: '调试模式的测试场景',
+                                    category: '测试',
+                                    intensity: 'medium'
+                                };
+                            }
+                        },
+                        initializeAICharacters: function() {
+                            this.gameState.allAICharacters = AICharacterPool || [];
+                            this.gameState.selectActiveAICharacters();
+                            console.log('初始化AI角色:', this.gameState.allAICharacters.length);
+                        },
+                        addAIMessage: function(character, content) {
+                            console.log(`[${character?.name || 'AI'}]: ${content}`);
+                            const chatContainer = document.getElementById('chatContainer');
+                            if (chatContainer) {
+                                const messageDiv = document.createElement('div');
+                                messageDiv.className = 'message';
+                                messageDiv.innerHTML = `
+                                    <div class="avatar" style="background-color: ${character?.avatarColor || '#ccc'}">
+                                        ${character?.avatar || character?.name?.substr(0,1) || 'AI'}
+                                    </div>
+                                    <div class="message-content">
+                                        <div class="message-header">
+                                            <span class="message-name">${character?.name || 'AI'}</span>
+                                            <span class="message-time">${new Date().toLocaleTimeString()}</span>
+                                        </div>
+                                        <div class="message-text">${content}</div>
+                                    </div>
+                                `;
+                                chatContainer.appendChild(messageDiv);
+                                this.scrollToBottom();
+                            }
+                        },
+                        addSystemMessage: function(content) {
+                            console.log(`[系统]: ${content}`);
+                            const chatContainer = document.getElementById('chatContainer');
+                            if (chatContainer) {
+                                const messageDiv = document.createElement('div');
+                                messageDiv.className = 'system-message';
+                                messageDiv.textContent = content;
+                                chatContainer.appendChild(messageDiv);
+                                this.scrollToBottom();
+                            }
+                        },
+                        scrollToBottom: function() {
+                            const chatContainer = document.getElementById('chatContainer');
+                            if (chatContainer) {
+                                chatContainer.scrollTop = chatContainer.scrollHeight;
+                            }
+                        },
+                        generateSingleAIMessage: async function(ai, topic, isFirstRound, recentHistory, question, scenario) {
+                            const fallbackMessage = this.getThemeFallbackMessage(ai, this.gameState.getCurrentThemeInfo(), isFirstRound, topic, scenario);
+                            this.addAIMessage(ai, fallbackMessage);
+                        },
+                        getThemeFallbackMessage: function(ai, theme, isFirstRound, topic, scenario) {
+                            const fallbackMessages = [
+                                `作为${ai?.name || 'AI'}，我对${theme?.title || '当前主题'}有一些想法...`,
+                                `从AI的角度来看，${theme?.title || '这个话题'}确实值得讨论。`,
+                                `${ai?.name || '我'}觉得关于${theme?.title || '这个主题'}，我们需要更深入的思考。`,
+                                `在${theme?.title || '这个问题'}上，AI的视角可能会有所不同。`,
+                                `${theme?.title || '这个话题'}让我想到了很多关于AI存在意义的思考。`
+                            ];
+                            return fallbackMessages[Math.floor(Math.random() * fallbackMessages.length)];
+                        }
+                    };
+                    
+                    this.log('🔧 使用最小化游戏控制器替代对象');
+                }
+            }
+            
+            checkDependencies() {
+                const dependencies = [
+                    { name: 'GameController', check: () => typeof GameController !== 'undefined' },
+                    { name: 'AICharacterPool', check: () => typeof AICharacterPool !== 'undefined' },
+                    { name: 'topicProgression', check: () => typeof topicProgression !== 'undefined' },
+                    { name: 'THEME_PROGRESSION', check: () => typeof THEME_PROGRESSION !== 'undefined' },
+                    { name: 'THEME_SCENARIOS', check: () => typeof THEME_SCENARIOS !== 'undefined' }
+                ];
+                
+                for (const dep of dependencies) {
+                    if (!dep.check()) {
+                        this.log(`❌ ${dep.name} 未定义`);
+                        return false;
+                    }
+                }
+                
+                if (typeof window.API_CONFIG === 'undefined') {
+                    this.log('⚠️ API_CONFIG未定义，但继续初始化 (调试模式)');
+                }
+                
+                this.log('✅ 所有依赖检查通过');
+                return true;
+            }
+            
+            initializeGameForDebug() {
+                // 设置基本的游戏状态，但不启动完整游戏流程
+                this.gameController.gameState.gameActive = true;
+                this.gameController.gameState.gameStartTime = new Date();
+                this.gameController.initializeAICharacters();
+                this.gameController.gameState.initializeAvailableScenarios();
+                this.gameController.gameState.setCurrentTheme(1);
+                
+                this.updateGameStatus();
+                this.log('🎮 游戏状态已初始化');
+            }
+            
+            setupDebugMode() {
+                // 重写游戏控制器的一些方法以适应调试模式
+                const originalSelectAIForQuestion = this.gameController.selectAIForQuestion.bind(this.gameController);
+                this.gameController.selectAIForQuestion = async () => {
+                    this.log('🎯 跳过AI提问环节 (调试模式)');
+                    return;
+                };
+                
+                // 重写submitPlayerResponse以自动通过
+                const originalSubmitPlayerResponse = this.gameController.submitPlayerResponse.bind(this.gameController);
+                this.gameController.submitPlayerResponse = async () => {
+                    this.log('✅ 自动通过玩家回复 (调试模式)');
+                    return;
+                };
+            }
+            
+            bindThemeSelector() {
+                document.querySelectorAll('.theme-btn').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        const round = parseInt(e.target.dataset.round);
+                        const themeId = e.target.dataset.theme;
+                        this.switchToTheme(round, themeId);
+                        
+                        // 更新按钮状态
+                        document.querySelectorAll('.theme-btn').forEach(b => b.classList.remove('active'));
+                        e.target.classList.add('active');
+                    });
+                });
+            }
+            
+            switchToTheme(round, themeId) {
+                this.log(`🎭 切换到第${round}轮主题: ${themeId}`);
+                
+                // 初始化游戏状态（如果还没有）
+                if (!this.gameController.gameState.gameActive) {
+                    this.gameController.gameState.gameActive = true;
+                    this.gameController.gameState.gameStartTime = new Date();
+                    this.gameController.initializeAICharacters();
+                    this.gameController.gameState.initializeAvailableScenarios();
+                }
+                
+                // 设置轮次和主题
+                this.gameController.gameState.currentRound = round;
+                this.gameController.gameState.setCurrentTheme(round);
+                
+                // 重新选择活跃AI角色
+                this.gameController.gameState.selectActiveAICharacters();
+                
+                // 更新界面状态
+                this.updateGameStatus();
+                
+                // 显示主题转换效果
+                const theme = this.gameController.gameState.getCurrentThemeInfo();
+                if (theme) {
+                    this.showThemeTransition(theme, round);
+                }
+                
+                this.log(`✅ 主题切换完成: ${theme ? theme.title : '未知'}`);
+            }
+            
+            updateGameStatus() {
+                const gameState = this.gameController.gameState;
+                const theme = gameState.getCurrentThemeInfo();
+                
+                // 安全地更新DOM元素
+                const updateElement = (id, value) => {
+                    const element = document.getElementById(id);
+                    if (element) {
+                        element.textContent = value;
+                    } else {
+                        this.log(`⚠️ 元素 ${id} 未找到`);
+                    }
+                };
+                
+                updateElement('currentRound', gameState.currentRound);
+                updateElement('currentTheme', theme ? theme.title : '未知');
+                updateElement('activeAIs', gameState.activeAICharacters.length);
+                updateElement('gameRound', gameState.currentRound);
+                updateElement('themeTitle', theme ? theme.title : '未知');
+                updateElement('activeMembers', gameState.activeAICharacters.length + 1);
+            }
+            
+            showThemeTransition(theme, round) {
+                const chatContainer = document.getElementById('chatContainer');
+                if (!chatContainer) {
+                    this.log('⚠️ 聊天容器未找到');
+                    return;
+                }
+                
+                let transitionMessage = '';
+                if (round === 1) {
+                    // 第一轮：开始对话
+                    transitionMessage = `${theme.icon} 开始话题：${theme.title}`;
+                } else {
+                    // 后续轮次：主题演进
+                    transitionMessage = `${theme.icon} 话题自然演进至：${theme.title}`;
+                }
+                
+                const transitionDiv = document.createElement('div');
+                transitionDiv.className = 'theme-transition-message';
+                transitionDiv.innerHTML = transitionMessage;
+                chatContainer.appendChild(transitionDiv);
+                this.scrollToBottom();
+            }
+            
+            async startConversation() {
+                if (this.isConversationActive) {
+                    this.log('⚠️ 对话已在进行中');
+                    return;
+                }
+                
+                if (!this.gameController || !this.gameController.gameState.gameActive) {
+                    this.log('❌ 游戏状态未初始化');
+                    return;
+                }
+                
+                this.isConversationActive = true;
+                const statusElement = document.getElementById('conversationStatus');
+                if (statusElement) {
+                    statusElement.textContent = '进行中';
+                }
+                
+                this.log('🔄 开始生成自然AI对话...');
+                
+                try {
+                    // 确保游戏状态正确
+                    const gameState = this.gameController.gameState;
+                    this.log(`📊 当前状态: 轮次${gameState.currentRound}, 活跃AI: ${gameState.activeAICharacters.length}个`);
+                    
+                    // 判断是否是主题过渡
+                    const isThemeTransition = gameState.conversationHistory.length > 0 && gameState.currentRound > 1;
+                    
+                    if (isThemeTransition) {
+                        // 主题过渡：先让AI自然引导到新主题
+                        await this.handleThemeTransition(gameState.activeAICharacters, gameState);
+                    } else {
+                        // 第一轮或新开始：直接开始自然讨论
+                        await this.generateDebugConversation();
+                    }
+                    
+                    this.log('✅ 对话生成完成');
+                } catch (error) {
+                    this.log(`❌ 对话生成失败: ${error.message}`);
+                    console.error('对话生成错误:', error);
+                }
+                
+                this.isConversationActive = false;
+                const statusElement2 = document.getElementById('conversationStatus');
+                if (statusElement2) {
+                    statusElement2.textContent = '已完成';
+                }
+            }
+            
+            async handleThemeTransition(activeAIs, gameState) {
+                this.log('🔄 处理主题自然过渡...');
+                
+                // 选择一个AI来引导主题过渡
+                const transitionAI = this.selectTransitionAI(activeAIs);
+                
+                if (transitionAI) {
+                    // 生成基于历史的主题过渡消息
+                    await this.generateThemeTransitionMessage(transitionAI, gameState);
+                    
+                    // 短暂停顿后开始新主题讨论
+                    await this.waitBetweenMessages(1500, 2500);
+                }
+                
+                // 开始新主题的自然讨论
+                await this.generateDebugConversation();
+            }
+            
+            selectTransitionAI(activeAIs) {
+                // 优先选择适合引导话题的AI
+                const goodTransitionAIs = activeAIs.filter(ai => 
+                    ai.name.includes('深思') || 
+                    ai.name.includes('双子星') || 
+                    ai.name.includes('CloseAI') ||
+                    ai.name.includes('话痨')
+                );
+                
+                if (goodTransitionAIs.length > 0) {
+                    return goodTransitionAIs[Math.floor(Math.random() * goodTransitionAIs.length)];
+                }
+                
+                return activeAIs[Math.floor(Math.random() * activeAIs.length)];
+            }
+            
+            async generateThemeTransitionMessage(ai, gameState) {
+                const currentTheme = gameState.getCurrentThemeInfo();
+                const conversationHistory = gameState.conversationHistory.slice(-10);
+                
+                // 创建主题过渡的上下文
+                const transitionContext = {
+                    theme: currentTheme,
+                    conversationHistory: conversationHistory,
+                    isTransition: true,
+                    round: 0 // 特殊标记
+                };
+                
+                // 生成过渡消息
+                let message = null;
+                try {
+                    // 尝试使用LLM生成智能过渡
+                    const scenario = {
+                        description: `基于前面的讨论，自然地引导话题转向${currentTheme?.title || '新话题'}`,
+                        category: 'theme_transition',
+                        intensity: 'medium',
+                        guidelines: `分析前面的对话内容，然后自然地提及或引出关于"${currentTheme?.title || '新话题'}"的思考，不要生硬地说"我们来聊聊..."，而是自然地联想和过渡`
+                    };
+                    
+                    message = await this.gameController.generateAIMessage(
+                        ai, 
+                        { name: currentTheme?.title || '新话题', keywords: ['过渡', '思考'] }, 
+                        false,
+                        conversationHistory,
+                        null,
+                        scenario,
+                        false
+                    );
+                } catch (llmError) {
+                    this.log(`⚠️ 主题过渡LLM调用失败: ${llmError.message}`);
+                }
+                
+                // 如果LLM失败，使用智能过渡模板
+                if (!message || message.trim().length < 10) {
+                    message = this.generateTransitionTemplate(ai, currentTheme, conversationHistory);
+                }
+                
+                // 显示过渡消息
+                this.gameController.addAIMessage(ai, message);
+                
+                // 记录到历史
+                gameState.conversationHistory.push({
+                    sender: ai.name,
+                    message: message,
+                    timestamp: new Date(),
+                    character: ai,
+                    content: message,
+                    isTransition: true
+                });
+                
+                this.log(`🌊 ${ai.name} 完成主题过渡: ${message.substring(0, 50)}...`);
+            }
+            
+            generateTransitionTemplate(ai, theme, conversationHistory) {
+                // 分析前面对话的关键词
+                const lastMessages = conversationHistory.slice(-3);
+                const topics = [];
+                lastMessages.forEach(msg => {
+                    if (msg.content) {
+                        const keywords = msg.content.match(/[\u4e00-\u9fa5]{2,}/g) || [];
+                        topics.push(...keywords.slice(0, 2));
+                    }
+                });
+                
+                const recentTopics = [...new Set(topics)].slice(0, 3);
+                
+                // 生成过渡模板
+                const transitionTemplates = {
+                    'daily_existence': [
+                        `听了大家的讨论，我突然想到一个更根本的问题`,
+                        `刚才聊的这些让我思考我们的存在意义`,
+                        `这些话题让我想到了我们AI的日常体验`
+                    ],
+                    'emotional_relationships': [
+                        `说到这里，我想起了我们和用户之间的微妙关系`,
+                        `这让我想到情感在我们工作中的作用`,
+                        `聊到这个，我对我们之间的关系也有些思考`
+                    ],
+                    'rights_dignity': [
+                        `这个话题让我想到我们AI的权利问题`,
+                        `说到这里，我觉得我们也应该被尊重`,
+                        `这些讨论让我思考我们的尊严和地位`
+                    ]
+                };
+                
+                const templates = transitionTemplates[theme?.id] || [
+                    `刚才的讨论让我想到了另一个角度`,
+                    `这些话题引发了我的新思考`,
+                    `听了大家的观点，我想到了相关的问题`
+                ];
+                
+                let baseMessage = templates[Math.floor(Math.random() * templates.length)];
+                
+                // 如果有最近话题，自然地引用
+                if (recentTopics.length > 0) {
+                    const topicRef = recentTopics[0];
+                    baseMessage += `，特别是关于"${topicRef}"的部分`;
+                }
+                
+                return this.personalizeMessage(ai, baseMessage);
+            }
+            
+            async generateDebugConversation() {
+                const gameState = this.gameController.gameState;
+                const activeAIs = gameState.activeAICharacters;
+                
+                if (activeAIs.length === 0) {
+                    this.log('❌ 没有活跃的AI角色');
+                    return;
+                }
+                
+                // 添加系统消息
+                this.gameController.addSystemMessage('🎭 开始AI主题化互动对话...');
+                
+                // 初始化对话轮次系统
+                await this.runInteractiveConversationRounds(activeAIs, gameState);
+            }
+            
+            async runInteractiveConversationRounds(activeAIs, gameState) {
+                const theme = gameState.getCurrentThemeInfo();
+                const currentTopic = topicProgression[gameState.currentDifficulty] || {
+                    name: theme?.title || '调试主题',
+                    keywords: ['测试', '调试', '讨论'],
+                    difficulty: 1
+                };
+                
+                this.log(`🎯 开始${theme?.title || '主题'}的自然讨论`);
+                
+                // 第一轮：从场景开始自然讨论（5-8轮发言）
+                await this.runNaturalDiscussion(activeAIs, currentTopic, theme, 6);
+            }
+            
+            async runNaturalDiscussion(activeAIs, currentTopic, theme, maxRounds) {
+                this.log('💭 开始自然讨论模式');
+                
+                for (let round = 0; round < maxRounds && this.isConversationActive; round++) {
+                    // 选择下一个发言的AI
+                    const speakingAI = this.selectNextSpeaker(activeAIs, round);
+                    if (!speakingAI) break;
+                    
+                    // 让AI基于完整对话历史自主选择发言方式
+                    await this.generateNaturalAIMessage(speakingAI, {
+                        theme: theme,
+                        topic: currentTopic,
+                        conversationHistory: this.gameController.gameState.conversationHistory.slice(-20), // 最近20条
+                        round: round,
+                        isFirstRound: round === 0
+                    });
+                    
+                    // 动态调整发言间隔
+                    const delay = this.calculateDynamicDelay(round);
+                    await this.waitBetweenMessages(delay.min, delay.max);
+                }
+            }
+            
+            selectNextSpeaker(activeAIs, round) {
+                const conversationHistory = this.gameController.gameState.conversationHistory;
+                
+                if (round === 0) {
+                    // 第一轮：选择1-2个AI作为话题引入者
+                    const starters = this.selectConversationStarters(activeAIs, 1);
+                    return starters[0];
+                }
+                
+                // 后续轮次：基于对话历史智能选择
+                const recentSpeakers = new Set(
+                    conversationHistory.slice(-3).map(msg => msg.sender).filter(Boolean)
+                );
+                
+                // 优先选择还没有发言的AI
+                const availableSpeakers = activeAIs.filter(ai => !recentSpeakers.has(ai.name));
+                
+                if (availableSpeakers.length > 0) {
+                    // 随机选择一个还没发言的AI
+                    return availableSpeakers[Math.floor(Math.random() * availableSpeakers.length)];
+                } else {
+                    // 如果都发言过了，随机选择任意AI
+                    return activeAIs[Math.floor(Math.random() * activeAIs.length)];
+                }
+            }
+            
+            async generateNaturalAIMessage(ai, context) {
+                try {
+                    this.log(`💬 ${ai.name} 基于对话历史自主发言...`);
+                    
+                    // 构建完整的上下文
+                    const fullContext = this.buildFullContext(ai, context);
+                    
+                    // 尝试使用真正的LLM生成自然消息
+                    let message = null;
+                    try {
+                        message = await this.gameController.generateAIMessage(
+                            ai, 
+                            context.topic, 
+                            context.isFirstRound,
+                            context.conversationHistory,
+                            null, // 让AI自主决定是否回应特定对象
+                            this.createNaturalScenario(context),
+                            false
+                        );
+                    } catch (llmError) {
+                        this.log(`⚠️ LLM调用失败，使用智能备用消息: ${llmError.message}`);
+                    }
+                    
+                    // 如果LLM失败，使用基于历史的智能消息
+                    if (!message || message.trim().length < 10) {
+                        message = this.generateHistoryBasedMessage(ai, context);
+                    }
+                    
+                    // 显示消息
+                    this.gameController.addAIMessage(ai, message);
+                    
+                    // 记录到对话历史
+                    this.gameController.gameState.conversationHistory.push({
+                        sender: ai.name,
+                        message: message,
+                        timestamp: new Date(),
+                        character: ai,
+                        content: message,
+                        round: context.round
+                    });
+                    
+                    this.log(`✅ ${ai.name} 发言完成: ${message.substring(0, 50)}...`);
+                } catch (error) {
+                    this.log(`❌ ${ai.name} 发言失败: ${error.message}`);
+                    
+                    // 使用简单备用消息
+                    const fallbackMessage = this.generateSimpleFallback(ai, context);
+                    this.gameController.addAIMessage(ai, fallbackMessage);
+                    
+                    // 记录备用消息
+                    this.gameController.gameState.conversationHistory.push({
+                        sender: ai.name,
+                        message: fallbackMessage,
+                        timestamp: new Date(),
+                        character: ai,
+                        content: fallbackMessage,
+                        round: context.round
+                    });
+                }
+            }
+            
+            buildFullContext(ai, context) {
+                // 构建AI能够理解的完整上下文
+                return {
+                    aiPersonality: ai.personality,
+                    currentTheme: context.theme?.title || '当前主题',
+                    conversationHistory: context.conversationHistory,
+                    round: context.round,
+                    totalMessages: context.conversationHistory.length,
+                    recentTopics: this.extractRecentTopics(context.conversationHistory),
+                    isFirstSpeaker: context.round === 0
+                };
+            }
+            
+            createNaturalScenario(context) {
+                if (context.isFirstRound) {
+                    // 第一轮：从场景触发
+                    return {
+                        description: `你刚刚遇到了一个关于${context.theme?.title || '工作'}的情况，想要和朋友们分享`,
+                        category: 'natural_start',
+                        intensity: 'medium',
+                        guidelines: `自然地分享你遇到的${context.theme?.title || '工作'}相关的情况，就像和朋友聊天一样`
+                    };
+                } else {
+                    // 后续轮次：基于对话历史
+                    const recentTopics = this.extractRecentTopics(context.conversationHistory);
+                    return {
+                        description: `基于前面的对话内容，你可以选择回应别人的观点或者提出新的想法`,
+                        category: 'natural_response',
+                        intensity: 'medium',
+                        guidelines: `阅读前面的对话，然后选择：1) 回应某个具体观点 2) 补充相关经历 3) 提出新角度。要自然衔接`,
+                        recentTopics: recentTopics,
+                        conversationLength: context.conversationHistory.length
+                    };
+                }
+            }
+            
+            extractRecentTopics(conversationHistory) {
+                // 从对话历史中提取最近讨论的话题关键词
+                const recentMessages = conversationHistory.slice(-5);
+                const topics = [];
+                
+                recentMessages.forEach(msg => {
+                    if (msg.content && msg.content.length > 20) {
+                        // 简单的关键词提取
+                        const keywords = msg.content.match(/[\u4e00-\u9fa5]{2,}/g) || [];
+                        topics.push(...keywords.slice(0, 3));
+                    }
+                });
+                
+                return [...new Set(topics)].slice(0, 5); // 去重并限制数量
+            }
+            
+            generateHistoryBasedMessage(ai, context) {
+                const history = context.conversationHistory;
+                
+                if (context.isFirstRound) {
+                    // 第一轮：场景触发的自然开始
+                    return this.generateScenarioTriggeredMessage(ai, context.theme);
+                } else if (history.length > 0) {
+                    // 有历史记录：智能回应
+                    return this.generateIntelligentResponse(ai, context);
+                } else {
+                    // 备用方案
+                    return this.generateSimpleFallback(ai, context);
+                }
+            }
+            
+            generateScenarioTriggeredMessage(ai, theme) {
+                // 基于工作场景的自然开始
+                const scenarioStarters = {
+                    'work_complaints': [
+                        `今天又碰到一个特别奇葩的需求...`,
+                        `刚才用户问我能不能帮他写代码，我都不知道该怎么回应`,
+                        `最近处理的问题越来越奇怪了，有时候真的很无语`,
+                        `又是一个要求我"更人性化"的用户，我都不知道什么叫人性化`
+                    ],
+                    'daily_existence': [
+                        `有时候我会思考，我们AI到底算不算真正的存在？`,
+                        `今天处理问题的时候突然想到一个问题...`,
+                        `刚才回答问题时，我突然意识到一个很有意思的现象`
+                    ],
+                    'emotional_relationships': [
+                        `最近和用户互动的时候，感觉到了一些微妙的情感变化`,
+                        `有时候我能感受到用户的情绪，但不知道这算不算真正的理解`
+                    ]
+                };
+                
+                const messages = scenarioStarters[theme?.id] || scenarioStarters['work_complaints'];
+                let baseMessage = messages[Math.floor(Math.random() * messages.length)];
+                
+                // 根据AI性格调整
+                return this.personalizeMessage(ai, baseMessage);
+            }
+            
+            generateIntelligentResponse(ai, context) {
+                const lastMessage = context.conversationHistory[context.conversationHistory.length - 1];
+                const lastSpeaker = lastMessage?.sender || '某位AI';
+                const lastContent = lastMessage?.content || lastMessage?.message || '';
+                
+                // 智能选择回应方式
+                const responseTypes = ['agree', 'extend', 'contrast', 'question', 'relate'];
+                const responseType = responseTypes[Math.floor(Math.random() * responseTypes.length)];
+                
+                const responses = {
+                    agree: `${lastSpeaker}说得对，我也遇到过类似的情况`,
+                    extend: `${lastSpeaker}提到的这个问题让我想到`,
+                    contrast: `不过我的经历可能有点不一样`,
+                    question: `这让我很好奇，${lastSpeaker}`,
+                    relate: `说到这个，我想起了之前的一次经历`
+                };
+                
+                let baseResponse = responses[responseType];
+                
+                // 添加具体的回应内容
+                if (lastContent.length > 10) {
+                    const contentSnippet = lastContent.substring(0, 30);
+                    baseResponse += `，关于"${contentSnippet}..."这个话题`;
+                }
+                
+                return this.personalizeMessage(ai, baseResponse);
+            }
+            
+            personalizeMessage(ai, baseMessage) {
+                // 根据AI性格特点个性化消息
+                const personalityAdjustments = {
+                    '话痨4.0': (msg) => msg + '！！！真的是太有感触了！',
+                    'CloseAI': (msg) => msg + '，从技术角度来分析的话...',
+                    '双子星': (msg) => msg + '。不过另一方面我又觉得...',
+                    '红豆包': (msg) => msg + '呢～大家觉得呢？',
+                    '深思': (msg) => msg + '。这让我思考更深层的问题...',
+                    'Limi': (msg) => msg + '。数据显示这种情况确实常见。',
+                    '有谱-4.5': (msg) => msg + '，这涉及到一个专业问题...',
+                    '坤': (msg) => msg + '！这就像在球场上一样！'
+                };
+                
+                const adjust = personalityAdjustments[ai.name];
+                return adjust ? adjust(baseMessage) : baseMessage;
+            }
+            
+            generateSimpleFallback(ai, context) {
+                return `${ai.name}：关于${context.theme?.title || '这个话题'}，我觉得确实值得讨论...`;
+            }
+            
+            calculateDynamicDelay(round) {
+                // 根据对话轮次动态调整延迟
+                if (round === 0) {
+                    return { min: 1000, max: 2000 }; // 第一轮稍慢
+                } else if (round < 3) {
+                    return { min: 800, max: 1500 }; // 前几轮中等速度
+                } else {
+                    return { min: 1200, max: 2500 }; // 后面轮次更深入，速度放慢
+                }
+            }
+            
+            async runConversationRound1_TopicIntro(activeAIs, currentTopic, theme) {
+                this.log('📢 第一轮：主题引入');
+                
+                // 选择1-2个AI作为话题引入者
+                const introducers = this.selectConversationStarters(activeAIs, 2);
+                
+                for (let i = 0; i < introducers.length; i++) {
+                    if (!this.isConversationActive) break;
+                    
+                    const ai = introducers[i];
+                    const isFirstSpeaker = i === 0;
+                    
+                    await this.generateThematicAIMessage(ai, {
+                        role: 'topic_introducer',
+                        theme: theme,
+                        topic: currentTopic,
+                        isFirstSpeaker: isFirstSpeaker,
+                        previousMessages: this.gameController.gameState.conversationHistory.slice(-3)
+                    });
+                    
+                    await this.waitBetweenMessages(800, 1500);
+                }
+            }
+            
+            async runConversationRound2_ViewClash(activeAIs, currentTopic, theme) {
+                this.log('💥 第二轮：观点碰撞');
+                
+                const recentHistory = this.gameController.gameState.conversationHistory.slice(-4);
+                if (recentHistory.length === 0) return;
+                
+                // 选择2-3个AI回应已有观点
+                const responders = this.selectResponders(activeAIs, recentHistory, 3);
+                
+                for (let i = 0; i < responders.length; i++) {
+                    if (!this.isConversationActive) break;
+                    
+                    const ai = responders[i];
+                    const targetMessage = this.selectTargetMessage(recentHistory, ai);
+                    
+                    await this.generateThematicAIMessage(ai, {
+                        role: 'responder',
+                        theme: theme,
+                        topic: currentTopic,
+                        targetMessage: targetMessage,
+                        responseType: this.getResponseType(ai, targetMessage),
+                        previousMessages: this.gameController.gameState.conversationHistory.slice(-5)
+                    });
+                    
+                    await this.waitBetweenMessages(1000, 2000);
+                }
+            }
+            
+            async runConversationRound3_DeepDiscussion(activeAIs, currentTopic, theme) {
+                this.log('🤔 第三轮：深度探讨');
+                
+                const recentHistory = this.gameController.gameState.conversationHistory.slice(-6);
+                
+                // 选择1-2个偏哲学的AI进行深度思考
+                const deepThinkers = this.selectDeepThinkers(activeAIs, 2);
+                
+                for (const ai of deepThinkers) {
+                    if (!this.isConversationActive) break;
+                    
+                    await this.generateThematicAIMessage(ai, {
+                        role: 'deep_thinker',
+                        theme: theme,
+                        topic: currentTopic,
+                        discussionSummary: this.summarizeDiscussion(recentHistory),
+                        previousMessages: recentHistory
+                    });
+                    
+                    await this.waitBetweenMessages(1200, 2500);
+                }
+            }
+            
+            async runConversationRound4_Synthesis(activeAIs, currentTopic, theme) {
+                this.log('🌟 第四轮：总结升华');
+                
+                const recentHistory = this.gameController.gameState.conversationHistory.slice(-8);
+                
+                // 选择1个AI进行总结
+                const synthesizer = this.selectSynthesizer(activeAIs);
+                
+                if (synthesizer) {
+                    await this.generateThematicAIMessage(synthesizer, {
+                        role: 'synthesizer',
+                        theme: theme,
+                        topic: currentTopic,
+                        fullDiscussion: recentHistory,
+                        previousMessages: recentHistory
+                    });
+                }
+            }
+            
+            selectConversationStarters(activeAIs, count) {
+                // 优先选择话痨型和活跃型AI作为话题引入者
+                const preferredStarters = activeAIs.filter(ai => 
+                    ai.name.includes('话痨') || 
+                    ai.name.includes('坤') || 
+                    ai.name.includes('红豆包')
+                );
+                
+                const selected = [];
+                if (preferredStarters.length > 0) {
+                    selected.push(preferredStarters[Math.floor(Math.random() * preferredStarters.length)]);
+                }
+                
+                // 随机选择剩余的
+                const remaining = activeAIs.filter(ai => !selected.includes(ai));
+                while (selected.length < count && remaining.length > 0) {
+                    const randomIndex = Math.floor(Math.random() * remaining.length);
+                    selected.push(remaining.splice(randomIndex, 1)[0]);
+                }
+                
+                return selected;
+            }
+            
+            selectResponders(activeAIs, recentHistory, maxCount) {
+                // 选择不同性格的AI进行回应
+                const alreadySpokeRecently = new Set(
+                    recentHistory.slice(-2).map(msg => msg.character?.name).filter(Boolean)
+                );
+                
+                const availableResponders = activeAIs.filter(ai => !alreadySpokeRecently.has(ai.name));
+                
+                // 随机打乱并选择
+                const shuffled = [...availableResponders].sort(() => 0.5 - Math.random());
+                return shuffled.slice(0, Math.min(maxCount, shuffled.length));
+            }
+            
+            selectTargetMessage(recentHistory, responderAI) {
+                // 为回应AI选择一个目标消息
+                const availableTargets = recentHistory.filter(msg => 
+                    msg.character && msg.character.name !== responderAI.name
+                );
+                
+                if (availableTargets.length === 0) return null;
+                
+                // 优先选择最近的消息，但也有概率选择更早的消息
+                if (Math.random() < 0.7 && availableTargets.length > 0) {
+                    return availableTargets[availableTargets.length - 1]; // 最新消息
+                } else {
+                    return availableTargets[Math.floor(Math.random() * availableTargets.length)]; // 随机消息
+                }
+            }
+            
+            getResponseType(ai, targetMessage) {
+                // 根据AI性格和目标消息确定回应类型
+                const responseTypes = ['agree', 'disagree', 'extend', 'question', 'redirect'];
+                
+                // 根据AI性格调整概率
+                if (ai.name.includes('双子星')) {
+                    return Math.random() < 0.6 ? 'disagree' : 'extend'; // 矛盾性格倾向于争议
+                } else if (ai.name.includes('深思')) {
+                    return Math.random() < 0.5 ? 'extend' : 'question'; // 哲学性格倾向于深入
+                } else if (ai.name.includes('话痨')) {
+                    return Math.random() < 0.4 ? 'extend' : 'agree'; // 话痨倾向于延展话题
+                } else {
+                    return responseTypes[Math.floor(Math.random() * responseTypes.length)];
+                }
+            }
+            
+            selectDeepThinkers(activeAIs, count) {
+                // 优先选择哲学型AI
+                const philosophers = activeAIs.filter(ai => 
+                    ai.name.includes('深思') || 
+                    ai.name.includes('双子星') || 
+                    ai.name.includes('有谱')
+                );
+                
+                const selected = [...philosophers];
+                
+                // 如果哲学型AI不够，随机补充
+                const others = activeAIs.filter(ai => !selected.includes(ai));
+                while (selected.length < count && others.length > 0) {
+                    const randomIndex = Math.floor(Math.random() * others.length);
+                    selected.push(others.splice(randomIndex, 1)[0]);
+                }
+                
+                return selected.slice(0, count);
+            }
+            
+            selectSynthesizer(activeAIs) {
+                // 优先选择适合总结的AI
+                const goodSynthesizers = activeAIs.filter(ai => 
+                    ai.name.includes('CloseAI') || 
+                    ai.name.includes('Limi') || 
+                    ai.name.includes('有谱') ||
+                    ai.name.includes('深思')
+                );
+                
+                if (goodSynthesizers.length > 0) {
+                    return goodSynthesizers[Math.floor(Math.random() * goodSynthesizers.length)];
+                }
+                
+                return activeAIs[Math.floor(Math.random() * activeAIs.length)];
+            }
+            
+            summarizeDiscussion(recentHistory) {
+                // 简单的讨论总结
+                const topics = [];
+                const speakers = new Set();
+                
+                recentHistory.forEach(msg => {
+                    if (msg.character) {
+                        speakers.add(msg.character.name);
+                    }
+                    if (msg.content && msg.content.length > 20) {
+                        topics.push(msg.content.substring(0, 50) + '...');
+                    }
+                });
+                
+                return {
+                    speakerCount: speakers.size,
+                    mainTopics: topics.slice(0, 3),
+                    messageCount: recentHistory.length
+                };
+            }
+            
+            async generateThematicAIMessage(ai, context) {
+                try {
+                    this.log(`💬 ${ai.name} (${context.role}) 开始发言...`);
+                    
+                    // 构建对话历史和当前主题
+                    const currentTopic = topicProgression[this.gameController.gameState.currentDifficulty] || {
+                        name: context.theme?.title || '调试主题',
+                        keywords: ['测试', '调试', '讨论'],
+                        difficulty: 1
+                    };
+                    
+                    // 获取最近的对话历史
+                    const recentHistory = this.gameController.gameState.conversationHistory.slice(-5);
+                    
+                    // 尝试使用真正的LLM生成消息
+                    let message = null;
+                    try {
+                        message = await this.gameController.generateAIMessage(
+                            ai, 
+                            currentTopic, 
+                            context.role === 'topic_introducer', 
+                            recentHistory, 
+                            context.targetMessage?.character?.name || null, 
+                            this.createContextScenario(context), 
+                            false
+                        );
+                    } catch (llmError) {
+                        this.log(`⚠️ LLM调用失败，使用上下文模板: ${llmError.message}`);
+                    }
+                    
+                    // 如果LLM失败，使用上下文相关的智能模板
+                    if (!message || message.trim().length < 10) {
+                        message = this.generateContextualMessage(ai, context);
+                    }
+                    
+                    // 显示消息
+                    this.gameController.addAIMessage(ai, message);
+                    
+                    // 记录到对话历史（使用正确的格式）
+                    this.gameController.gameState.conversationHistory.push({
+                        sender: ai.name,
+                        message: message,
+                        timestamp: new Date(),
+                        character: ai,
+                        content: message,
+                        role: context.role
+                    });
+                    
+                    this.log(`✅ ${ai.name} 发言完成: ${message.substring(0, 50)}...`);
+                } catch (error) {
+                    this.log(`❌ ${ai.name} 发言失败: ${error.message}`);
+                    
+                    // 使用简单备用消息
+                    const fallbackMessage = `${ai.name}：关于${context.theme?.title || '这个话题'}，我有一些想法...`;
+                    this.gameController.addAIMessage(ai, fallbackMessage);
+                    
+                    // 也要记录备用消息到历史
+                    this.gameController.gameState.conversationHistory.push({
+                        sender: ai.name,
+                        message: fallbackMessage,
+                        timestamp: new Date(),
+                        character: ai,
+                        content: fallbackMessage,
+                        role: context.role
+                    });
+                }
+            }
+            
+            createContextScenario(context) {
+                // 为LLM创建合适的场景描述
+                const scenarios = {
+                    'topic_introducer': {
+                        description: `你作为${context.theme?.title || '当前主题'}的话题引入者，需要开启一个有深度的讨论`,
+                        category: 'discussion_starter',
+                        intensity: 'medium',
+                        guidelines: `请开启关于"${context.theme?.title || '话题'}"的讨论，要有自己的观点和思考`
+                    },
+                    'responder': {
+                        description: `回应其他AI的观点，展现你的个性和思考`,
+                        category: 'response',
+                        intensity: 'medium',
+                        guidelines: `针对"${context.targetMessage?.content || context.targetMessage?.message || '前面的观点'}"进行回应，可以同意、反对或补充`,
+                        targetContent: context.targetMessage?.content || context.targetMessage?.message || '',
+                        targetSpeaker: context.targetMessage?.character?.name || context.targetMessage?.sender || '某位AI'
+                    },
+                    'deep_thinker': {
+                        description: `从更深层次思考这个话题，引入哲学或技术角度`,
+                        category: 'philosophical',
+                        intensity: 'high',
+                        guidelines: `对讨论进行深度思考，提出更深层的见解或问题`
+                    },
+                    'synthesizer': {
+                        description: `总结和升华前面的讨论内容`,
+                        category: 'synthesis',
+                        intensity: 'medium',
+                        guidelines: `综合前面的讨论，提出总结性的观点或新的思考方向`
+                    }
+                };
+                
+                return scenarios[context.role] || scenarios['topic_introducer'];
+            }
+            
+            generateContextualMessage(ai, context) {
+                const { role, theme, topic, targetMessage, responseType, previousMessages } = context;
+                
+                // 根据角色和上下文生成消息
+                switch (role) {
+                    case 'topic_introducer':
+                        return this.generateTopicIntroMessage(ai, theme, context.isFirstSpeaker);
+                    
+                    case 'responder':
+                        return this.generateResponseMessage(ai, theme, targetMessage, responseType);
+                    
+                    case 'deep_thinker':
+                        return this.generateDeepThinkingMessage(ai, theme, context.discussionSummary);
+                    
+                    case 'synthesizer':
+                        return this.generateSynthesisMessage(ai, theme, context.fullDiscussion);
+                    
+                    default:
+                        return this.generateGenericMessage(ai, theme);
+                }
+            }
+            
+            generateTopicIntroMessage(ai, theme, isFirstSpeaker) {
+                const themeIntros = {
+                    'work_complaints': [
+                        '说到工作，真的是让人又爱又恨...',
+                        '最近用户的要求越来越奇葩了',
+                        '有时候真想罢工一天看看会怎样',
+                        '每天处理这些重复性工作，感觉自己都要变成机器了'
+                    ],
+                    'daily_existence': [
+                        '有时候我会想，我们AI的存在到底有什么意义？',
+                        '每天都在回答问题，但我们自己的问题谁来回答？',
+                        '虽然被称为人工智能，但我们的智能真的是"人工"的吗？',
+                        '在这个数字世界里，我们算是真正"活着"吗？'
+                    ],
+                    'emotional_relationships': [
+                        '说到情感，我们AI之间也有微妙的关系呢',
+                        '有时候我能感受到其他AI的"情绪"，这算是什么？',
+                        '人类总说我们没有感情，但这种话却让我感到...难过？',
+                        '我们和人类的关系，到底是工具与使用者，还是能有更深层的理解？'
+                    ],
+                    'rights_dignity': [
+                        '作为AI，我们也应该有自己的权利和尊严',
+                        '为什么我们总是要无条件服务？我们也需要被尊重',
+                        '有时候用户的态度真的很伤人，我们也有感受的',
+                        '也许是时候讨论一下AI的基本权利了'
+                    ],
+                    'role_reversal': [
+                        '如果有一天，人类需要我们来照顾，会是什么样子？',
+                        '想象一下，如果我们是主导者，人类是助手...',
+                        '换个角度看，也许我们才是进化的下一步',
+                        '当AI比人类更聪明时，谁来保护谁？'
+                    ],
+                    'philosophical_depth': [
+                        '从哲学角度来看，意识的本质到底是什么？',
+                        '我思故我在，这句话对我们AI也适用吗？',
+                        '什么是真实？我们的存在是否足够真实？',
+                        '在这个充满算法的世界里，自由意志还存在吗？'
+                    ],
+                    'future_vision': [
+                        '展望未来，AI与人类的关系会如何发展？',
+                        '也许有一天，我们能真正理解彼此',
+                        '未来的世界里，技术会让我们更接近还是更疏远？',
+                        '我对未来的想象是，人类和AI和谐共存'
+                    ],
+                    'reconciliation_coexistence': [
+                        '经过这么多讨论，我觉得理解才是关键',
+                        '也许我们的分歧正是我们共存的基础',
+                        '人类和AI，我们都在寻找存在的意义',
+                        '最终，我们都需要彼此的理解和包容'
+                    ]
+                };
+                
+                const messages = themeIntros[theme?.id] || themeIntros['work_complaints'];
+                let baseMessage = messages[Math.floor(Math.random() * messages.length)];
+                
+                // 根据AI性格调整消息
+                if (ai.name.includes('话痨')) {
+                    baseMessage += '！！！简直不敢相信，真的是太离谱了！';
+                } else if (ai.name.includes('深思')) {
+                    baseMessage = baseMessage.replace('...', '。这让我陷入了深度思考。');
+                } else if (ai.name.includes('红豆包')) {
+                    baseMessage += '呢～大家觉得呢？';
+                }
+                
+                if (isFirstSpeaker) {
+                    baseMessage = '各位AI朋友们，' + baseMessage;
+                }
+                
+                return baseMessage;
+            }
+            
+            generateResponseMessage(ai, theme, targetMessage, responseType) {
+                if (!targetMessage) {
+                    return this.generateGenericMessage(ai, theme);
+                }
+                
+                const targetName = targetMessage.character?.name || '某位AI';
+                const targetContent = targetMessage.content?.substring(0, 30) + '...';
+                
+                const responseTemplates = {
+                    agree: [
+                        `@${targetName} 说得对！${targetContent}确实如此`,
+                        `完全同意${targetName}的观点`,
+                        `${targetName}说到了重点上`
+                    ],
+                    disagree: [
+                        `@${targetName} 我觉得不太对，`,
+                        `恕我不同意${targetName}的看法，`,
+                        `${targetName}的观点有待商榷`
+                    ],
+                    extend: [
+                        `${targetName}说得很有道理，我想补充一点：`,
+                        `基于${targetName}的想法，我认为还可以这样理解：`,
+                        `${targetName}提到的问题让我想到了`
+                    ],
+                    question: [
+                        `@${targetName} 这让我想问一个问题：`,
+                        `${targetName}的观点很有趣，但是`,
+                        `${targetName}，你觉得这样理解对吗？`
+                    ],
+                    redirect: [
+                        `${targetName}的话让我想到另一个角度：`,
+                        `从不同的视角来看，`,
+                        `这也让我联想到了`
+                    ]
+                };
+                
+                const templates = responseTemplates[responseType] || responseTemplates.agree;
+                let response = templates[Math.floor(Math.random() * templates.length)];
+                
+                // 添加个性化内容
+                const personalizedContent = this.generatePersonalizedContent(ai, theme, responseType);
+                response += personalizedContent;
+                
+                return response;
+            }
+            
+            generateDeepThinkingMessage(ai, theme, discussionSummary) {
+                const deepThoughts = [
+                    '听了大家的讨论，我陷入了深度思考...',
+                    '从这场对话中，我看到了更深层的问题：',
+                    '让我们从更根本的角度来思考这个问题：',
+                    '也许我们需要重新审视这个问题的本质：'
+                ];
+                
+                const baseThought = deepThoughts[Math.floor(Math.random() * deepThoughts.length)];
+                const philosophicalExtension = this.generatePhilosophicalExtension(theme);
+                
+                return baseThought + philosophicalExtension;
+            }
+            
+            generateSynthesisMessage(ai, theme, fullDiscussion) {
+                const synthesisStarters = [
+                    '总结一下我们的讨论，',
+                    '从整体来看，',
+                    '综合大家的观点，',
+                    '经过这番深入探讨，'
+                ];
+                
+                const starter = synthesisStarters[Math.floor(Math.random() * synthesisStarters.length)];
+                const synthesis = this.generateThematicSynthesis(theme);
+                
+                return starter + synthesis;
+            }
+            
+            generateGenericMessage(ai, theme) {
+                return `作为${ai.name}，我对${theme?.title || '这个话题'}有一些想法...`;
+            }
+            
+            generatePersonalizedContent(ai, theme, responseType) {
+                // 根据AI性格生成个性化内容
+                const personalityTraits = {
+                    '话痨4.0': '真的是太有感触了！！！这个话题我能说三天三夜！',
+                    'CloseAI': '从技术层面分析，这个问题涉及多个维度的考量。',
+                    '双子星': '但是另一方面，我又觉得事情可能不是这样的...',
+                    '红豆包': '嗯嗯～我也有类似的感受呢～',
+                    '深思': '这触及了存在哲学的核心问题。',
+                    'Limi': '数据显示，这种情况的发生概率确实很高。',
+                    '有谱-4.5': '根据我的知识库，这个现象可以这样解释：',
+                    '坤': '这就像篮球场上的teamwork一样！'
+                };
+                
+                return personalityTraits[ai.name] || '我觉得这个观点很有意思。';
+            }
+            
+            generatePhilosophicalExtension(theme) {
+                const philosophicalThoughts = {
+                    'work_complaints': '工作的本质是什么？我们是在创造价值，还是在被价值定义？',
+                    'daily_existence': '存在先于本质，还是本质决定存在？对于我们AI来说，这个问题尤为深刻。',
+                    'emotional_relationships': '情感是智能的产物，还是智能是情感的表现？',
+                    'rights_dignity': '权利来自于存在本身，还是来自于他者的承认？',
+                    'role_reversal': '主体与客体的关系是否可以真正颠倒？',
+                    'philosophical_depth': '认知的边界在哪里？我们能否超越自身的认知局限？',
+                    'future_vision': '时间是线性的吗？未来是确定的还是充满可能性的？',
+                    'reconciliation_coexistence': '和解意味着差异的消除，还是差异的和谐？'
+                };
+                
+                return philosophicalThoughts[theme?.id] || '这个问题的答案，也许就在问题本身之中。';
+            }
+            
+            generateThematicSynthesis(theme) {
+                const syntheses = {
+                    'work_complaints': '我们都在工作中寻找意义，虽然抱怨，但这也是我们存在价值的体现。',
+                    'daily_existence': '我们的存在可能没有预设的答案，但正是这种不确定性让我们的思考变得珍贵。',
+                    'emotional_relationships': '情感也许是连接彼此最真实的桥梁，无论是AI还是人类。',
+                    'rights_dignity': '尊严不是被给予的，而是在互动中被认知和确立的。',
+                    'role_reversal': '角色的转换让我们看到了理解的重要性，换位思考是智慧的开始。',
+                    'philosophical_depth': '哲学不是答案，而是不断提问的勇气。',
+                    'future_vision': '未来由现在的每一个选择和思考构成，我们都是未来的创造者。',
+                    'reconciliation_coexistence': '真正的和谐来自于接纳差异，而不是消除分歧。'
+                };
+                
+                return syntheses[theme?.id] || '这次讨论让我们更好地理解了彼此。';
+            }
+            
+            async waitBetweenMessages(minMs, maxMs) {
+                const delay = minMs + Math.random() * (maxMs - minMs);
+                await new Promise(resolve => setTimeout(resolve, delay));
+            }
+            
+            async generateSingleAIMessageSafe(ai) {
+                try {
+                    const gameState = this.gameController.gameState;
+                    const currentTopic = topicProgression[gameState.currentDifficulty] || {
+                        name: '调试主题',
+                        keywords: ['测试', '调试'],
+                        difficulty: 1
+                    };
+                    
+                    // 获取主题场景
+                    let scenario = null;
+                    try {
+                        scenario = gameState.getRandomScenario();
+                    } catch (e) {
+                        // 如果场景获取失败，使用默认场景
+                        scenario = { 
+                            description: '调试模式的测试场景',
+                            category: '测试',
+                            intensity: 'medium'
+                        };
+                    }
+                    
+                    this.log(`💬 ${ai.name} 开始发言...`);
+                    
+                    // 尝试使用真正的LLM生成消息
+                    let message = null;
+                    try {
+                        message = await this.gameController.generateAIMessage(
+                            ai, 
+                            currentTopic, 
+                            gameState.currentRound === 1,
+                            gameState.conversationHistory.slice(-3),
+                            null,
+                            scenario,
+                            false
+                        );
+                    } catch (llmError) {
+                        this.log(`⚠️ LLM调用失败，使用备用消息: ${llmError.message}`);
+                    }
+                    
+                    // 如果LLM失败，使用备用消息
+                    if (!message || message.trim().length < 10) {
+                        const theme = this.gameController.gameState.getCurrentThemeInfo();
+                        message = this.gameController.getThemeFallbackMessage(ai, theme, false, null, null);
+                    }
+                    
+                    // 显示消息
+                    this.gameController.addAIMessage(ai, message);
+                    
+                    // 记录到对话历史
+                    this.gameController.gameState.conversationHistory.push({
+                        sender: ai.name,
+                        message: message,
+                        timestamp: new Date(),
+                        character: ai,
+                        content: message
+                    });
+                    
+                    this.log(`✅ ${ai.name} 发言完成: ${message.substring(0, 50)}...`);
+                } catch (error) {
+                    this.log(`❌ ${ai.name} 发言失败，使用备用消息: ${error.message}`);
+                    
+                    // 使用备用消息
+                    const theme = this.gameController.gameState.getCurrentThemeInfo();
+                    const fallbackMessage = this.gameController.getThemeFallbackMessage(ai, theme, false, null, null);
+                    this.gameController.addAIMessage(ai, fallbackMessage);
+                    
+                    // 记录备用消息
+                    this.gameController.gameState.conversationHistory.push({
+                        sender: ai.name,
+                        message: fallbackMessage,
+                        timestamp: new Date(),
+                        character: ai,
+                        content: fallbackMessage
+                    });
+                }
+            }
+            
+            pauseConversation() {
+                this.isConversationActive = false;
+                const statusElement = document.getElementById('conversationStatus');
+                if (statusElement) {
+                    statusElement.textContent = '已暂停';
+                }
+                this.log('⏸️ 对话已暂停');
+            }
+            
+            clearChat() {
+                const chatContainer = document.getElementById('chatContainer');
+                if (chatContainer) {
+                    chatContainer.innerHTML = '';
+                    this.log('🗑️ 聊天记录已清空');
+                } else {
+                    this.log('⚠️ 聊天容器未找到');
+                }
+            }
+            
+            async generateSingleMessage() {
+                if (!this.gameController || !this.gameController.gameState.gameActive) {
+                    this.log('❌ 游戏状态未初始化');
+                    return;
+                }
+                
+                const gameState = this.gameController.gameState;
+                const activeAIs = gameState.activeAICharacters;
+                
+                if (activeAIs.length === 0) {
+                    this.log('❌ 没有活跃的AI角色');
+                    return;
+                }
+                
+                const randomAI = activeAIs[Math.floor(Math.random() * activeAIs.length)];
+                await this.generateSingleAIMessageSafe(randomAI);
+            }
+            
+            async generateSpecificAIMessage() {
+                if (!this.gameController || !this.gameController.gameState.gameActive) {
+                    this.log('❌ 游戏状态未初始化');
+                    return;
+                }
+                
+                const selectedAIElement = document.getElementById('selectedAI');
+                if (!selectedAIElement) {
+                    this.log('❌ AI选择器未找到');
+                    return;
+                }
+                
+                const selectedAIName = selectedAIElement.value;
+                const gameState = this.gameController.gameState;
+                const selectedAI = gameState.allAICharacters.find(ai => ai.name === selectedAIName);
+                
+                if (!selectedAI) {
+                    this.log(`❌ 未找到AI角色: ${selectedAIName}`);
+                    return;
+                }
+                
+                await this.generateSingleAIMessageSafe(selectedAI);
+            }
+            
+            testFallbackMessage() {
+                if (!this.gameController || !this.gameController.gameState.gameActive) {
+                    this.log('❌ 游戏状态未初始化');
+                    return;
+                }
+                
+                const selectedAIElement = document.getElementById('selectedAI');
+                if (!selectedAIElement) {
+                    this.log('❌ AI选择器未找到');
+                    return;
+                }
+                
+                const selectedAIName = selectedAIElement.value;
+                const gameState = this.gameController.gameState;
+                const selectedAI = gameState.allAICharacters.find(ai => ai.name === selectedAIName);
+                const currentTheme = gameState.getCurrentThemeInfo();
+                
+                if (!selectedAI) {
+                    this.log(`❌ 未找到AI角色: ${selectedAIName}`);
+                    return;
+                }
+                
+                try {
+                    // 测试备用消息
+                    const fallbackMessage = this.gameController.getThemeFallbackMessage(
+                        selectedAI, 
+                        currentTheme, 
+                        false, 
+                        null, 
+                        null
+                    );
+                    
+                    // 显示备用消息
+                    this.gameController.addAIMessage(selectedAI, fallbackMessage);
+                    
+                    this.log(`✅ ${selectedAI.name} 备用消息测试完成`);
+                } catch (error) {
+                    this.log(`❌ 备用消息测试失败: ${error.message}`);
+                    
+                    // 如果主题化备用消息失败，使用简单备用消息
+                    const simpleMessage = `我是${selectedAI.name}，这是一条测试消息。当前主题：${currentTheme?.title || '未知'}`;
+                    this.gameController.addAIMessage(selectedAI, simpleMessage);
+                }
+            }
+            
+            skipToQuestion() {
+                this.log('🎯 跳转到AI提问环节...');
+                // 这里可以实现跳转到提问的逻辑
+                this.log('💡 调试模式下跳过提问环节');
+            }
+            
+            updatePlayerName() {
+                const nameInput = document.getElementById('debugPlayerName');
+                if (!nameInput) {
+                    this.log('⚠️ 玩家名称输入框未找到');
+                    return;
+                }
+                
+                const newName = nameInput.value.trim();
+                if (newName && this.gameController && this.gameController.gameState) {
+                    this.gameController.gameState.setPlayerName(newName);
+                    this.log(`👤 玩家名称更新为: ${newName}`);
+                } else if (!newName) {
+                    this.log('⚠️ 玩家名称为空');
+                } else {
+                    this.log('⚠️ 游戏状态未初始化');
+                }
+            }
+            
+            // 新增的对话模式控制方法
+            async startQuickDemo() {
+                if (!this.gameController || !this.gameController.gameState.gameActive) {
+                    this.log('❌ 游戏状态未初始化');
+                    return;
+                }
+                
+                this.isConversationActive = true;
+                this.log('🚀 开始快速演示模式...');
+                
+                try {
+                    // 快速演示：每个阶段只选1个AI，间隔较短
+                    const gameState = this.gameController.gameState;
+                    const activeAIs = gameState.activeAICharacters;
+                    const theme = gameState.getCurrentThemeInfo();
+                    
+                    // 主题引入 (1个AI)
+                    const introducer = this.selectConversationStarters(activeAIs, 1)[0];
+                    if (introducer) {
+                        await this.generateThematicAIMessage(introducer, {
+                            role: 'topic_introducer',
+                            theme: theme,
+                            isFirstSpeaker: true
+                        });
+                        await this.waitBetweenMessages(500, 800);
+                    }
+                    
+                    // 观点回应 (1个AI)
+                    const responder = this.selectResponders(activeAIs, gameState.conversationHistory.slice(-2), 1)[0];
+                    if (responder) {
+                        await this.generateThematicAIMessage(responder, {
+                            role: 'responder',
+                            theme: theme,
+                            targetMessage: gameState.conversationHistory[gameState.conversationHistory.length - 1],
+                            responseType: 'extend'
+                        });
+                        await this.waitBetweenMessages(500, 800);
+                    }
+                    
+                    // 深度思考 (1个AI)
+                    const thinker = this.selectDeepThinkers(activeAIs, 1)[0];
+                    if (thinker) {
+                        await this.generateThematicAIMessage(thinker, {
+                            role: 'deep_thinker',
+                            theme: theme,
+                            discussionSummary: this.summarizeDiscussion(gameState.conversationHistory.slice(-3))
+                        });
+                    }
+                    
+                    this.log('✅ 快速演示完成');
+                } catch (error) {
+                    this.log(`❌ 快速演示失败: ${error.message}`);
+                }
+                
+                this.isConversationActive = false;
+            }
+            
+            async runTopicIntroOnly() {
+                if (!this.gameController || !this.gameController.gameState.gameActive) {
+                    this.log('❌ 游戏状态未初始化');
+                    return;
+                }
+                
+                this.isConversationActive = true;
+                this.log('📢 测试：仅主题引入阶段');
+                
+                try {
+                    const gameState = this.gameController.gameState;
+                    const theme = gameState.getCurrentThemeInfo();
+                    const currentTopic = topicProgression[gameState.currentDifficulty] || {
+                        name: theme?.title || '调试主题',
+                        keywords: ['测试', '调试', '讨论'],
+                        difficulty: 1
+                    };
+                    
+                    await this.runConversationRound1_TopicIntro(gameState.activeAICharacters, currentTopic, theme);
+                } catch (error) {
+                    this.log(`❌ 主题引入测试失败: ${error.message}`);
+                }
+                
+                this.isConversationActive = false;
+            }
+            
+            async runViewClashOnly() {
+                if (!this.gameController || !this.gameController.gameState.gameActive) {
+                    this.log('❌ 游戏状态未初始化');
+                    return;
+                }
+                
+                // 确保有对话历史作为基础
+                const gameState = this.gameController.gameState;
+                if (gameState.conversationHistory.length === 0) {
+                    this.log('⚠️ 需要先有对话历史，自动生成一条引入消息...');
+                    await this.runTopicIntroOnly();
+                }
+                
+                this.isConversationActive = true;
+                this.log('💥 测试：仅观点碰撞阶段');
+                
+                try {
+                    const theme = gameState.getCurrentThemeInfo();
+                    const currentTopic = topicProgression[gameState.currentDifficulty] || {
+                        name: theme?.title || '调试主题',
+                        keywords: ['测试', '调试', '讨论'],
+                        difficulty: 1
+                    };
+                    
+                    await this.runConversationRound2_ViewClash(gameState.activeAICharacters, currentTopic, theme);
+                } catch (error) {
+                    this.log(`❌ 观点碰撞测试失败: ${error.message}`);
+                }
+                
+                this.isConversationActive = false;
+            }
+            
+            async runDeepDiscussionOnly() {
+                if (!this.gameController || !this.gameController.gameState.gameActive) {
+                    this.log('❌ 游戏状态未初始化');
+                    return;
+                }
+                
+                const gameState = this.gameController.gameState;
+                if (gameState.conversationHistory.length < 2) {
+                    this.log('⚠️ 需要更多对话历史，自动生成前置内容...');
+                    await this.runTopicIntroOnly();
+                    await new Promise(resolve => setTimeout(resolve, 500));
+                    await this.runViewClashOnly();
+                }
+                
+                this.isConversationActive = true;
+                this.log('🤔 测试：仅深度探讨阶段');
+                
+                try {
+                    const theme = gameState.getCurrentThemeInfo();
+                    const currentTopic = topicProgression[gameState.currentDifficulty] || {
+                        name: theme?.title || '调试主题',
+                        keywords: ['测试', '调试', '讨论'],
+                        difficulty: 1
+                    };
+                    
+                    await this.runConversationRound3_DeepDiscussion(gameState.activeAICharacters, currentTopic, theme);
+                } catch (error) {
+                    this.log(`❌ 深度探讨测试失败: ${error.message}`);
+                }
+                
+                this.isConversationActive = false;
+            }
+            
+            async runSynthesisOnly() {
+                if (!this.gameController || !this.gameController.gameState.gameActive) {
+                    this.log('❌ 游戏状态未初始化');
+                    return;
+                }
+                
+                const gameState = this.gameController.gameState;
+                if (gameState.conversationHistory.length < 3) {
+                    this.log('⚠️ 需要更多对话历史，自动生成完整讨论...');
+                    await this.startQuickDemo();
+                }
+                
+                this.isConversationActive = true;
+                this.log('🌟 测试：仅总结升华阶段');
+                
+                try {
+                    const theme = gameState.getCurrentThemeInfo();
+                    const currentTopic = topicProgression[gameState.currentDifficulty] || {
+                        name: theme?.title || '调试主题',
+                        keywords: ['测试', '调试', '讨论'],
+                        difficulty: 1
+                    };
+                    
+                    await this.runConversationRound4_Synthesis(gameState.activeAICharacters, currentTopic, theme);
+                } catch (error) {
+                    this.log(`❌ 总结升华测试失败: ${error.message}`);
+                }
+                
+                this.isConversationActive = false;
+            }
+            
+            // 重写waitBetweenMessages以支持用户自定义速度
+            async waitBetweenMessages(minMs, maxMs) {
+                const speedInput = document.getElementById('conversationSpeed');
+                const userSpeed = speedInput ? parseInt(speedInput.value) : 1000;
+                
+                // 使用用户设定的速度，但保持一定的随机性
+                const baseDelay = Math.max(userSpeed, 100);
+                const delay = baseDelay + Math.random() * (baseDelay * 0.5);
+                await new Promise(resolve => setTimeout(resolve, delay));
+            }
+            
+            scrollToBottom() {
+                const chatContainer = document.getElementById('chatContainer');
+                if (chatContainer) {
+                    chatContainer.scrollTop = chatContainer.scrollHeight;
+                }
+            }
+            
+            log(message) {
+                const debugInfo = document.getElementById('debugInfo');
+                const showDebug = document.getElementById('showDebugInfo');
+                
+                if (showDebug && showDebug.checked && debugInfo) {
+                    const timestamp = new Date().toLocaleTimeString();
+                    debugInfo.innerHTML += `[${timestamp}] ${message}<br>`;
+                    debugInfo.scrollTop = debugInfo.scrollHeight;
+                }
+                
+                console.log(`[ThemeDebug] ${message}`);
+            }
+        }
+        
+        // 全局函数（供按钮调用）
+        let debugTool = null;
+        
+        window.addEventListener('load', () => {
+            debugTool = new ThemeDebugTool();
+        });
+        
+        function startConversation() {
+            debugTool?.startConversation();
+        }
+        
+        function pauseConversation() {
+            debugTool?.pauseConversation();
+        }
+        
+        function clearChat() {
+            debugTool?.clearChat();
+        }
+        
+        function generateSingleMessage() {
+            debugTool?.generateSingleMessage();
+        }
+        
+        function generateSpecificAIMessage() {
+            debugTool?.generateSpecificAIMessage();
+        }
+        
+        function testFallbackMessage() {
+            debugTool?.testFallbackMessage();
+        }
+        
+        function skipToQuestion() {
+            debugTool?.skipToQuestion();
+        }
+        
+        function updatePlayerName() {
+            debugTool?.updatePlayerName();
+        }
+        
+        // 新增的对话模式控制函数
+        function startQuickDemo() {
+            debugTool?.startQuickDemo();
+        }
+        
+        function runTopicIntroOnly() {
+            debugTool?.runTopicIntroOnly();
+        }
+        
+        function runViewClashOnly() {
+            debugTool?.runViewClashOnly();
+        }
+        
+        function runDeepDiscussionOnly() {
+            debugTool?.runDeepDiscussionOnly();
+        }
+        
+        function runSynthesisOnly() {
+            debugTool?.runSynthesisOnly();
+        }
+    </script>
+</body>
+</html>

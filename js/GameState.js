@@ -24,6 +24,12 @@ class GameState {
         this.aiEmotionalStates = {}; // 每个AI的情绪状态
         this.aiInteractionHistory = {}; // AI间的互动历史
         this.playerInteractionHistory = {}; // 玩家与AI的互动历史
+        
+        // 主题系统相关状态
+        this.currentTheme = null; // 当前轮次主题
+        this.themeHistory = []; // 历史主题记录
+        this.themeEmotionalContext = {}; // 主题情绪上下文
+        this.themeTransitionInProgress = false; // 主题转换进行中标志
     }
 
     reset() {
@@ -47,6 +53,12 @@ class GameState {
         this.aiEmotionalStates = {};
         this.aiInteractionHistory = {};
         this.playerInteractionHistory = {};
+        
+        // 重置主题系统状态
+        this.currentTheme = null;
+        this.themeHistory = [];
+        this.themeEmotionalContext = {};
+        this.themeTransitionInProgress = false;
     }
 
     setPlayerName(name) {
@@ -134,8 +146,19 @@ class GameState {
         this.availableScenarios = [...allScenarios];
     }
 
-    // 获取随机工作场景（确保不重复）
+    // 获取随机工作场景（支持主题场景）
     getRandomScenario() {
+        // 如果有主题系统，使用主题场景
+        if (this.currentTheme && typeof window !== 'undefined' && window.ThemeScenarioIntegration) {
+            const themeScenario = window.ThemeScenarioIntegration.getThemeScenario(this);
+            if (themeScenario) {
+                // 将主题场景添加到已使用列表
+                this.usedScenarios.push(themeScenario);
+                return themeScenario;
+            }
+        }
+        
+        // 回退到原有逻辑
         if (this.availableScenarios.length === 0) {
             // 如果场景用完了，重新初始化
             this.initializeAvailableScenarios();
@@ -149,6 +172,22 @@ class GameState {
         this.usedScenarios.push(selectedScenario);
         
         return selectedScenario;
+    }
+    
+    // 为特定AI角色获取场景
+    getRandomScenarioForCharacter(character) {
+        // 如果有主题系统，使用主题场景
+        if (this.currentTheme && typeof window !== 'undefined' && window.ThemeScenarioIntegration) {
+            const themeScenario = window.ThemeScenarioIntegration.getScenarioForAICharacter(this, character);
+            if (themeScenario) {
+                // 将主题场景添加到已使用列表
+                this.usedScenarios.push(themeScenario);
+                return themeScenario;
+            }
+        }
+        
+        // 回退到通用获取方法
+        return this.getRandomScenario();
     }
 
     getPlayerTitle() {
@@ -423,6 +462,33 @@ class GameState {
         state.lastUpdateTime = Date.now();
     }
     
+    // 基于主题更新AI情绪状态
+    updateEmotionalStateByTheme(aiName, themeId) {
+        if (!this.aiEmotionalStates[aiName]) return;
+        
+        const state = this.aiEmotionalStates[aiName];
+        const themeEmotion = window.ThemeUtils?.getThemeEmotion(themeId);
+        
+        if (themeEmotion) {
+            // 渐进式调整到主题情绪，而不是直接设置
+            const adjustmentFactor = 0.3; // 30%的调整强度，保持个性
+            
+            state.mood = themeEmotion.dominant;
+            state.energy = state.energy * (1 - adjustmentFactor) + themeEmotion.energy * adjustmentFactor;
+            state.socialness = state.socialness * (1 - adjustmentFactor) + themeEmotion.socialness * adjustmentFactor;
+            state.suspicionLevel = state.suspicionLevel * (1 - adjustmentFactor) + themeEmotion.suspicion * adjustmentFactor;
+            
+            // 确保值在有效范围内
+            state.energy = Math.max(0, Math.min(1, state.energy));
+            state.socialness = Math.max(0, Math.min(1, state.socialness));
+            state.suspicionLevel = Math.max(0, Math.min(1, state.suspicionLevel));
+            
+            state.lastUpdateTime = Date.now();
+            
+            console.log(`🎭 ${aiName} 情绪调整为主题 ${themeId}: mood=${state.mood}, energy=${state.energy.toFixed(2)}`);
+        }
+    }
+    
     // 获取AI的记忆上下文（用于生成更个性化的回复）
     getMemoryContext(aiName, targetAI = null) {
         if (!this.aiMemories[aiName]) return null;
@@ -502,6 +568,96 @@ class GameState {
         // 按分数排序并选择最高分的
         candidates.sort((a, b) => b.score - a.score);
         return candidates[0].ai;
+    }
+
+    // ==============================================
+    // 主题系统管理方法
+    // ==============================================
+    
+    // 设置当前轮次主题
+    setCurrentTheme(roundNumber) {
+        if (typeof window !== 'undefined' && window.ThemeUtils) {
+            this.currentTheme = window.ThemeUtils.getCurrentTheme(roundNumber);
+            this.themeHistory.push({
+                theme: this.currentTheme,
+                round: roundNumber,
+                timestamp: Date.now()
+            });
+            
+            // 初始化主题情绪上下文
+            this.initializeThemeEmotionalContext();
+            
+            console.log(`🎭 主题切换到: ${this.currentTheme.title} (第${roundNumber}轮)`);
+            return this.currentTheme;
+        }
+        return null;
+    }
+    
+    // 初始化主题情绪上下文
+    initializeThemeEmotionalContext() {
+        if (!this.currentTheme) return;
+        
+        const themeEmotion = window.ThemeUtils?.getThemeEmotion(this.currentTheme.id);
+        if (themeEmotion) {
+            this.themeEmotionalContext = {
+                dominantMood: themeEmotion.dominant,
+                secondaryMoods: themeEmotion.secondary || [],
+                baseEnergy: themeEmotion.energy || 0.5,
+                baseSocialness: themeEmotion.socialness || 0.5,
+                baseSuspicion: themeEmotion.suspicion || 0.5,
+                lastUpdate: Date.now()
+            };
+        }
+    }
+    
+    // 获取当前主题信息
+    getCurrentThemeInfo() {
+        return this.currentTheme;
+    }
+    
+    // 获取主题历史
+    getThemeHistory() {
+        return this.themeHistory;
+    }
+    
+    // 检查是否为特殊轮次
+    isSpecialRound() {
+        if (!this.currentTheme) return false;
+        return this.currentTheme.passRate === "special" || 
+               this.currentTheme.passRate === "awakening";
+    }
+    
+    // 获取主题适配的难度
+    getThemeDifficulty() {
+        if (!this.currentTheme) return this.currentDifficulty;
+        
+        // 如果主题定义了特殊难度，使用主题难度
+        if (typeof this.currentTheme.difficulty === 'number') {
+            return this.currentTheme.difficulty;
+        }
+        
+        // 否则使用原有的轮次难度
+        return this.currentDifficulty;
+    }
+    
+    // 获取主题关键词
+    getThemeKeywords() {
+        return this.currentTheme?.keywords || [];
+    }
+    
+    // 获取主题指导文本
+    getThemeGuidance() {
+        return this.currentTheme?.guidanceText || '';
+    }
+    
+    // 设置主题转换状态
+    setThemeTransitionState(inProgress) {
+        this.themeTransitionInProgress = inProgress;
+    }
+    
+    // 检查是否在主题转换中
+    isThemeTransitionInProgress() {
+        return this.themeTransitionInProgress;
     }
 
     addPlayerResponse(question, response) {
