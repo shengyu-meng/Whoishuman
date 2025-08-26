@@ -176,7 +176,7 @@ class GameController {
     }
 
     updateActiveMembersDisplay() {
-        const activeCount = this.gameState.activeAICharacters.length;
+        const activeCount = this.gameState.activeAICharacters.length + 1; // +1 为玩家
         document.getElementById('activeMembers').textContent = activeCount;
     }
 
@@ -238,15 +238,20 @@ class GameController {
         this.scrollToBottom();
     }
 
-    addAIMessage(character, message) {
+    addAIMessage(character, message, isPlayer = false) {
         const chatContainer = document.getElementById('chatContainer');
         const messageDiv = document.createElement('div');
-        messageDiv.className = 'message';
+        messageDiv.className = `message ${isPlayer ? 'player' : ''}`;
+        
+        // 为玩家消息添加特殊样式
+        if (isPlayer) {
+            messageDiv.classList.add('player');
+        }
         
         const avatar = document.createElement('div');
         avatar.className = 'avatar';
-        avatar.textContent = character.avatar;
-        avatar.style.backgroundColor = character.avatarColor;
+        avatar.textContent = character.avatar || (isPlayer ? '我' : character.name.charAt(0));
+        avatar.style.backgroundColor = character.avatarColor || (isPlayer ? '#07c160' : '#999');
         
         const content = document.createElement('div');
         content.className = 'message-content';
@@ -265,6 +270,26 @@ class GameController {
             minute: '2-digit' 
         });
         
+        // 添加消息状态（仅对玩家消息）
+        if (isPlayer) {
+            const status = document.createElement('span');
+            status.className = 'message-status sending';
+            status.textContent = '发送中';
+            status.id = `status-${Date.now()}`;
+            time.appendChild(status);
+            
+            // 模拟消息状态变化
+            setTimeout(() => {
+                status.className = 'message-status sent';
+                status.textContent = '已发送';
+            }, 500);
+            
+            setTimeout(() => {
+                status.className = 'message-status read';
+                status.textContent = '已读';
+            }, 1500);
+        }
+        
         const text = document.createElement('div');
         text.className = 'message-text';
         text.textContent = message;
@@ -277,6 +302,12 @@ class GameController {
         messageDiv.appendChild(content);
         
         chatContainer.appendChild(messageDiv);
+        
+        // 添加消息送达效果
+        setTimeout(() => {
+            messageDiv.classList.add('message-delivered');
+        }, 100);
+        
         this.scrollToBottom();
         
         // 添加到对话历史
@@ -1380,8 +1411,12 @@ ${emojiInstruction}
     showSuspicionNotice() {
         console.log('DEBUG: showSuspicionNotice 被调用');
         const suspicionNotice = document.getElementById('suspicionNotice');
+        const chatContainer = document.getElementById('chatContainer');
         console.log('DEBUG: suspicionNotice 元素:', suspicionNotice);
+        
         suspicionNotice.classList.remove('hidden');
+        chatContainer.classList.add('with-notice');  // 为聊天容器添加类，调整右侧间距
+        
         console.log('DEBUG: suspicionNotice 显示状态:', suspicionNotice.classList.contains('hidden'));
     }
 
@@ -1553,11 +1588,17 @@ ${emojiInstruction}
         this.gameState.waitingForResponse = false;
         document.getElementById('responseArea').classList.add('hidden');
         document.getElementById('suspicionNotice').classList.add('hidden');
+        document.getElementById('chatContainer').classList.remove('with-notice');  // 移除间距类
         
-        // 添加玩家回复到聊天记录
+        // 添加玩家回复到聊天记录（使用isPlayer=true参数）
         this.addAIMessage(
-            { name: this.gameState.playerName, avatar: '玩' },
-            responseText
+            { 
+                name: this.gameState.playerName, 
+                avatar: '我',
+                avatarColor: '#07c160'
+            },
+            responseText,
+            true  // 标记为玩家消息
         );
         
         // 记录玩家回复
@@ -1636,7 +1677,7 @@ ${emojiInstruction}
                 
                 await this.generateInitialConversation();
             });
-        }, 500);
+        }, 5500);  // 调整为5.5秒，在轮次开始消息显示1秒后
     }
 
     async analyzePlayerResponse(response) {
@@ -1994,12 +2035,18 @@ ${isSuccess ? '✅ 判定结果：通过' : '❌ 判定结果：不通过'}`;
                     // 恭喜消息应该在下一轮开始前显示，使用已完成的轮数
                     this.addJudgmentMessage(`🎉 恭喜！你成功通过了第${displayRound}轮！`);
                     
-                    // 延迟一下让玩家看到恭喜消息，然后再开始下一轮
+                    // 延迟显示下一轮开始消息，确保在AI思考之前
                     this.safeTimeout(() => {
                         this.safeAsync(async () => {
-                            // 注意：startNextRound() 已经在 showSuccessResponse 中调用过了
-                            // 这里只需要显示下一轮开始的分隔消息
                             this.addJudgmentMessage(`--- 第${displayRound + 1}轮开始 ---`);
+                            
+                            // 再延迟一下，让玩家看到轮次开始消息后再显示AI思考
+                            this.safeTimeout(() => {
+                                this.safeAsync(async () => {
+                                    // 注意：startNextRound() 已经在 showSuccessResponse 中调用过了
+                                    // 这里什么都不做，让之前的startNextRound流程继续
+                                });
+                            }, 1000);  // 1秒后AI开始思考
                         });
                     }, 1500);
                 } else {
