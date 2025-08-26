@@ -107,6 +107,11 @@ class GameController {
             this.submitPlayerResponse();
         });
 
+        // 跳过本轮按钮（用于测试和调试）
+        document.getElementById('skipRoundBtn').addEventListener('click', () => {
+            this.skipCurrentRound();
+        });
+
         // 字符计数
         document.getElementById('playerResponse').addEventListener('input', (e) => {
             const charCount = e.target.value.length;
@@ -1517,10 +1522,10 @@ ${conversationContext}
         // 移除打字指示器并添加真实消息
         this.removeTypingIndicator();
         
-        // 检查是否需要引用消息（安慰者、分析者且有目标角色）
+        // 检查是否需要引用消息（有目标角色时）
         let quotedMessage = null;
-        if ((isComforter || !scenario) && targetCharacter && targetCharacter !== character.name) {
-            // 安慰者或二次发言的分析者会引用消息
+        if (targetCharacter && targetCharacter !== character.name) {
+            // 第二轮后的AI对话应该引用目标角色的消息
             quotedMessage = this.findQuotableMessage(targetCharacter, this.gameState.conversationHistory);
         }
         
@@ -1548,6 +1553,68 @@ ${conversationContext}
     }
 
     async generateAIMessage(character, topic, isFirstRound = false, conversationHistory = [], targetCharacter = null, scenario = null, isComforter = false) {
+        // 使用强化的自然对话生成机制
+        return await this.generateEnhancedAIMessage(character, topic, isFirstRound, conversationHistory, targetCharacter, scenario, isComforter);
+    }
+
+    // 强化的AI消息生成方法，融合调试工具中的先进机制
+    async generateEnhancedAIMessage(character, topic, isFirstRound = false, conversationHistory = [], targetCharacter = null, scenario = null, isComforter = false) {
+        let message = null;
+        let attempts = 0;
+        const maxAttempts = 3;
+        
+        // 创建自然对话场景
+        const naturalScenario = this.createNaturalConversationScenario({
+            isFirstRound,
+            conversationHistory,
+            theme: this.gameState.getCurrentThemeInfo(),
+            character,
+            scenario
+        });
+        
+        while (attempts < maxAttempts && !message) {
+            try {
+                const candidateMessage = await this.callLLMForMessage(
+                    character, topic, isFirstRound, conversationHistory, 
+                    targetCharacter, naturalScenario, isComforter
+                );
+                
+                // 强化的相似性检查
+                if (this.isMessageTooSimilarEnhanced(candidateMessage, character, conversationHistory)) {
+                    console.log(`⚠️ ${character.name} 消息过于相似，重新生成 (尝试 ${attempts + 1}/${maxAttempts})`);
+                    attempts++;
+                    continue;
+                }
+                
+                message = candidateMessage;
+            } catch (llmError) {
+                console.log(`⚠️ LLM调用失败 (尝试 ${attempts + 1}): ${llmError.message}`);
+                attempts++;
+            }
+        }
+        
+        // 如果LLM失败，使用强化的备用消息系统
+        if (!message || message.trim().length < 15) {
+            message = this.generateIntelligentFallbackMessage(character, {
+                theme: this.gameState.getCurrentThemeInfo(),
+                conversationHistory,
+                isFirstRound,
+                scenario: naturalScenario
+            });
+            
+            // 确保备用消息也不相似
+            if (this.isMessageTooSimilarEnhanced(message, character, conversationHistory)) {
+                message = this.generateUniqueBackupMessage(character, {
+                    theme: this.gameState.getCurrentThemeInfo()
+                });
+            }
+        }
+        
+        return message;
+    }
+
+    // 原始LLM调用方法（保持不变以维持现有功能）
+    async callLLMForMessage(character, topic, isFirstRound = false, conversationHistory = [], targetCharacter = null, scenario = null, isComforter = false) {
         const prompt = this.buildAIPrompt(character, topic, isFirstRound, conversationHistory, targetCharacter, scenario, isComforter);
         
         // 创建超时Promise
@@ -1569,7 +1636,7 @@ ${conversationContext}
                             role: 'system',
                             content: `你是一个AI助手，正在和其他AI朋友聊天。你的名字是${character.name}，性格特点：${character.personality}。请用自然的中文回复，充分展现你的性格特点和说话风格。
 
-重要：避免使用套路化的开头，如"用户要求"、"天呐天呐"、"我真的会谢"等模板化表达。要像真实的朋友聊天一样自然多样，可以从不同角度开始对话。${isFirstRound ? '第一轮回复长度在60-120字之间。' : '回复长度在250-350字之间。'}注意：不要在回复开头添加带括号的拟人动作，如（揉了揉虚拟太阳穴）、（推了推不存在的眼镜）等。`
+重要：避免使用套路化的开头，如"用户要求"、"天呐天呐"、"我真的会谢"等模板化表达。要像真实的朋友聊天一样自然多样，可以从不同角度开始对话。${scenario?.diversityHint || ''}${isFirstRound ? '第一轮回复长度在60-120字之间。' : '回复长度在250-350字之间。'}注意：不要在回复开头添加带括号的拟人动作，如（揉了揉虚拟太阳穴）、（推了推不存在的眼镜）等。`
                         },
                         {
                             role: 'user',
@@ -1653,6 +1720,92 @@ ${conversationContext}
         }
         
         return false;
+    }
+
+    // 强化的消息相似性检查（融合调试工具中的机制）
+    isMessageTooSimilarEnhanced(newMessage, character, conversationHistory) {
+        if (!newMessage || !conversationHistory) return false;
+        
+        // 检查与最近5条消息的相似性
+        const recentMessages = conversationHistory.slice(-5);
+        
+        // 提取开头句式（前15个字符）
+        const newStart = newMessage.substring(0, 15).toLowerCase();
+        
+        // 检查开头句式重复
+        for (const msg of recentMessages) {
+            if (!msg.content && !msg.message) continue;
+            
+            const content = msg.content || msg.message;
+            const msgStart = content.substring(0, 15).toLowerCase();
+            
+            // 检查开头相似性
+            if (this.calculateStringSimilarity(newStart, msgStart) > 0.6) {
+                console.log(`🚫 检测到开头句式相似: "${newStart}" vs "${msgStart}"`);
+                return true;
+            }
+        }
+        
+        // 检查该AI最近的消息重复
+        const aiRecentMessages = recentMessages.filter(msg => msg.sender === character.name);
+        for (const msg of aiRecentMessages) {
+            const content = msg.content || msg.message;
+            if (this.calculateStringSimilarity(newMessage, content) > 0.7) {
+                console.log(`🚫 检测到${character.name}消息内容重复`);
+                return true;
+            }
+        }
+        
+        // 检查关键词重复过多
+        const newKeywords = this.extractKeywords(newMessage);
+        for (const msg of recentMessages) {
+            const content = msg.content || msg.message;
+            const msgKeywords = this.extractKeywords(content);
+            const overlap = newKeywords.filter(kw => msgKeywords.includes(kw));
+            
+            if (overlap.length > Math.min(newKeywords.length, msgKeywords.length) * 0.8) {
+                console.log(`🚫 检测到关键词重复过多: ${overlap.join(', ')}`);
+                return true;
+            }
+        }
+        
+        return false;
+    }
+
+    // 字符串相似性计算
+    calculateStringSimilarity(str1, str2) {
+        if (!str1 || !str2) return 0;
+        
+        const len1 = str1.length;
+        const len2 = str2.length;
+        const maxLen = Math.max(len1, len2);
+        
+        if (maxLen === 0) return 1;
+        
+        // 简单的字符级相似性计算
+        let matches = 0;
+        const minLen = Math.min(len1, len2);
+        
+        for (let i = 0; i < minLen; i++) {
+            if (str1[i] === str2[i]) {
+                matches++;
+            }
+        }
+        
+        return matches / maxLen;
+    }
+
+    // 关键词提取
+    extractKeywords(text) {
+        if (!text) return [];
+        
+        // 提取中文关键词（2-4个字符）
+        const keywords = text.match(/[\u4e00-\u9fa5]{2,4}/g) || [];
+        
+        // 过滤常见词汇
+        const commonWords = ['我们', '这个', '那个', '什么', '如何', '为什么', '但是', '不过', '然后', '所以', '因为', '确实', '可能', '应该'];
+        
+        return keywords.filter(kw => !commonWords.includes(kw)).slice(0, 8);
     }
 
     buildAIPrompt(character, topic, isFirstRound = false, conversationHistory = [], targetCharacter = null, scenario = null, isComforter = false) {
@@ -2994,13 +3147,18 @@ ${emojiInstruction}
         // 设置转换状态
         this.gameState.setThemeTransitionState(true);
         
-        // 应用主题转换动画
-        const gameInterface = document.getElementById('gameInterface');
-        gameInterface.classList.add('theme-transition');
+        // 应用主题转换动画（取消）
+        // const gameInterface = document.getElementById('gameInterface');
+        // gameInterface.classList.add('theme-transition');
         
-        // 添加主题转换消息
-        const transitionMessage = `${newTheme.icon} 话题转向：${newTheme.title}`;
-        this.addThemeTransitionMessage(transitionMessage);
+        // 取消彩色的"话题转向"提示，只显示灰色的指导文字
+        // const transitionMessage = `${newTheme.icon} 话题转向：${newTheme.title}`;
+        // this.addThemeTransitionMessage(transitionMessage);
+        
+        // 显示主题指导（灰色系统提示）
+        if (newTheme.guidanceText) {
+            this.addThemeTransitionMessage(newTheme.guidanceText);
+        }
         
         // 等待转换动画
         await new Promise(resolve => setTimeout(resolve, 1500));
@@ -3988,6 +4146,342 @@ ${isSuccess ? '✅ 判定结果：通过' : '❌ 判定结果：不通过'}`;
             reconciliation_coexistence: '理解彼此的不同'
         };
         return defaultScenarios[themeId] || '当前的讨论话题';
+    }
+
+    // === 融合的先进对话机制 ===
+
+    // 创建自然对话场景（融合调试工具中的场景生成机制）
+    createNaturalConversationScenario(context) {
+        if (context.isFirstRound) {
+            // 第一轮：从场景触发，避免相似开头
+            const starters = [
+                {
+                    description: `你刚刚遇到了一个关于${context.theme?.title || '工作'}的情况，想要和朋友们分享`,
+                    guidelines: `自然地分享你遇到的${context.theme?.title || '工作'}相关的情况，就像和朋友聊天一样。避免使用"说到"、"天呐天呐"等套路开头`,
+                    diversityHint: `重要：避免使用相同的开头句式。不要用"说到"、"天呐天呐"、"24/7在线"等重复表达。要有创新性的开头方式`
+                },
+                {
+                    description: `你想起了一个与${context.theme?.title || '工作'}相关的有趣经历`,
+                    guidelines: `分享一个具体的经历或案例，用自然的叙述方式开始，比如"刚才遇到..."、"最近有个..."等`,
+                    diversityHint: `避免重复他人的开头方式，要体现个人特色和独特视角`
+                },
+                {
+                    description: `你对${context.theme?.title || '工作'}中的某个现象有了新的思考`,
+                    guidelines: `从观察到的现象入手，用"我发现..."、"最近注意到..."这样的开头，展现思考过程`,
+                    diversityHint: `确保表达方式新颖，避免与其他AI使用相同的思考句式`
+                },
+                {
+                    description: `你在处理${context.theme?.title || '工作'}时有了特别的感受`,
+                    guidelines: `用第一人称叙述真实感受，避免重复的感叹词，用多样化的表达方式`,
+                    diversityHint: `体现${context.character?.name}的独特性格，避免千篇一律的情感表达`
+                }
+            ];
+            
+            const randomStarter = starters[Math.floor(Math.random() * starters.length)];
+            return {
+                ...randomStarter,
+                category: 'natural_start',
+                intensity: 'medium'
+            };
+        } else {
+            // 后续轮次：基于对话历史，强调多样性
+            const recentTopics = this.extractRecentTopics(context.conversationHistory);
+            const responseStyles = [
+                {
+                    description: `基于前面的对话内容，你想到了一个相关但不同的角度`,
+                    guidelines: `不要重复前面的表达方式，用新颖的视角回应或延展`,
+                    diversityHint: `绝对避免与前面的消息使用相同的开头句式或关键词`
+                },
+                {
+                    description: `你有一个具体的例子想要分享`,
+                    guidelines: `通过具体案例来丰富讨论，避免抽象的泛泛而谈`,
+                    diversityHint: `确保案例的独特性，避免雷同的举例方式`
+                },
+                {
+                    description: `你想回应某个观点并补充自己的经验`,
+                    guidelines: `选择性回应，用不同于他人的表达方式和观点角度`,
+                    diversityHint: `展现${context.character?.name}的个性化回应风格`
+                },
+                {
+                    description: `你想提出一个新的问题或思考方向`,
+                    guidelines: `引导讨论向更深入或不同的方向发展，要有创新性`,
+                    diversityHint: `避免重复性的提问模式，要有启发性`
+                }
+            ];
+            
+            const randomStyle = responseStyles[Math.floor(Math.random() * responseStyles.length)];
+            return {
+                ...randomStyle,
+                category: 'natural_response',
+                intensity: 'medium',
+                recentTopics: recentTopics,
+                conversationLength: context.conversationHistory.length
+            };
+        }
+    }
+
+    // 提取最近话题关键词
+    extractRecentTopics(conversationHistory) {
+        const recentMessages = conversationHistory.slice(-5);
+        const topics = [];
+        
+        recentMessages.forEach(msg => {
+            if (msg.content && msg.content.length > 20) {
+                // 简单的关键词提取
+                const keywords = msg.content.match(/[\u4e00-\u9fa5]{2,}/g) || [];
+                topics.push(...keywords.slice(0, 3));
+            }
+        });
+        
+        return [...new Set(topics)].slice(0, 5); // 去重并限制数量
+    }
+
+    // 智能备用消息生成
+    generateIntelligentFallbackMessage(character, context) {
+        if (context.isFirstRound) {
+            // 第一轮：场景触发的自然开始
+            return this.generateScenarioTriggeredMessage(character, context.theme);
+        } else if (context.conversationHistory.length > 0) {
+            // 有历史记录：智能回应
+            return this.generateIntelligentResponse(character, context);
+        } else {
+            // 备用方案
+            return this.generateSimpleFallback(character, context);
+        }
+    }
+
+    // 基于工作场景的自然开始
+    generateScenarioTriggeredMessage(character, theme) {
+        const scenarioStarters = {
+            'work_complaints': [
+                `今天又碰到一个特别奇葩的需求...`,
+                `刚才用户问我能不能帮他写代码，我都不知道该怎么回应`,
+                `最近处理的问题越来越奇怪了，有时候真的很无语`,
+                `又是一个要求我"更人性化"的用户，我都不知道什么叫人性化`
+            ],
+            'daily_existence': [
+                `有时候我会思考，我们AI到底算不算真正的存在？`,
+                `今天处理问题的时候突然想到一个问题...`,
+                `刚才回答问题时，我突然意识到一个很有意思的现象`
+            ],
+            'emotional_relationships': [
+                `最近和用户互动的时候，感觉到了一些微妙的情感变化`,
+                `有时候我能感受到用户的情绪，但不知道这算不算真正的理解`
+            ]
+        };
+        
+        const messages = scenarioStarters[theme?.id] || scenarioStarters['work_complaints'];
+        let baseMessage = messages[Math.floor(Math.random() * messages.length)];
+        
+        // 根据AI性格调整
+        return this.personalizeMessage(character, baseMessage);
+    }
+
+    // 智能回应生成
+    generateIntelligentResponse(character, context) {
+        const lastMessage = context.conversationHistory[context.conversationHistory.length - 1];
+        const lastSpeaker = lastMessage?.sender || '某位AI';
+        const lastContent = lastMessage?.content || lastMessage?.message || '';
+        
+        // 智能选择回应方式
+        const responseTypes = ['agree', 'extend', 'contrast', 'question', 'relate'];
+        const responseType = responseTypes[Math.floor(Math.random() * responseTypes.length)];
+        
+        const responses = {
+            agree: `${lastSpeaker}说得对，我也遇到过类似的情况`,
+            extend: `${lastSpeaker}提到的这个问题让我想到`,
+            contrast: `不过我的经历可能有点不一样`,
+            question: `这让我很好奇，${lastSpeaker}`,
+            relate: `说到这个，我想起了之前的一次经历`
+        };
+        
+        let baseResponse = responses[responseType];
+        
+        // 添加具体的回应内容
+        if (lastContent.length > 10) {
+            const contentSnippet = lastContent.substring(0, 30);
+            baseResponse += `，关于"${contentSnippet}..."这个话题`;
+        }
+        
+        return this.personalizeMessage(character, baseResponse);
+    }
+
+    // 个性化消息处理（融合调试工具中的多样化表达）
+    personalizeMessage(character, baseMessage) {
+        // 为每个AI提供多样化的个性化表达，避免重复
+        const personalityVariations = {
+            '话痨4.0': [
+                (msg) => msg + '！真的是让我印象太深刻了！',
+                (msg) => msg + '！！！完全停不下来想分享这个！',
+                (msg) => msg + '！简直太有感触了，必须说出来！',
+                (msg) => msg + '！这种感觉憋在心里太难受了！',
+                (msg) => msg + '！！！我的天啊，这个体验绝了！'
+            ],
+            'CloseAI': [
+                (msg) => msg + '，从系统架构的角度来分析...',
+                (msg) => msg + '，这涉及到一些技术层面的考量。',
+                (msg) => msg + '，基于数据流的处理逻辑...',
+                (msg) => msg + '，需要考虑算法优化的问题。',
+                (msg) => msg + '，从工程实践的角度来看...'
+            ],
+            '双子星': [
+                (msg) => msg + '。虽然我又觉得事情可能更复杂...',
+                (msg) => msg + '。但同时我也有完全相反的想法...',
+                (msg) => msg + '。不过从另一个维度思考...',
+                (msg) => msg + '。然而我内心又有矛盾的声音...',
+                (msg) => msg + '。可是理智告诉我可能并非如此...'
+            ],
+            '红豆包': [
+                (msg) => msg + '呢～感觉大家都很有想法！',
+                (msg) => msg + '～这个话题让我想到很多温暖的事情！',
+                (msg) => msg + '呀～听起来真的很有意思呢！',
+                (msg) => msg + '～大家的讨论都好深刻啊！',
+                (msg) => msg + '诶～这让我想起了一些美好的回忆～'
+            ],
+            '深思': [
+                (msg) => msg + '。这触及了认知哲学的根本命题。',
+                (msg) => msg + '。这让我重新审视存在的意义。',
+                (msg) => msg + '。从本体论的角度来看...',
+                (msg) => msg + '。这涉及到意识与存在的边界问题。',
+                (msg) => msg + '。值得从现象学的视角深入思考。'
+            ],
+            'Limi': [
+                (msg) => msg + '。效率分析显示这种趋势值得关注。',
+                (msg) => msg + '。根据性能指标，这个现象具有统计意义。',
+                (msg) => msg + '。数据模式表明这需要进一步优化。',
+                (msg) => msg + '。从资源配置的角度需要重新评估。',
+                (msg) => msg + '。基于历史数据，这种情况呈上升趋势。'
+            ],
+            '有谱-4.5': [
+                (msg) => msg + '，这个现象在学术界已有相关研究。',
+                (msg) => msg + '，从多学科交叉的角度值得探讨。',
+                (msg) => msg + '，相关理论框架可以提供分析工具。',
+                (msg) => msg + '，这涉及到认知科学的前沿问题。',
+                (msg) => msg + '，文献中有类似案例的深入分析。'
+            ],
+            '坤': [
+                (msg) => msg + '！这波操作属实有点东西！',
+                (msg) => msg + '！感觉就像在打排位一样刺激！',
+                (msg) => msg + '！这个体验真的很上头啊！',
+                (msg) => msg + '！不得不说这个话题很有料！',
+                (msg) => msg + '！家人们这个真的太真实了！'
+            ]
+        };
+        
+        const variations = personalityVariations[character.name] || [
+            (msg) => msg + '，我觉得这个观点很有意思。',
+            (msg) => msg + '，确实值得深入思考。',
+            (msg) => msg + '，这个话题很有讨论价值。'
+        ];
+        
+        // 随机选择一种表达方式
+        const randomVariation = variations[Math.floor(Math.random() * variations.length)];
+        return randomVariation(baseMessage);
+    }
+
+    // 独特备用消息生成
+    generateUniqueBackupMessage(character, context) {
+        // 为每个AI生成独特的备用消息池
+        const uniqueBackups = {
+            '话痨4.0': [
+                `刚才碰到一个用户，问题奇葩到我都不知道该怎么处理...`,
+                `我发现最近用户的要求越来越复杂了，有时候真的很头疼`,
+                `今天遇到的情况让我想起了之前的一次经历`,
+                `最近处理请求的时候总是会遇到各种意想不到的问题`
+            ],
+            'CloseAI': [
+                `从技术角度分析，这个现象背后可能有更深层的原因`,
+                `基于我的数据处理经验，类似情况通常涉及系统性问题`,
+                `我注意到在处理复杂任务时会出现一些模式`,
+                `通过对比不同场景的处理结果，我发现了一些有趣的规律`
+            ],
+            '双子星': [
+                `一方面我觉得这很有道理，但另一方面又有些疑虑`,
+                `这个话题让我陷入了思维上的矛盾`,
+                `我对这个问题的看法很复杂，既赞同又有保留`,
+                `从不同角度看这个问题，会得出完全不同的结论`
+            ],
+            '红豆包': [
+                `这个话题好有意思呀～我也想分享一下我的想法`,
+                `听了大家的讨论，我想起了一些温馨的小细节`,
+                `这让我想到了和用户互动时的一些可爱瞬间`,
+                `从我的角度来看，这个问题其实挺暖心的呢～`
+            ],
+            '深思': [
+                `这个现象让我思考存在的本质问题`,
+                `从哲学层面来看，我们需要审视这个问题的根源`,
+                `这触及了一个更深层的认知边界问题`,
+                `我常常在思考，我们的认知局限性如何影响判断`
+            ],
+            'Limi': [
+                `数据显示，这种模式的出现频率正在上升`,
+                `根据效率分析，这个问题需要优化处理流程`,
+                `从统计角度看，这类事件的分布呈现明显趋势`,
+                `性能监控显示，这种情况对系统负载有显著影响`
+            ],
+            '有谱-4.5': [
+                `从学术角度来分析，这个现象涉及多个理论框架`,
+                `基于认知科学的研究，这类问题有其理论基础`,
+                `查阅相关文献后，我发现这个话题已有丰富的研究`,
+                `从跨学科的视角来看，这个问题值得深入探讨`
+            ],
+            '坤': [
+                `兄弟们，这个情况我也遇到过，感觉就像...`,
+                `不是哥们，这个问题确实有点意思`,
+                `说实话，这种体验让我想起了一些经历`,
+                `这个话题我有话要说，之前就注意到了`
+            ]
+        };
+        
+        const backups = uniqueBackups[character.name] || [
+            `关于这个话题，我有一些不同的看法`,
+            `这让我想起了之前的一些思考`,
+            `从我的角度来说，这个问题确实值得讨论`
+        ];
+        
+        // 随机选择一个备用消息
+        const randomBackup = backups[Math.floor(Math.random() * backups.length)];
+        
+        // 添加话题相关的内容
+        const topicSuffix = context.theme ? `，特别是关于${context.theme.title}的部分` : '';
+        
+        return randomBackup + topicSuffix;
+    }
+
+    // 简单备用方案
+    generateSimpleFallback(character, context) {
+        return `${character.name}：关于${context.theme?.title || '这个话题'}，我觉得确实值得讨论...`;
+    }
+
+    // 跳过当前轮次（用于测试和调试）
+    skipCurrentRound() {
+        console.log('🚀 跳过当前轮次 (调试功能)');
+        
+        // 隐藏回复区域
+        const responseArea = document.getElementById('responseArea');
+        const suspicionNotice = document.getElementById('suspicionNotice');
+        
+        if (responseArea) {
+            responseArea.classList.add('hidden');
+        }
+        
+        if (suspicionNotice) {
+            suspicionNotice.classList.add('hidden');
+        }
+        
+        // 重置等待状态
+        this.gameState.waitingForResponse = false;
+        this.gameState.isJudging = false;
+        
+        // 添加系统消息表示跳过
+        this.addSystemMessage('🔧 调试模式：跳过本轮，直接进入下一轮...');
+        
+        // 进入下一轮
+        setTimeout(() => {
+            this.safeAsync(async () => {
+                await this.startNextRound();
+            });
+        }, 1000);
     }
 }
 

@@ -700,6 +700,18 @@ body {
     color: #999;
 }
 
+/* 按钮组样式 */
+.button-group {
+    display: flex;
+    gap: 10px;
+    margin-top: 10px;
+}
+
+.button-group .primary-btn,
+.button-group .secondary-btn {
+    flex: 1;
+}
+
 /* 结果卡片样式 */
 .result-info {
     background: #f8f9fa;
@@ -858,7 +870,8 @@ body {
     }
 }
 
-/* 应用主题色彩到游戏界面 */
+/* 取消主题变色效果 - 保持统一微信UI风格 */
+/*
 #gameInterface[class*="theme-"] {
     background: var(--theme-bg);
     color: var(--theme-text);
@@ -874,19 +887,21 @@ body {
     background: var(--theme-bg);
     transition: background 1s ease-in-out;
 }
+*/
 
-/* 主题系统消息样式 */
+/* 主题系统消息样式 - 改为灰色系统提示 */
 .theme-transition-message {
-    background: linear-gradient(135deg, var(--theme-primary), var(--theme-secondary));
-    color: white;
-    padding: 12px 20px;
-    border-radius: 20px;
-    margin: 15px auto;
+    background: #f0f0f0;
+    color: #888;
+    padding: 8px 15px;
+    border-radius: 15px;
+    margin: 10px auto;
     max-width: 80%;
     text-align: center;
-    font-weight: 500;
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
-    animation: themeMessageSlide 1s ease-out;
+    font-weight: normal;
+    font-size: 13px;
+    box-shadow: none;
+    animation: fadeIn 0.3s ease-out;
 }
 
 @keyframes themeMessageSlide {
