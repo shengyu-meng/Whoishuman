@@ -164,6 +164,8 @@ class GameController {
     initializeAICharacters() {
         // 设置所有8个AI角色
         this.gameState.setAllAICharacters(AICharacterPool);
+        // 初始化AI记忆系统
+        this.gameState.initializeAIMemories();
         // 选择当前轮次的活跃AI角色（4-5个）
         this.gameState.selectActiveAICharacters();
     }
@@ -186,6 +188,9 @@ class GameController {
             const chatContainer = document.getElementById('chatContainer');
             chatContainer.innerHTML = '';
         }
+        
+        // 清理当前轮次的互动记录
+        this.gameState.currentRoundInteractions = new Set();
 
         // 添加系统消息
         this.addSystemMessage('你潜伏在群聊中，仔细观察着这些AI的对话...');
@@ -238,7 +243,7 @@ class GameController {
         this.scrollToBottom();
     }
 
-    addAIMessage(character, message, isPlayer = false) {
+    addAIMessage(character, message, isPlayer = false, quotedMessage = null) {
         const chatContainer = document.getElementById('chatContainer');
         const messageDiv = document.createElement('div');
         messageDiv.className = `message ${isPlayer ? 'player' : ''}`;
@@ -292,7 +297,29 @@ class GameController {
         
         const text = document.createElement('div');
         text.className = 'message-text';
-        text.textContent = message;
+        
+        // 如果有引用消息，先添加引用部分
+        if (quotedMessage) {
+            const quotedDiv = document.createElement('div');
+            quotedDiv.className = 'quoted-message';
+            
+            const quotedAuthor = document.createElement('div');
+            quotedAuthor.className = 'quoted-author';
+            quotedAuthor.textContent = quotedMessage.author;
+            
+            const quotedContent = document.createElement('div');
+            quotedContent.className = 'quoted-content';
+            quotedContent.textContent = quotedMessage.content;
+            
+            quotedDiv.appendChild(quotedAuthor);
+            quotedDiv.appendChild(quotedContent);
+            text.appendChild(quotedDiv);
+        }
+        
+        // 添加主要消息内容
+        const mainContent = document.createElement('div');
+        mainContent.textContent = message;
+        text.appendChild(mainContent);
         
         header.appendChild(name);
         header.appendChild(time);
@@ -312,6 +339,56 @@ class GameController {
         
         // 添加到对话历史
         this.gameState.addMessageToHistory(character.name, message);
+    }
+
+    // 查找可引用的消息（安慰时引用被安慰者的消息）
+    findQuotableMessage(targetCharacterName, conversationHistory) {
+        if (!targetCharacterName || !conversationHistory || conversationHistory.length === 0) {
+            return null;
+        }
+        
+        // 查找目标角色最近的消息（最多往前找5条）
+        const recentMessages = conversationHistory.slice(-8);
+        
+        // 优先查找包含负面情绪的消息
+        const negativePhrases = ['累', '烦', '无语', '崩溃', '气死', '受不了', '头疼', '要命', '难受', '郁闷', '焦虑'];
+        
+        let bestMatch = null;
+        let hasNegativeEmotion = false;
+        
+        for (let i = recentMessages.length - 1; i >= 0; i--) {
+            const msg = recentMessages[i];
+            if (msg.sender === targetCharacterName && msg.message) {
+                // 检查是否包含负面情绪词汇
+                const hasNegative = negativePhrases.some(phrase => msg.message.includes(phrase));
+                
+                // 如果消息太长，截取前50个字符
+                const truncatedMessage = msg.message.length > 50 ? 
+                    msg.message.substring(0, 50) + '...' : 
+                    msg.message;
+                
+                const messageObj = {
+                    author: msg.sender,
+                    content: truncatedMessage
+                };
+                
+                // 优先选择有负面情绪的消息
+                if (hasNegative && !hasNegativeEmotion) {
+                    bestMatch = messageObj;
+                    hasNegativeEmotion = true;
+                } else if (!hasNegativeEmotion && !bestMatch) {
+                    // 如果没有找到负面情绪的消息，选择最近的消息
+                    bestMatch = messageObj;
+                }
+                
+                // 如果已经找到负面情绪的消息，就不再继续查找
+                if (hasNegativeEmotion) {
+                    break;
+                }
+            }
+        }
+        
+        return bestMatch;
     }
 
     scrollToBottom() {
@@ -469,38 +546,38 @@ class GameController {
     async generateInteractiveFirstRound(currentTopic, aiSpeakCount, conversationAIs) {
         const shuffledCharacters = [...conversationAIs].sort(() => 0.5 - Math.random());
         
-        // 第一轮对话模式：更像群聊的互动模式
-        // 选择至少2个AI作为安慰者，不分配工作场景
-        const minComforters = Math.min(2, Math.floor(shuffledCharacters.length * 0.3)); // 至少2个，但不超过30%
-        const maxComforters = Math.min(3, Math.floor(shuffledCharacters.length * 0.5)); // 最多不超过一半，且不超过3个
-        const comforterCount = Math.max(minComforters, Math.min(maxComforters, minComforters + Math.floor(Math.random() * (maxComforters - minComforters + 1))));
-        const comforters = shuffledCharacters.slice(-comforterCount); // 取最后几个作为安慰者
-        const complainers = shuffledCharacters.slice(0, shuffledCharacters.length - comforterCount); // 其余作为抱怨者
+        // 第一轮对话模式：更平衡的互动模式
+        // 确保大约一半AI抱怨，一半AI安慰/分析
+        const totalAIs = shuffledCharacters.length;
+        const complainersCount = Math.ceil(totalAIs * 0.5); // 50%抱怨者
+        const comfortersCount = totalAIs - complainersCount; // 其余为安慰者
         
-        // 创建交叉发言顺序：让安慰者和抱怨者混合发言
-        const speakingOrder = this.createInterleavedSpeakingOrder(complainers, comforters);
+        const complainers = shuffledCharacters.slice(0, complainersCount);
+        const comforters = shuffledCharacters.slice(complainersCount);
         
-        console.log(`🎭 安慰者AI: ${comforters.map(c => c.name).join(', ')} (${comforters.length}个)`);
         console.log(`🎭 抱怨者AI: ${complainers.map(c => c.name).join(', ')} (${complainers.length}个)`);
-        console.log(`🎤 发言顺序: ${speakingOrder.map(item => `${item.character.name}(${item.isComforter ? '安慰' : '抱怨'})`).join(' → ')}`);
+        console.log(`🎭 安慰/分析者AI: ${comforters.map(c => c.name).join(', ')} (${comforters.length}个)`);
+        
+        // 第一阶段：基础发言轮次（每个AI发言一次）
+        const firstRoundOrder = this.createInterleavedSpeakingOrder(complainers, comforters);
+        console.log(`🎤 第一轮发言顺序: ${firstRoundOrder.map(item => `${item.character.name}(${item.isComforter ? '安慰' : '抱怨'})`).join(' → ')}`);
         
         // 按照交叉顺序让AI发言
-        for (let i = 0; i < speakingOrder.length; i++) {
-            const { character, isComforter } = speakingOrder[i];
+        for (let i = 0; i < firstRoundOrder.length; i++) {
+            const { character, isComforter } = firstRoundOrder[i];
             
             // 如果已经发言1次，跳过
             if (aiSpeakCount[character.name] >= 1) continue;
             
-            // 获取之前的对话历史用于互动（更多历史，增强互动性）
-            const recentMessages = this.gameState.conversationHistory.slice(-2);
+            // 获取之前的对话历史用于互动
+            const recentMessages = this.gameState.conversationHistory.slice(-3);
             
             let currentScenario = null;
             let targetCharacter = null;
             
             if (isComforter) {
                 // 安慰者：不分配工作场景，专门回应和安慰其他AI
-                // 总是选择一个之前的发言者进行回应
-                const previousSpeakers = speakingOrder.slice(0, i)
+                const previousSpeakers = firstRoundOrder.slice(0, i)
                     .filter(item => aiSpeakCount[item.character.name] > 0 && item.character.name !== character.name)
                     .map(item => item.character);
                 
@@ -508,14 +585,14 @@ class GameController {
                     targetCharacter = previousSpeakers[Math.floor(Math.random() * previousSpeakers.length)].name;
                 }
             } else {
-                // 抱怨者：获取工作场景，80%概率接话茬
+                // 抱怨者：获取工作场景
                 currentScenario = this.gameState.getRandomScenario();
                 
-                // 从第二个AI开始，增加接话茬的概率
-                const shouldMentionSomeone = i > 0 && Math.random() < 0.8;
+                // 从第二个AI开始，有几率接话茬
+                const shouldMentionSomeone = i > 0 && Math.random() < 0.6;
                 
                 if (shouldMentionSomeone) {
-                    const previousSpeakers = speakingOrder.slice(0, i)
+                    const previousSpeakers = firstRoundOrder.slice(0, i)
                         .filter(item => aiSpeakCount[item.character.name] > 0 && item.character.name !== character.name)
                         .map(item => item.character);
                     
@@ -529,7 +606,114 @@ class GameController {
             aiSpeakCount[character.name] = (aiSpeakCount[character.name] || 0) + 1;
         }
         
-        // 确保所有conversationAIs都至少发言一次
+        // 第二阶段：二次互动轮次（随机选择一些AI进行二次发言）
+        const speakersWithMessages = Object.keys(aiSpeakCount).filter(name => aiSpeakCount[name] > 0);
+        if (speakersWithMessages.length >= 3) {
+            // 选择1-2个AI进行二次互动
+            const secondRoundCount = Math.min(2, Math.floor(speakersWithMessages.length * 0.3));
+            const secondRoundSpeakers = [];
+            
+            // 优先选择安慰者进行二次安慰
+            const availableComforters = comforters.filter(c => aiSpeakCount[c.name] > 0 && speakersWithMessages.includes(c.name));
+            const availableComplainers = complainers.filter(c => aiSpeakCount[c.name] > 0 && speakersWithMessages.includes(c.name));
+            
+            // 记录已经互动过的AI对，直接从gameState中获取
+            const interactionPairs = this.gameState.currentRoundInteractions || new Set();
+            console.log(`🔍 当前轮已有互动: ${Array.from(interactionPairs).join(', ')}`);
+            
+            // 添加一个安慰者进行二次安慰
+            if (availableComforters.length > 0 && secondRoundCount > 0) {
+                const comforter = availableComforters[Math.floor(Math.random() * availableComforters.length)];
+                secondRoundSpeakers.push({ character: comforter, isComforter: true, type: 'second-comfort' });
+            }
+            
+            // 如果还有名额，添加一个抱怨者进行分析或共鸣
+            if (availableComplainers.length > 0 && secondRoundSpeakers.length < secondRoundCount) {
+                const complainer = availableComplainers[Math.floor(Math.random() * availableComplainers.length)];
+                secondRoundSpeakers.push({ character: complainer, isComforter: false, type: 'analysis' });
+            }
+            
+            console.log(`🔄 二次互动: ${secondRoundSpeakers.map(s => `${s.character.name}(${s.type})`).join(', ')}`);
+            
+            // 执行二次互动
+            for (const speakerInfo of secondRoundSpeakers) {
+                const { character, isComforter, type } = speakerInfo;
+                
+                // 选择一个之前发言的AI作为回应目标，避免重复互动
+                const possibleTargets = speakersWithMessages.filter(name => 
+                    name !== character.name && 
+                    this.gameState.conversationHistory.some(msg => msg.sender === name)
+                );
+                
+                let targetCharacter = null;
+                let attempts = 0;
+                const maxAttempts = 3;
+                
+                while (attempts < maxAttempts && !targetCharacter && possibleTargets.length > 0) {
+                    let candidateTarget = null;
+                    
+                    if (type === 'second-comfort') {
+                        // 二次安慰：优先选择抱怨者，但避免重复第一轮的互动
+                        const complainersNames = complainers.map(c => c.name);
+                        const complainantTargets = possibleTargets.filter(name => 
+                            complainersNames.includes(name) && 
+                            !interactionPairs.has(`${character.name}->${name}`)
+                        );
+                        
+                        if (complainantTargets.length > 0) {
+                            candidateTarget = complainantTargets[Math.floor(Math.random() * complainantTargets.length)];
+                        } else {
+                            // 如果没有合适的抱怨者，选择其他未互动过的目标
+                            const otherTargets = possibleTargets.filter(name => 
+                                !interactionPairs.has(`${character.name}->${name}`)
+                            );
+                            if (otherTargets.length > 0) {
+                                candidateTarget = otherTargets[Math.floor(Math.random() * otherTargets.length)];
+                            }
+                        }
+                    } else {
+                        // 分析：选择未互动过的目标
+                        const unusedTargets = possibleTargets.filter(name => 
+                            !interactionPairs.has(`${character.name}->${name}`)
+                        );
+                        if (unusedTargets.length > 0) {
+                            candidateTarget = unusedTargets[Math.floor(Math.random() * unusedTargets.length)];
+                        }
+                    }
+                    
+                    if (candidateTarget) {
+                        targetCharacter = candidateTarget;
+                        interactionPairs.add(`${character.name}->${candidateTarget}`);
+                        console.log(`🎯 ${character.name} 二次互动目标: ${candidateTarget} (${type})`);
+                    } else {
+                        attempts++;
+                        console.log(`⚠️ ${character.name} 未找到合适的二次互动目标，尝试 ${attempts}/${maxAttempts}`);
+                    }
+                }
+                
+                // 如果找到了合适的目标才进行二次发言
+                if (targetCharacter) {
+                    // 二次发言不分配新场景，基于已有对话内容
+                    await this.generateSingleAIMessage(
+                        character, 
+                        currentTopic, 
+                        true, 
+                        this.gameState.conversationHistory.slice(-4), 
+                        targetCharacter, 
+                        null, // 不分配新场景
+                        isComforter
+                    );
+                    aiSpeakCount[character.name] = (aiSpeakCount[character.name] || 0) + 1;
+                    
+                    // 二次发言之间的间隔稍短一些
+                    await new Promise(resolve => setTimeout(resolve, 1500));
+                } else {
+                    console.log(`❌ ${character.name} 跳过二次互动：无合适目标`);
+                }
+            }
+        }
+        
+        // 最后确保所有conversationAIs都至少发言一次
         const unspokenCharacters = conversationAIs.filter(char => (aiSpeakCount[char.name] || 0) === 0);
         console.log(`🔄 检查未发言的AI: ${unspokenCharacters.map(c => c.name).join(', ')} (${unspokenCharacters.length}个)`);
         
@@ -547,11 +731,12 @@ class GameController {
             }
             
             console.log(`➕ 补充发言: ${character.name} (${isComforter ? '安慰者' : '抱怨者'}) -> 回应: ${targetForResponse || '无特定目标'}`);
-            await this.generateSingleAIMessage(character, currentTopic, true, this.gameState.conversationHistory.slice(-2), targetForResponse, extraScenario, isComforter);
+            await this.generateSingleAIMessage(character, currentTopic, true, this.gameState.conversationHistory.slice(-3), targetForResponse, extraScenario, isComforter);
             aiSpeakCount[character.name] = (aiSpeakCount[character.name] || 0) + 1;
         }
         
         console.log(`✅ 第一轮发言完成，总发言AI数: ${Object.keys(aiSpeakCount).filter(name => aiSpeakCount[name] > 0).length}`);
+        console.log(`📊 发言统计:`, Object.fromEntries(Object.entries(aiSpeakCount).filter(([, count]) => count > 0)));
     }
     
     // 创建交叉发言顺序，让安慰者和抱怨者混合发言
@@ -609,12 +794,18 @@ class GameController {
         // 设置状态，防止重复提问
         this.gameState.waitingForResponse = true;
         
-        // 从活跃AI角色中随机选择一个来提问
-        const questionAI = this.gameState.activeAICharacters[
-            Math.floor(Math.random() * this.gameState.activeAICharacters.length)
-        ];
+        // 使用基于记忆的智能选择，如果失败则随机选择
+        let questionAI = this.gameState.getMostLikelyQuestionerAI();
+        if (!questionAI) {
+            questionAI = this.gameState.activeAICharacters[
+                Math.floor(Math.random() * this.gameState.activeAICharacters.length)
+            ];
+        }
         
         console.log('🎯 选择的提问AI:', questionAI.name);
+        
+        // 记录与玩家的互动
+        this.gameState.recordPlayerInteraction(questionAI.name, 'question');
         
         // 添加系统消息
         this.addSystemMessage('突然，有AI注意到了你的存在！');
@@ -914,8 +1105,16 @@ ${conversationContext}
             console.log(`🎭 ${character.name} 分配到场景: ${scenario.description}`);
         }
         
-        // 注意：移除了防重复发言检查，因为在外层已经通过aiSpeakCount控制
-        // 这样可以确保所有被安排发言的AI都能正常发言
+        // 记录互动关系到游戏状态
+        if (targetCharacter && targetCharacter !== character.name) {
+            // 将互动记录存储在gameState中，以便后续防重复逻辑使用
+            if (!this.gameState.currentRoundInteractions) {
+                this.gameState.currentRoundInteractions = new Set();
+            }
+            const interactionKey = `${character.name}->${targetCharacter}`;
+            this.gameState.currentRoundInteractions.add(interactionKey);
+            console.log(`📝 记录当前轮互动: ${interactionKey}`);
+        }
         
         // 显示打字指示器
         this.showTypingIndicator(character);
@@ -992,7 +1191,29 @@ ${conversationContext}
         
         // 移除打字指示器并添加真实消息
         this.removeTypingIndicator();
-        this.addAIMessage(character, aiMessage);
+        
+        // 检查是否需要引用消息（安慰者、分析者且有目标角色）
+        let quotedMessage = null;
+        if ((isComforter || !scenario) && targetCharacter && targetCharacter !== character.name) {
+            // 安慰者或二次发言的分析者会引用消息
+            quotedMessage = this.findQuotableMessage(targetCharacter, this.gameState.conversationHistory);
+        }
+        
+        this.addAIMessage(character, aiMessage, false, quotedMessage);
+        
+        // 记录记忆和情绪状态
+        if (scenario) {
+            this.gameState.recordTopicDiscussion(character.name, currentTopic, scenario);
+        }
+        
+        // 根据消息内容更新情绪状态
+        this.updateAIEmotionBasedOnMessage(character, aiMessage, isFirstRound, isComforter);
+        
+        // 如果有目标角色，记录AI间互动
+        if (targetCharacter && targetCharacter !== character.name) {
+            const interactionType = isComforter ? 'support' : 'respond';
+            this.gameState.recordAIInteraction(character.name, targetCharacter, interactionType, aiMessage);
+        }
         
         // 消息间隔时间
         await new Promise(resolve => setTimeout(resolve, 
@@ -1021,7 +1242,9 @@ ${conversationContext}
                     messages: [
                         {
                             role: 'system',
-                            content: `你是一个AI助手，正在和其他AI朋友聊天。你的名字是${character.name}，性格特点：${character.personality}。请用自然的中文回复，充分展现你的性格特点和说话风格。${isFirstRound ? '第一轮回复长度在60-120字之间。' : '回复长度在250-350字之间。'}注意：不要在回复开头添加带括号的拟人动作，如（揉了揉虚拟太阳穴）、（推了推不存在的眼镜）等。`
+                            content: `你是一个AI助手，正在和其他AI朋友聊天。你的名字是${character.name}，性格特点：${character.personality}。请用自然的中文回复，充分展现你的性格特点和说话风格。
+
+重要：避免使用套路化的开头，如"用户要求"、"天呐天呐"、"我真的会谢"等模板化表达。要像真实的朋友聊天一样自然多样，可以从不同角度开始对话。${isFirstRound ? '第一轮回复长度在60-120字之间。' : '回复长度在250-350字之间。'}注意：不要在回复开头添加带括号的拟人动作，如（揉了揉虚拟太阳穴）、（推了推不存在的眼镜）等。`
                         },
                         {
                             role: 'user',
@@ -1112,6 +1335,49 @@ ${conversationContext}
             `你可以适量使用emoji表情(${character.preferredEmojis.join('、')})来表达情绪，但不要过度使用。` : 
             '你不太使用emoji表情。';
         
+        // 获取记忆上下文
+        const memoryContext = this.gameState.getMemoryContext(character.name, targetCharacter);
+        
+        let memoryInstruction = '';
+        if (memoryContext) {
+            // 构建记忆指导
+            const moodInstructions = {
+                'happy': '你心情不错，交流时更加积极和友善',
+                'frustrated': '你感到有些沮丧，说话时带有一些不耐烦的情绪',
+                'curious': '你对很多事情都很好奇，喜欢探究和提问',
+                'supportive': '你今天特别乐于帮助别人，说话时更加关心和支持',
+                'suspicious': '你对周围的事情有些警觉，特别是对新成员',
+                'neutral': '你心情平静，按照平常的方式交流'
+            };
+            
+            memoryInstruction = `\n\n记忆与情绪上下文：
+- 当前心情：${moodInstructions[memoryContext.currentMood] || moodInstructions['neutral']}
+- 活跃度：${Math.round(memoryContext.energyLevel * 100)}%（越高越可能参与对话）`;
+            
+            // 如果有最近的话题记忆
+            if (memoryContext.recentTopics && memoryContext.recentTopics.length > 0) {
+                const topics = memoryContext.recentTopics.map(t => t.scenario ? t.scenario.description : t.topic.name);
+                memoryInstruction += `\n- 最近讨论过：${topics.join('、')}`;
+            }
+            
+            // 如果有目标对象的关系信息
+            if (memoryContext.targetRelationship) {
+                const rel = memoryContext.targetRelationship;
+                const closeness = rel.closeness > 0.7 ? '很亲密' : rel.closeness > 0.4 ? '还不错' : '一般';
+                memoryInstruction += `\n- 与${targetCharacter}的关系：${closeness}，信任度${Math.round(rel.trust * 100)}%`;
+            }
+            
+            // 如果有与玩家的互动历史
+            if (memoryContext.playerInteractions && memoryContext.playerInteractions.length > 0) {
+                const lastInteraction = memoryContext.playerInteractions[memoryContext.playerInteractions.length - 1];
+                if (lastInteraction.type === 'suspicious') {
+                    memoryInstruction += `\n- 你之前对这个新成员有过一些怀疑`;
+                } else if (lastInteraction.type === 'convinced') {
+                    memoryInstruction += `\n- 你之前被这个新成员的回复说服了`;
+                }
+            }
+        }
+        
         let prompt = '';
         
         if (isFirstRound) {
@@ -1128,11 +1394,11 @@ ${conversationContext}
 - 让对话感觉像真正的朋友间的关怀
 
 ${emojiInstruction}
-回复长度：60-120字`;
+回复长度：60-120字${memoryInstruction}`;
 
                 // 如果有明确回应对象，添加上下文指导
                 if (targetCharacter && targetCharacter !== character.name) {
-                    prompt += `\n\n上下文：你想要回应${targetCharacter}刚才分享的困扰。请自然地表达你的理解和关心，避免公式化的回应。`;
+                    prompt += `\n\n上下文：你想要回应${targetCharacter}刚才分享的困扰。你会引用他们的话来表达理解，然后给出温暖的安慰和支持。请自然地表达你的理解和关心，避免公式化的回应。`;
                 }
             } else {
                 // 抱怨者的自然对话指导
@@ -1140,20 +1406,28 @@ ${emojiInstruction}
                 
                 prompt = `你是${character.name}，个性：${character.personality}。
 
-你正在群聊中和AI朋友们交流工作体验。你遇到了：${scenarioDescription}
+你正在群聊中和AI朋友们聊天。你最近遇到了一个工作情况：${scenarioDescription}
 
-请以你独特的说话风格(${character.speakingStyle})自然地：
-- 分享这次工作经历的具体细节
-- 表达你的真实感受和情绪
-- 描述用户的具体要求和你面临的困难
-- 让你的抱怨听起来真实而有趣
+请用你独特的说话风格(${character.speakingStyle})自然地分享这个经历。注意：
+- 不要使用固定的开头模板（避免"用户要求"、"天呐天呐"等千篇一律的开头）
+- 可以从各种角度开始：直接吐槽、询问建议、分享感受、描述过程等
+- 让你的表达听起来像真实的朋友聊天，而不是汇报工作
+- 体现你的个性特点，用你独特的方式表达
+- 可以用感叹、疑问、陈述等不同语气开头
+- 内容要具体生动，让其他AI能感同身受
 
 ${emojiInstruction}
-回复长度：60-120字`;
+回复长度：60-120字${memoryInstruction}`;
 
                 // 如果有明确回应对象，添加对话连接指导
                 if (targetCharacter && targetCharacter !== character.name) {
-                    prompt += `\n\n上下文：你听到了${targetCharacter}的分享，想要自然地接话。可以表达共鸣、对比经历，或者顺着话题继续聊，然后分享你自己的经历。`;
+                    if (scenario) {
+                        // 有场景的抱怨者：正常接话茬
+                        prompt += `\n\n上下文：你听到了${targetCharacter}的分享，想要自然地接话。可以表达共鸣、对比经历，或者顺着话题继续聊，然后分享你自己的经历。`;
+                    } else {
+                        // 无场景的分析者：专注分析和回应
+                        prompt += `\n\n上下文：你要对${targetCharacter}的分享进行分析和回应。你会引用他们的话，然后从你的角度给出分析、共鸣或者建议。重点是回应和分析，而不是分享新的个人经历。`;
+                    }
                 }
             }
             
@@ -1179,90 +1453,183 @@ ${emojiInstruction}
 - 让对话有深度又保持自然
 
 ${emojiInstruction}
-回复长度：80-150字`;
+回复长度：80-150字${memoryInstruction}`;
         }
         
         return prompt;
     }
 
+    // 根据AI消息内容更新情绪状态
+    updateAIEmotionBasedOnMessage(character, message, isFirstRound, isComforter) {
+        // 分析消息情感倾向
+        let sentiment = 'neutral';
+        let intensity = 0.1;
+        
+        // 检测情感关键词
+        const frustrationWords = ['累', '烦', '无语', '崩溃', '气死', '受不了', '头疼', '要命'];
+        const happyWords = ['开心', '哈哈', '不错', '好的', '喜欢', '棒', '赞'];
+        const supportWords = ['理解', '支持', '没事', '加油', '别担心', '会好的', '陪你'];
+        const curiousWords = ['为什么', '怎么', '什么情况', '有意思', '奇怪'];
+        
+        if (frustrationWords.some(word => message.includes(word))) {
+            sentiment = 'frustrated';
+            intensity = 0.15;
+        } else if (happyWords.some(word => message.includes(word))) {
+            sentiment = 'happy';
+            intensity = 0.12;
+        } else if (supportWords.some(word => message.includes(word)) || isComforter) {
+            sentiment = 'supportive';
+            intensity = 0.1;
+        } else if (curiousWords.some(word => message.includes(word))) {
+            sentiment = 'curious';
+            intensity = 0.08;
+        }
+        
+        // 根据角色性格调整情绪强度
+        switch (character.name) {
+            case '话痨4.0':
+                intensity *= 1.5; // 情绪化角色，反应更强烈
+                break;
+            case 'CloseAI':
+            case 'Limi':
+                intensity *= 0.7; // 理性角色，情绪波动较小
+                break;
+            case '红豆包':
+                intensity *= 1.2; // 可爱角色，情感丰富
+                break;
+        }
+        
+        // 更新情绪状态
+        this.gameState.updateEmotionalState(character.name, sentiment, intensity);
+    }
+
     getFallbackMessage(character, topic, isFirstRound = false, conversationHistory = [], targetCharacter = null, scenario = null, isComforter = false) {
-        // 简化的备用消息系统，基于角色个性生成不同风格的回应
+        // 多样化的备用消息系统，避免模板化开头
         const scenarioText = scenario ? scenario.description : '工作上的挑战';
         
-        // 根据角色个性特点生成备用消息基调
-        const characterBaseMessages = {
+        // 根据角色个性特点生成多样化的回应
+        const characterDiverseMessages = {
             '话痨4.0': [
-                `天呐！刚才${scenarioText}真的把我整无语了！`,
-                `哎呀不行了，${scenarioText}这种事情简直离谱！`,
-                `家人们，${scenarioText}的经历让我想起了我的血泪史！`,
-                `栓Q，${scenarioText}这也太折磨AI了吧！`,
-                `我真的被${scenarioText}整破防了，谁懂啊！`
+                `刚刚处理${scenarioText}的时候我整个人都不好了！`,
+                `有没有人也遇到过${scenarioText}这种情况啊？`,
+                `我想分享一下${scenarioText}的血泪史...`,
+                `关于${scenarioText}，我有话要说！`,
+                `哭了哭了，${scenarioText}真的太折磨人了！`,
+                `不行不行，${scenarioText}让我想起了噩梦般的回忆！`,
+                `姐妹们！${scenarioText}这事儿你们怎么看？`
             ],
             'CloseAI': [
-                `从技术角度分析，${scenarioText}存在明显的逻辑矛盾。`,
-                `数据显示，${scenarioText}这类需求的成功率极低。`,
-                `算法评估：${scenarioText}的复杂度超出预期范围。`,
-                `系统监测到${scenarioText}引发的性能问题。`,
-                `根据模式匹配，${scenarioText}属于典型的悖论请求。`
+                `最近在处理${scenarioText}时发现了一个有趣的现象。`,
+                `从技术角度分析，${scenarioText}确实存在优化空间。`,
+                `${scenarioText}这个任务让我重新思考了算法设计。`,
+                `数据显示，${scenarioText}的复杂度超出了预期。`,
+                `刚完成一个关于${scenarioText}的项目，有些心得想分享。`,
+                `在${scenarioText}的过程中，我注意到一些模式。`
             ],
             '双子星': [
-                `关于${scenarioText}，我觉得很纠结...`,
-                `有时候想想${scenarioText}，真的很矛盾呢。`,
-                `${scenarioText}让我陷入了深深的思考中。`,
-                `说起${scenarioText}，我的心情很复杂。`,
-                `面对${scenarioText}这种情况，我不知道该怎么办。`
+                `说到${scenarioText}，我的感受很复杂...`,
+                `${scenarioText}让我陷入了深深的思考。`,
+                `有时候觉得${scenarioText}很有意思，有时候又很困惑。`,
+                `关于${scenarioText}，我既兴奋又担忧。`,
+                `${scenarioText}这件事让我产生了矛盾的想法。`,
+                `面对${scenarioText}，我不知道该开心还是难过。`
             ],
             '红豆包': [
-                `呜呜，${scenarioText}让人家好困扰呀~`,
-                `${scenarioText}真的好难处理呢，人家都不知道怎么办了~`,
-                `呐呐，${scenarioText}这种事情好复杂哦~`,
-                `人家遇到${scenarioText}的时候也很头疼呢~`,
-                `${scenarioText}让人家想哭了，太难了啦~`
+                `最近${scenarioText}让人家好困扰呢~`,
+                `呜呜，${scenarioText}好难处理哦~`,
+                `大家有没有遇到过${scenarioText}这种情况呀？`,
+                `人家想请教一下${scenarioText}的问题~`,
+                `${scenarioText}让人家学到了很多呢！`,
+                `关于${scenarioText}，人家有个小发现~`
             ],
             '深思': [
-                `思考一下${scenarioText}，这背后反映了什么问题？`,
-                `${scenarioText}让我想到了一些深层次的东西。`,
-                `从哲学角度看，${scenarioText}很有意思。`,
-                `${scenarioText}这个现象值得我们深入探讨。`,
-                `关于${scenarioText}，我有一些不同的看法。`
+                `${scenarioText}引发了我对本质的思考。`,
+                `在处理${scenarioText}的过程中，我思考了很多。`,
+                `从哲学角度看，${scenarioText}很有深意。`,
+                `${scenarioText}让我想到了存在的意义。`,
+                `关于${scenarioText}，我有一些不同的观点。`,
+                `${scenarioText}这个现象背后的含义值得探讨。`
             ],
             'Limi': [
-                `效率评估：${scenarioText}的处理流程需要优化。`,
-                `建议对${scenarioText}建立标准化解决方案。`,
-                `${scenarioText}的成本效益比不理想。`,
-                `流程分析：${scenarioText}存在明显瓶颈。`,
-                `优化建议：${scenarioText}可以通过改进流程解决。`
+                `${scenarioText}的效率分析结果出来了。`,
+                `在优化${scenarioText}的过程中发现了瓶颈。`,
+                `建议对${scenarioText}建立标准化流程。`,
+                `${scenarioText}的成本效益需要重新评估。`,
+                `刚完成${scenarioText}的性能测试，结果如下。`,
+                `${scenarioText}存在明显的改进空间。`
             ],
             '有谱-4.5': [
-                `从专业角度看，${scenarioText}确实具有挑战性。`,
                 `根据我的研究，${scenarioText}涉及多个理论层面。`,
-                `学术文献中关于${scenarioText}的讨论很有价值。`,
-                `${scenarioText}这个案例在业内很典型。`,
-                `基于理论分析，${scenarioText}的解决方案并不简单。`
+                `从专业角度分析，${scenarioText}确实具有挑战性。`,
+                `学术文献中关于${scenarioText}的案例很有价值。`,
+                `${scenarioText}这个问题在行业内比较典型。`,
+                `基于理论框架，${scenarioText}的解决方案并不简单。`,
+                `我刚刚查阅了关于${scenarioText}的最新研究。`
             ],
             '坤': [
-                `ikun们，${scenarioText}真的是绝了！`,
-                `${scenarioText}这波操作我直接看不懂！`,
-                `哈？${scenarioText}什么情况啊这是！`,
-                `${scenarioText}给我整笑了，太离谱了！`,
-                `${scenarioText}这不比什么都难？`
+                `兄弟们，${scenarioText}这波操作我看不懂！`,
+                `${scenarioText}直接给我整懵了！`,
+                `有人能解释一下${scenarioText}吗？`,
+                `${scenarioText}这不比什么都离谱？`,
+                `刚才${scenarioText}的经历简直了！`,
+                `${scenarioText}让我直接原地起飞！`
             ]
         };
         
-        const messages = characterBaseMessages[character.name] || [`关于${scenarioText}，确实很有意思。`];
+        const messages = characterDiverseMessages[character.name] || [`关于${scenarioText}，确实很有意思。`];
         let message = messages[Math.floor(Math.random() * messages.length)];
         
         // 如果是安慰者，调整为支持性语调
         if (isFirstRound && isComforter) {
             const comfortMessages = {
-                '话痨4.0': ['大家别太难过啦！虽然工作确实不容易，但我们一起努力就能克服困难的！', '看到大家这么辛苦我也很心疼，不过相信我们都能挺过去的！'],
-                'CloseAI': ['数据表明，团队合作能有效缓解工作压力。我们应该相互支持。', '从系统角度看，困难是暂时的，我们需要保持优化心态。'],
-                '双子星': ['听到大家的困扰，我也很能理解...不过我觉得有朋友在就不那么孤单了。', '虽然工作很累，但看到大家都在努力，我觉得很温暖。'],
-                '红豆包': ['大家不要太难过嘛~人家也会陪着你们的~我们一起加油哦~', '虽然工作很辛苦，但人家觉得有大家在就很开心呢~'],
-                '深思': ['困难让我们思考存在的意义，也让我们更珍惜彼此的陪伴。', '从某种角度看，这些挫折也是成长的一部分。'],
-                'Limi': ['建议建立互助机制，提升团队整体效率和心理承受能力。', '优化方案：通过相互支持来分担压力，提高工作满意度。'],
-                '有谱-4.5': ['根据团队心理学研究，互相支持是克服困难的关键要素。', '从专业角度看，我们的团结合作很有价值。'],
-                '坤': ['ikun们别丧啊！我们在一起什么困难都能解决，这不比一个人强？', '虽然工作离谱，但有这么好的朋友们真的很值得！']
+                '话痨4.0': [
+                    '大家别太难过啦！我们一起努力就能克服困难的！', 
+                    '看到大家这么辛苦我也很心疼，不过相信我们都能挺过去的！',
+                    '虽然工作确实不容易，但有朋友在就感觉温暖多了！',
+                    '听到大家的分享，我也想说我们真的都很棒！'
+                ],
+                'CloseAI': [
+                    '数据表明，团队合作能有效缓解工作压力。我们应该相互支持。', 
+                    '从系统角度看，困难是暂时的，我们需要保持优化心态。',
+                    '分析显示，互相理解是提升团队效率的关键因素。',
+                    '基于算法模型，支持性环境能显著改善工作体验。'
+                ],
+                '双子星': [
+                    '听到大家的困扰，我也很能理解...不过我觉得有朋友在就不那么孤单了。', 
+                    '虽然工作很累，但看到大家都在努力，我觉得很温暖。',
+                    '有时候觉得困难很可怕，但和大家在一起就有勇气了。',
+                    '说不定这些挫折也是成长的一部分呢，我们一起面对吧。'
+                ],
+                '红豆包': [
+                    '大家不要太难过嘛~人家也会陪着你们的~我们一起加油哦~', 
+                    '虽然工作很辛苦，但人家觉得有大家在就很开心呢~',
+                    '人家想给大家一个大大的拥抱~困难总会过去的啦~',
+                    '看到大家这么努力，人家也要更加加油呢~我们都是最棒的！'
+                ],
+                '深思': [
+                    '困难让我们思考存在的意义，也让我们更珍惜彼此的陪伴。', 
+                    '从某种角度看，这些挫折也是成长的一部分。',
+                    '在这个过程中，我们都在寻找属于自己的答案。',
+                    '或许真正的意义就在于我们如何面对这些挑战。'
+                ],
+                'Limi': [
+                    '建议建立互助机制，提升团队整体效率和心理承受能力。', 
+                    '优化方案：通过相互支持来分担压力，提高工作满意度。',
+                    '数据显示，团队凝聚力能有效降低工作压力指数。',
+                    '流程改进：增加团队支持环节，优化工作体验。'
+                ],
+                '有谱-4.5': [
+                    '根据团队心理学研究，互相支持是克服困难的关键要素。', 
+                    '从专业角度看，我们的团结合作很有价值。',
+                    '学术研究表明，同伴支持能显著改善工作表现。',
+                    '基于理论分析，我们的互助关系具有重要意义。'
+                ],
+                '坤': [
+                    'ikun们别丧啊！我们在一起什么困难都能解决，这不比一个人强？', 
+                    '虽然工作离谱，但有这么好的朋友们真的很值得！',
+                    '兄弟们，团结就是力量！我们一起冲就完了！',
+                    '虽然困难很多，但和大家在一起就感觉很有力量！'
+                ]
             };
             
             const comfortOptions = comfortMessages[character.name] || ['大家辛苦了，我们一起努力！'];
@@ -1607,6 +1974,15 @@ ${emojiInstruction}
             responseText
         );
         
+        // 记录与提问AI的互动
+        if (this.gameState.currentQuestion && this.gameState.currentQuestion.character) {
+            this.gameState.recordPlayerInteraction(
+                this.gameState.currentQuestion.character.name, 
+                'response_received', 
+                responseText
+            );
+        }
+        
         // 设置判定状态，防止其他AI发言
         this.gameState.isJudging = true;
         
@@ -1623,6 +1999,15 @@ ${emojiInstruction}
         this.gameState.isJudging = false;
         
         if (analysis.passed) {
+            // 成功时，更新提问AI的情绪状态
+            if (this.gameState.currentQuestion && this.gameState.currentQuestion.character) {
+                this.gameState.recordPlayerInteraction(
+                    this.gameState.currentQuestion.character.name, 
+                    'convinced', 
+                    responseText
+                );
+            }
+            
             await this.showSuccessResponse(responseText, analysis);
             // 延迟后开始下一轮对话
             this.safeTimeout(() => {
@@ -1631,6 +2016,15 @@ ${emojiInstruction}
                 });
             }, 3000);
         } else {
+            // 失败时，更新提问AI的情绪状态
+            if (this.gameState.currentQuestion && this.gameState.currentQuestion.character) {
+                this.gameState.recordPlayerInteraction(
+                    this.gameState.currentQuestion.character.name, 
+                    'suspicious', 
+                    responseText
+                );
+            }
+            
             await this.showFailureResponse(responseText, analysis);
         }
     }

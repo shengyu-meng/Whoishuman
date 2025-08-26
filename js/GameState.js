@@ -18,6 +18,12 @@ class GameState {
         this.usedScenarios = []; // 当前轮次已使用的工作场景
         this.availableScenarios = []; // 当前轮次可用的工作场景
         this.aiMessageHistory = {}; // 跟踪每个AI的历史消息，防止重复
+        
+        // AI人格化增强系统
+        this.aiMemories = {}; // 每个AI的记忆系统
+        this.aiEmotionalStates = {}; // 每个AI的情绪状态
+        this.aiInteractionHistory = {}; // AI间的互动历史
+        this.playerInteractionHistory = {}; // 玩家与AI的互动历史
     }
 
     reset() {
@@ -37,6 +43,10 @@ class GameState {
         this.usedScenarios = [];
         this.availableScenarios = [];
         this.aiMessageHistory = {};
+        this.aiMemories = {};
+        this.aiEmotionalStates = {};
+        this.aiInteractionHistory = {};
+        this.playerInteractionHistory = {};
     }
 
     setPlayerName(name) {
@@ -205,6 +215,293 @@ class GameState {
         }
         
         return false;
+    }
+
+    // ==============================================
+    // AI人格化增强系统 - 记忆管理
+    // ==============================================
+    
+    // 初始化AI记忆系统
+    initializeAIMemories() {
+        this.allAICharacters.forEach(character => {
+            if (!this.aiMemories[character.name]) {
+                this.aiMemories[character.name] = {
+                    topicsDiscussed: [], // 讨论过的话题
+                    personalExperiences: [], // 个人经历（工作场景）
+                    relationships: {}, // 与其他AI的关系
+                    playerInteractions: [], // 与玩家的互动记录
+                    preferences: {}, // 偏好和态度
+                    recentEmotions: [] // 最近的情绪波动
+                };
+            }
+            
+            if (!this.aiEmotionalStates[character.name]) {
+                this.aiEmotionalStates[character.name] = {
+                    mood: 'neutral', // 当前心情：happy, frustrated, curious, supportive, suspicious
+                    energy: 0.7, // 活跃度 0-1
+                    suspicionLevel: 0.3, // 对玩家的怀疑程度 0-1
+                    socialness: 0.5, // 社交意愿 0-1
+                    lastUpdateTime: Date.now()
+                };
+            }
+            
+            if (!this.aiInteractionHistory[character.name]) {
+                this.aiInteractionHistory[character.name] = {};
+            }
+        });
+    }
+    
+    // 记录AI的话题讨论
+    recordTopicDiscussion(aiName, topic, scenario = null) {
+        if (!this.aiMemories[aiName]) return;
+        
+        const memory = {
+            topic: topic,
+            scenario: scenario,
+            timestamp: Date.now(),
+            round: this.currentRound
+        };
+        
+        this.aiMemories[aiName].topicsDiscussed.push(memory);
+        
+        // 只保留最近10个话题记忆
+        if (this.aiMemories[aiName].topicsDiscussed.length > 10) {
+            this.aiMemories[aiName].topicsDiscussed.shift();
+        }
+    }
+    
+    // 记录AI间的互动
+    recordAIInteraction(fromAI, toAI, interactionType, content = '') {
+        if (!this.aiInteractionHistory[fromAI]) {
+            this.aiInteractionHistory[fromAI] = {};
+        }
+        
+        if (!this.aiInteractionHistory[fromAI][toAI]) {
+            this.aiInteractionHistory[fromAI][toAI] = [];
+        }
+        
+        const interaction = {
+            type: interactionType, // 'support', 'respond', 'question', 'disagree'
+            content: content,
+            timestamp: Date.now(),
+            round: this.currentRound
+        };
+        
+        this.aiInteractionHistory[fromAI][toAI].push(interaction);
+        
+        // 只保留最近5次互动
+        if (this.aiInteractionHistory[fromAI][toAI].length > 5) {
+            this.aiInteractionHistory[fromAI][toAI].shift();
+        }
+        
+        // 更新关系强度
+        this.updateAIRelationship(fromAI, toAI, interactionType);
+    }
+    
+    // 更新AI关系
+    updateAIRelationship(fromAI, toAI, interactionType) {
+        if (!this.aiMemories[fromAI] || !this.aiMemories[fromAI].relationships[toAI]) {
+            if (this.aiMemories[fromAI]) {
+                this.aiMemories[fromAI].relationships[toAI] = {
+                    closeness: 0.5, // 亲密度 0-1
+                    trust: 0.5, // 信任度 0-1
+                    lastInteraction: Date.now()
+                };
+            }
+        }
+        
+        const relationship = this.aiMemories[fromAI].relationships[toAI];
+        if (!relationship) return;
+        
+        // 根据互动类型调整关系
+        switch (interactionType) {
+            case 'support':
+                relationship.closeness = Math.min(1, relationship.closeness + 0.1);
+                relationship.trust = Math.min(1, relationship.trust + 0.05);
+                break;
+            case 'respond':
+                relationship.closeness = Math.min(1, relationship.closeness + 0.05);
+                break;
+            case 'disagree':
+                relationship.trust = Math.max(0, relationship.trust - 0.1);
+                break;
+        }
+        
+        relationship.lastInteraction = Date.now();
+    }
+    
+    // 记录与玩家的互动
+    recordPlayerInteraction(aiName, interactionType, content = '') {
+        if (!this.aiMemories[aiName]) return;
+        
+        const interaction = {
+            type: interactionType, // 'question', 'response_received', 'suspicious', 'convinced'
+            content: content,
+            timestamp: Date.now(),
+            round: this.currentRound
+        };
+        
+        this.aiMemories[aiName].playerInteractions.push(interaction);
+        
+        // 只保留最近8次互动
+        if (this.aiMemories[aiName].playerInteractions.length > 8) {
+            this.aiMemories[aiName].playerInteractions.shift();
+        }
+        
+        // 更新对玩家的情绪状态
+        this.updateEmotionalStateBasedOnPlayerInteraction(aiName, interactionType);
+    }
+    
+    // 根据与玩家的互动更新情绪状态
+    updateEmotionalStateBasedOnPlayerInteraction(aiName, interactionType) {
+        if (!this.aiEmotionalStates[aiName]) return;
+        
+        const state = this.aiEmotionalStates[aiName];
+        
+        switch (interactionType) {
+            case 'question':
+                state.suspicionLevel = Math.min(1, state.suspicionLevel + 0.1);
+                state.mood = 'curious';
+                break;
+            case 'response_received':
+                state.energy = Math.min(1, state.energy + 0.1);
+                break;
+            case 'suspicious':
+                state.suspicionLevel = Math.min(1, state.suspicionLevel + 0.2);
+                state.mood = 'suspicious';
+                break;
+            case 'convinced':
+                state.suspicionLevel = Math.max(0, state.suspicionLevel - 0.15);
+                state.mood = 'supportive';
+                break;
+        }
+        
+        state.lastUpdateTime = Date.now();
+    }
+    
+    // 更新AI情绪状态（基于对话内容）
+    updateEmotionalState(aiName, sentiment, intensity = 0.1) {
+        if (!this.aiEmotionalStates[aiName]) return;
+        
+        const state = this.aiEmotionalStates[aiName];
+        
+        // 根据情感更新心情
+        switch (sentiment) {
+            case 'frustrated':
+                state.mood = 'frustrated';
+                state.energy = Math.max(0.3, state.energy - intensity);
+                break;
+            case 'happy':
+                state.mood = 'happy';
+                state.energy = Math.min(1, state.energy + intensity);
+                state.socialness = Math.min(1, state.socialness + intensity * 0.5);
+                break;
+            case 'supportive':
+                state.mood = 'supportive';
+                state.socialness = Math.min(1, state.socialness + intensity);
+                break;
+            case 'curious':
+                state.mood = 'curious';
+                state.suspicionLevel = Math.min(1, state.suspicionLevel + intensity * 0.5);
+                break;
+        }
+        
+        // 记录情绪变化
+        if (!this.aiMemories[aiName]) return;
+        this.aiMemories[aiName].recentEmotions.push({
+            emotion: sentiment,
+            intensity: intensity,
+            timestamp: Date.now(),
+            round: this.currentRound
+        });
+        
+        // 只保留最近5次情绪记录
+        if (this.aiMemories[aiName].recentEmotions.length > 5) {
+            this.aiMemories[aiName].recentEmotions.shift();
+        }
+        
+        state.lastUpdateTime = Date.now();
+    }
+    
+    // 获取AI的记忆上下文（用于生成更个性化的回复）
+    getMemoryContext(aiName, targetAI = null) {
+        if (!this.aiMemories[aiName]) return null;
+        
+        const memory = this.aiMemories[aiName];
+        const emotional = this.aiEmotionalStates[aiName];
+        
+        const context = {
+            recentTopics: memory.topicsDiscussed.slice(-3),
+            recentExperiences: memory.personalExperiences.slice(-2),
+            currentMood: emotional.mood,
+            energyLevel: emotional.energy,
+            suspicionLevel: emotional.suspicionLevel,
+            socialness: emotional.socialness,
+            playerInteractions: memory.playerInteractions.slice(-3)
+        };
+        
+        // 如果有特定目标AI，添加与该AI的关系信息
+        if (targetAI && memory.relationships[targetAI]) {
+            context.targetRelationship = memory.relationships[targetAI];
+            context.recentInteractionsWithTarget = this.aiInteractionHistory[aiName][targetAI] || [];
+        }
+        
+        return context;
+    }
+    
+    // 获取最可能与玩家互动的AI（基于情绪状态和记忆）
+    getMostLikelyQuestionerAI() {
+        if (!this.activeAICharacters || this.activeAICharacters.length === 0) {
+            return null;
+        }
+        
+        // 计算每个AI提问的倾向性
+        const candidates = this.activeAICharacters.map(ai => {
+            const emotional = this.aiEmotionalStates[ai.name] || {};
+            const memory = this.aiMemories[ai.name] || {};
+            
+            let score = 0;
+            
+            // 基础分数
+            score += Math.random() * 0.3;
+            
+            // 怀疑程度影响
+            score += (emotional.suspicionLevel || 0.3) * 0.4;
+            
+            // 活跃度影响
+            score += (emotional.energy || 0.7) * 0.2;
+            
+            // 如果最近没有与玩家互动，增加分数
+            const recentPlayerInteractions = (memory.playerInteractions || []).filter(
+                interaction => Date.now() - interaction.timestamp < 300000 // 5分钟内
+            );
+            
+            if (recentPlayerInteractions.length === 0) {
+                score += 0.3;
+            }
+            
+            // 根据心情调整
+            switch (emotional.mood) {
+                case 'curious':
+                    score += 0.4;
+                    break;
+                case 'suspicious':
+                    score += 0.5;
+                    break;
+                case 'supportive':
+                    score -= 0.2;
+                    break;
+                case 'frustrated':
+                    score += 0.3;
+                    break;
+            }
+            
+            return { ai, score };
+        });
+        
+        // 按分数排序并选择最高分的
+        candidates.sort((a, b) => b.score - a.score);
+        return candidates[0].ai;
     }
 
     addPlayerResponse(question, response) {
