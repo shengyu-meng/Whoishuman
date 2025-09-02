@@ -479,7 +479,9 @@ class GameController {
                 console.log(`  - 打乱后的角色顺序: ${shuffledCharacters.map(c => c.name).join(', ')}`);
                 
                 // 每个对话AI发言一次，每个获得不重复场景
-                for (const character of shuffledCharacters) {
+                for (let i = 0; i < shuffledCharacters.length; i++) {
+                    const character = shuffledCharacters[i];
+                    
                     // 检查该AI是否已经在本轮发过言
                     if (aiSpeakCount[character.name] >= 1) {
                         console.log(`  - ${character.name} 本轮已发言${aiSpeakCount[character.name]}次，跳过`);
@@ -488,7 +490,28 @@ class GameController {
                     
                     console.log(`  - 让 ${character.name} 发言 (当前计数: ${aiSpeakCount[character.name] || 0})`);
                     const scenario = this.gameState.getRandomScenario();
-                    await this.generateSingleAIMessage(character, currentTopic, false, [], null, scenario);
+                    
+                    // 获取之前的对话历史用于互动
+                    const recentMessages = this.gameState.conversationHistory.slice(-3);
+                    
+                    // 为非第一轮次也添加目标角色选择逻辑，实现引用回复
+                    let targetCharacter = null;
+                    
+                    // 从第二个AI开始，有较高几率回应之前的发言
+                    const shouldMentionSomeone = i > 0 && Math.random() < 0.7; // 提高回应概率
+                    
+                    if (shouldMentionSomeone) {
+                        // 找到本轮已发言的其他AI
+                        const previousSpeakers = shuffledCharacters.slice(0, i)
+                            .filter(item => aiSpeakCount[item.name] > 0 && item.name !== character.name);
+                        
+                        if (previousSpeakers.length > 0) {
+                            targetCharacter = previousSpeakers[Math.floor(Math.random() * previousSpeakers.length)].name;
+                            console.log(`  - ${character.name} 将回应 ${targetCharacter} 的发言`);
+                        }
+                    }
+                    
+                    await this.generateSingleAIMessage(character, currentTopic, false, recentMessages, targetCharacter, scenario);
                     aiSpeakCount[character.name] = (aiSpeakCount[character.name] || 0) + 1;
                     console.log(`  - ${character.name} 发言完成 (新计数: ${aiSpeakCount[character.name]})`);
                 }
@@ -3165,11 +3188,6 @@ ${emojiInstruction}
         
         // 更新UI主题
         this.applyThemeStyles(newTheme);
-        
-        // 显示主题指导
-        if (newTheme.guidanceText) {
-            this.addThemeGuidance(newTheme.guidanceText);
-        }
         
         // 移除转换动画
         gameInterface.classList.remove('theme-transition');

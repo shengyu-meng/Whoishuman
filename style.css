@@ -581,9 +581,9 @@ body {
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
     border-left: 3px solid #07c160;  /* 微信绿色强调边 */
     
-    /* 改为绝对定位的浮动元素 */
+    /* 改为绝对定位的浮动元素，位置上移避免与对话重叠 */
     position: fixed;
-    top: 50%;
+    top: 30%;
     right: 20px;
     transform: translateY(-50%);
     z-index: 1000;  /* 确保在最上层 */
@@ -1003,7 +1003,7 @@ body {
 /* 游戏头部主题适配 */
 .round-info {
     background: rgba(255, 255, 255, 0.2);
-    color: white;
+    color: #999;
     padding: 4px 12px;
     border-radius: 12px;
     font-size: 12px;
