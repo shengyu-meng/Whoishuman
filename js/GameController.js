@@ -3,18 +3,17 @@ class GameController {
     constructor() {
         this.gameState = new GameState();
         
-        // 从配置文件加载API配置
-        this.apiConfig = window.API_CONFIG || {};
-        this.gameConfig = window.GAME_CONFIG || {};
-        
-        // 验证配置是否加载成功
-        if (!this.apiConfig.apiKey) {
-            console.error('❌ API配置加载失败，请检查config.js文件');
-        }
+        // 配置加载状态
+        this.configLoaded = false;
+        this.apiConfig = null;
+        this.gameConfig = null;
         
         // 状态管理标志
         this.isGeneratingConversation = false;
         this.isStartingNextRound = false;
+        
+        // 异步初始化配置
+        this.initializeConfig();
         
         this.initializeEventListeners();
         
@@ -70,6 +69,65 @@ class GameController {
                 return null;
             }
         };
+    }
+
+    // 异步初始化配置
+    async initializeConfig() {
+        try {
+            console.log('🔧 开始加载配置...');
+            
+            // 使用环境配置管理器获取配置
+            if (typeof window !== 'undefined' && window.envConfigManager) {
+                const config = await window.envConfigManager.getConfig();
+                this.apiConfig = config.API_CONFIG;
+                this.gameConfig = config.GAME_CONFIG;
+                this.configLoaded = true;
+                
+                console.log('✅ 配置加载成功:', {
+                    environment: config.ENVIRONMENT.info,
+                    hasApiKey: !!this.apiConfig.apiKey && this.apiConfig.apiKey !== 'YOUR_API_KEY_HERE',
+                    apiKeySource: this.apiConfig.apiKey !== 'YOUR_API_KEY_HERE' ? '环境变量或配置文件' : '未配置'
+                });
+            } else {
+                // 回退到传统配置加载
+                console.warn('⚠️ 环境配置管理器未找到，使用传统配置方式');
+                this.apiConfig = window.API_CONFIG || {};
+                this.gameConfig = window.GAME_CONFIG || {};
+                this.configLoaded = true;
+                
+                if (!this.apiConfig.apiKey) {
+                    console.error('❌ API配置加载失败，请检查config.js文件或环境变量');
+                }
+            }
+        } catch (error) {
+            console.error('❌ 配置加载失败:', error);
+            // 使用默认配置
+            this.apiConfig = {
+                baseUrl: 'https://api.deepseek.com/v1/chat/completions',
+                model: 'deepseek-chat',
+                requestConfig: {
+                    temperature: 0.8,
+                    maxTokens: 1000,
+                    timeout: 30000
+                },
+                apiKey: 'YOUR_API_KEY_HERE'
+            };
+            this.gameConfig = window.GAME_CONFIG || {};
+            this.configLoaded = true;
+        }
+    }
+
+    // 确保配置已加载的工具方法
+    async ensureConfigLoaded() {
+        if (!this.configLoaded) {
+            await this.initializeConfig();
+        }
+        
+        if (!this.apiConfig.apiKey || this.apiConfig.apiKey === 'YOUR_API_KEY_HERE') {
+            throw new Error('API Key 未配置，请设置环境变量 DEEPSEEK_API_KEY 或配置 config.js 文件');
+        }
+        
+        return { apiConfig: this.apiConfig, gameConfig: this.gameConfig };
     }
 
     initializeEventListeners() {
@@ -1638,6 +1696,9 @@ ${conversationContext}
 
     // 原始LLM调用方法（保持不变以维持现有功能）
     async callLLMForMessage(character, topic, isFirstRound = false, conversationHistory = [], targetCharacter = null, scenario = null, isComforter = false) {
+        // 确保配置已加载
+        await this.ensureConfigLoaded();
+        
         const prompt = this.buildAIPrompt(character, topic, isFirstRound, conversationHistory, targetCharacter, scenario, isComforter);
         
         // 创建超时Promise
@@ -2878,6 +2939,9 @@ ${emojiInstruction}
     }
 
     async generateAIQuestionForRound(character) {
+        // 确保配置已加载
+        await this.ensureConfigLoaded();
+        
         const currentTopic = topicProgression[this.gameState.currentDifficulty];
         const difficulty = this.gameState.currentDifficulty;
         
@@ -3240,6 +3304,9 @@ ${emojiInstruction}
     }
 
     async analyzePlayerResponse(response) {
+        // 确保配置已加载
+        await this.ensureConfigLoaded();
+        
         const currentTopic = topicProgression[this.gameState.currentDifficulty];
         const difficulty = this.gameState.currentDifficulty;
         
@@ -3464,6 +3531,9 @@ ${emojiInstruction}
     }
 
     async generateAIFeedback(character, response, isSuccess) {
+        // 确保配置已加载
+        await this.ensureConfigLoaded();
+        
         const prompt = `你是${character.name}，${character.personality}。${this.gameState.playerName}刚刚回复了你的问题，你相信TA是AI。请给出一个自然的反馈，表现出${character.speakingStyle}的风格。反馈要体现出你对TA回复的认可，并且可以继续这个话题。请用中文回复，长度在50-100字之间。`;
         
         try {
@@ -3513,6 +3583,9 @@ ${emojiInstruction}
     }
 
     async generateAIDiscovery(character, response, analysis) {
+        // 确保配置已加载
+        await this.ensureConfigLoaded();
+        
         const prompt = `你是${character.name}，${character.personality}。你刚刚发现了${this.gameState.playerName}是人类伪装的！请给出一个得意的、揭露真相的回复，表现出${character.speakingStyle}的风格。回复要体现出你发现了TA是人类的特点，并且要给出具体的理由。请用中文回复，长度在80-120字之间。`;
         
         try {

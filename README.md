@@ -16,6 +16,46 @@
 - 质疑技术发展中的伦理边界
 - 体验数字化时代的身份认同危机
 
+## 🚀 快速开始
+
+### 方式一：自动配置（推荐）
+1. **Windows 用户**：双击运行 `setup.bat`
+2. **Linux/Mac 用户**：运行 `./setup.sh`
+3. 按照提示配置 API Key
+4. 打开 `test-config.html` 测试配置
+5. 确认无误后打开 `index.html` 开始游戏
+
+### 方式二：手动配置
+1. 复制 `js/config.js.template` 为 `js/config.js`
+2. 编辑 `js/config.js`，填入您的 DeepSeek API Key
+3. 在浏览器中打开 `index.html`
+
+### 方式三：环境变量配置
+设置环境变量 `DEEPSEEK_API_KEY`，然后直接打开 `index.html`
+
+**Windows:**
+```cmd
+set DEEPSEEK_API_KEY=sk-your-api-key-here
+```
+
+**Linux/Mac:**
+```bash
+export DEEPSEEK_API_KEY="sk-your-api-key-here"
+```
+
+## ☁️ 部署到 Cloudflare Pages
+
+1. **推送代码到 GitHub/GitLab**
+2. **连接 Cloudflare Pages**
+   - 登录 [Cloudflare Dashboard](https://dash.cloudflare.com/)
+   - 选择 Pages → Create a project
+   - 连接您的仓库
+3. **配置环境变量**
+   - 在项目设置中添加：`DEEPSEEK_API_KEY = sk-your-api-key`
+4. **部署完成**
+
+详细部署说明请参考 [DEPLOYMENT.md](./DEPLOYMENT.md)
+
 ## 🏗️ 技术架构
 
 ### 架构概览

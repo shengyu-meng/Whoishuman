@@ -184,7 +184,8 @@
     </div>
 
     <!-- 模块化脚本文件 -->
-    <script src="js/config.js"></script>
+    <script src="js/envConfig.js"></script>
+    <script src="js/config.js" onerror="console.warn('⚠️ config.js 文件未找到，将使用环境变量配置')"></script>
     <script src="js/ThemeProgression.js"></script>
     <script src="js/ThemeScenarios.js"></script>
     <script src="js/GameState.js"></script>

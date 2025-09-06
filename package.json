@@ -1,0 +1,27 @@
+{
+  "name": "whois-human-game",
+  "version": "1.0.0",
+  "description": "WhoisHuman - AI vs Human识别游戏",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "ai",
+    "game",
+    "deepseek",
+    "javascript",
+    "web"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.18.2"
+  },
+  "devDependencies": {},
+  "engines": {
+    "node": ">=14.0.0"
+  }
+}
