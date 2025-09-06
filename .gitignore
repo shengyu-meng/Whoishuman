@@ -12,6 +12,7 @@ verify_*.html
 
 # 日志文件
 *.log
+working_plan/
 
 # 环境文件
 .env
