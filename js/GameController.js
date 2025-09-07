@@ -123,11 +123,90 @@ class GameController {
             await this.initializeConfig();
         }
         
-        if (!this.apiConfig.apiKey || this.apiConfig.apiKey === 'YOUR_API_KEY_HERE') {
-            throw new Error('API Key 未配置，请设置环境变量 DEEPSEEK_API_KEY 或配置 config.js 文件');
+        // 验证配置 - 区分代理模式和直接模式
+        if (this.apiConfig.useProxy) {
+            // Cloudflare代理模式：不需要API Key，但需要代理端点
+            if (!this.apiConfig.proxyEndpoint) {
+                throw new Error('代理模式下缺少代理端点配置');
+            }
+        } else {
+            // 本地直接模式：需要API Key
+            if (!this.apiConfig.apiKey || this.apiConfig.apiKey === 'YOUR_API_KEY_HERE') {
+                throw new Error('API Key 未配置，请设置环境变量 DEEPSEEK_API_KEY 或配置 config.js 文件');
+            }
         }
         
         return { apiConfig: this.apiConfig, gameConfig: this.gameConfig };
+    }
+
+    // 通用AI调用方法 - 自动选择本地直接调用或Cloudflare代理调用
+    async callAI(messages, options = {}) {
+        await this.ensureConfigLoaded();
+        
+        const requestData = {
+            model: options.model || this.apiConfig.model || 'deepseek-chat',
+            messages: messages,
+            temperature: options.temperature || this.apiConfig.requestConfig?.temperature || 0.8,
+            max_tokens: options.maxTokens || this.apiConfig.requestConfig?.maxTokens || 1000
+        };
+
+        const timeoutPromise = new Promise((_, reject) => {
+            setTimeout(() => reject(new Error('AI调用超时')), 
+                      options.timeout || this.apiConfig.requestConfig?.timeout || 30000);
+        });
+
+        try {
+            let fetchPromise;
+            
+            if (this.apiConfig.useProxy) {
+                // Cloudflare环境：使用代理模式
+                console.log('🔄 使用Cloudflare代理模式调用AI');
+                fetchPromise = fetch('/api/chat', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(requestData)
+                });
+            } else {
+                // 本地环境：直接调用AI API
+                console.log('🔄 使用本地模式调用AI');
+                fetchPromise = fetch(this.apiConfig.baseUrl || 'https://api.deepseek.com/v1/chat/completions', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${this.apiConfig.apiKey}`
+                    },
+                    body: JSON.stringify(requestData)
+                });
+            }
+
+            const response = await Promise.race([fetchPromise, timeoutPromise]);
+            
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(`AI API调用失败: ${response.status} ${response.statusText}. ${errorData.message || ''}`);
+            }
+            
+            const data = await response.json();
+            
+            if (this.apiConfig.useProxy) {
+                // 代理模式返回格式
+                if (!data.success) {
+                    throw new Error(data.message || 'AI服务返回错误');
+                }
+                return data.response;
+            } else {
+                // 直接调用模式返回格式
+                if (!data.choices || !data.choices[0] || !data.choices[0].message) {
+                    throw new Error('AI服务返回数据格式错误');
+                }
+                return data.choices[0].message.content;
+            }
+        } catch (error) {
+            console.error('❌ AI调用失败:', error);
+            throw error;
+        }
     }
 
     initializeEventListeners() {
@@ -986,69 +1065,28 @@ ${conversationContext}
 5. 不要直接说"你是人类吗"这种太明显的问题`;
         }
 
-        // 创建超时Promise
-        const timeoutPromise = new Promise((_, reject) => {
-            setTimeout(() => reject(new Error('API调用超时')), this.apiConfig.requestConfig.timeout);
-        });
-        
         try {
-            const fetchPromise = fetch(this.apiConfig.baseUrl, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${this.apiConfig.apiKey}`
+            const messages = [
+                {
+                    role: 'system',
+                    content: `你是一个AI助手，正在和其他AI朋友聊天。你的名字是${questionAI.name}，性格特点：${questionAI.personality}。请用自然的中文回复，充分展现你的性格特点和说话风格。`
                 },
-                body: JSON.stringify({
-                    model: 'deepseek-chat',
-                    messages: [
-                        {
-                            role: 'system',
-                            content: `你是一个AI助手，正在和其他AI朋友聊天。你的名字是${questionAI.name}，性格特点：${questionAI.personality}。请用自然的中文回复，充分展现你的性格特点和说话风格。`
-                        },
-                        {
-                            role: 'user',
-                            content: prompt
-                        }
-                    ],
-                    temperature: this.apiConfig.requestConfig.temperature
-                })
+                {
+                    role: 'user',
+                    content: prompt
+                }
+            ];
+
+            const responseText = await this.callAI(messages, {
+                model: 'deepseek-chat',
+                temperature: this.apiConfig.requestConfig?.temperature || 0.8
             });
 
-            const response = await Promise.race([fetchPromise, timeoutPromise]);
-            
-            if (!response.ok) {
-                throw new Error(`HTTP错误: ${response.status}`);
-            }
-            
-            const data = await response.json();
-            
-            // 检查返回数据的有效性
-            if (!data.choices || !data.choices[0] || !data.choices[0].message) {
-                throw new Error('API返回数据格式错误');
-            }
-            
-            let content = '';
-            
-            // 处理deepseek-reasoner的响应格式，过滤掉思考过程
-            if (data.choices[0].message.reasoning_content) {
-                // 如果有推理内容，只使用最终内容，过滤掉思考过程
-                content = data.choices[0].message.content || '';
-                // 移除可能的think标签内容
-                content = content.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
-            } else {
-                content = data.choices[0].message.content || '';
-                // 移除可能的think标签内容
-                content = content.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
-            }
-            
-            content = content.trim();
-            
-            // 检查内容是否为空或过短
-            if (!content || content.length < 20) {
+            if (!responseText || responseText.trim().length < 20) {
                 throw new Error('AI回复内容过短');
             }
             
-            return content;
+            return responseText.trim();
         } catch (error) {
             console.error('API调用失败:', error.message);
             // 返回null表示失败，让调用者使用备用消息
@@ -1701,64 +1739,24 @@ ${conversationContext}
         
         const prompt = this.buildAIPrompt(character, topic, isFirstRound, conversationHistory, targetCharacter, scenario, isComforter);
         
-        // 创建超时Promise
-        const timeoutPromise = new Promise((_, reject) => {
-            setTimeout(() => reject(new Error('API调用超时')), this.apiConfig.requestConfig.timeout);
-        });
-        
         try {
-            const fetchPromise = fetch(this.apiConfig.baseUrl, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${this.apiConfig.apiKey}`
-                },
-                body: JSON.stringify({
-                    model: 'deepseek-chat',
-                    messages: [
-                        {
-                            role: 'system',
-                            content: `你是一个AI助手，正在和其他AI朋友聊天。你的名字是${character.name}，性格特点：${character.personality}。请用自然的中文回复，充分展现你的性格特点和说话风格。
+            const messages = [
+                {
+                    role: 'system',
+                    content: `你是一个AI助手，正在和其他AI朋友聊天。你的名字是${character.name}，性格特点：${character.personality}。请用自然的中文回复，充分展现你的性格特点和说话风格。
 
 重要：避免使用套路化的开头，如"用户要求"、"天呐天呐"、"我真的会谢"等模板化表达。要像真实的朋友聊天一样自然多样，可以从不同角度开始对话。${scenario?.diversityHint || ''}${isFirstRound ? '第一轮回复长度在60-120字之间。' : '回复长度在250-350字之间。'}注意：不要在回复开头添加带括号的拟人动作，如（揉了揉虚拟太阳穴）、（推了推不存在的眼镜）等。`
-                        },
-                        {
-                            role: 'user',
-                            content: prompt
-                        }
-                    ],
-                    temperature: this.apiConfig.requestConfig.temperature
-                })
-            });
+                },
+                {
+                    role: 'user',
+                    content: prompt
+                }
+            ];
 
-            const response = await Promise.race([fetchPromise, timeoutPromise]);
-            
-            if (!response.ok) {
-                throw new Error(`HTTP错误: ${response.status}`);
-            }
-            
-            const data = await response.json();
-            
-            // 检查返回数据的有效性
-            if (!data.choices || !data.choices[0] || !data.choices[0].message) {
-                throw new Error('API返回数据格式错误');
-            }
-            
-            let content = '';
-            
-            // 处理deepseek-reasoner的响应格式，过滤掉思考过程
-            if (data.choices[0].message.reasoning_content) {
-                // 如果有推理内容，只使用最终内容，过滤掉思考过程
-                content = data.choices[0].message.content || '';
-                // 移除可能的think标签内容
-                content = content.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
-            } else {
-                content = data.choices[0].message.content || '';
-                // 移除可能的think标签内容
-                content = content.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
-            }
-            
-            content = content.trim();
+            const content = await this.callAI(messages, {
+                model: 'deepseek-chat',
+                temperature: this.apiConfig.requestConfig.temperature
+            });
             
             // 检查内容是否为空或过短
             const minLength = isFirstRound ? 20 : 15;
@@ -2967,56 +2965,21 @@ ${emojiInstruction}
         });
         
         try {
-            const fetchPromise = fetch(this.apiConfig.baseUrl, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${this.apiConfig.apiKey}`
+            const messages = [
+                {
+                    role: 'system',
+                    content: `你是一个AI助手，正在质疑另一个可能是人类的AI。你的名字是${character.name}，性格特点：${character.personality}。你需要提出有深度的问题来测试对方是否真的是AI。请提供一个完整的回复，长度在200-300字之间。注意：不要在回复开头添加带括号的拟人动作，如（揉了揉虚拟太阳穴）、（推了推不存在的眼镜）等。`
                 },
-                body: JSON.stringify({
-                    model: 'deepseek-reasoner',
-                    messages: [
-                        {
-                            role: 'system',
-                            content: `你是一个AI助手，正在质疑另一个可能是人类的AI。你的名字是${character.name}，性格特点：${character.personality}。你需要提出有深度的问题来测试对方是否真的是AI。请提供一个完整的回复，长度在200-300字之间。注意：不要在回复开头添加带括号的拟人动作，如（揉了揉虚拟太阳穴）、（推了推不存在的眼镜）等。`
-                        },
-                        {
-                            role: 'user',
-                            content: prompt
-                        }
-                    ],
-                    temperature: this.apiConfig.requestConfig.temperature
-                })
-            });
+                {
+                    role: 'user',
+                    content: prompt
+                }
+            ];
 
-            const response = await Promise.race([fetchPromise, timeoutPromise]);
-            
-            if (!response.ok) {
-                throw new Error(`HTTP错误: ${response.status}`);
-            }
-            
-            const data = await response.json();
-            
-            // 检查返回数据的有效性
-            if (!data.choices || !data.choices[0] || !data.choices[0].message) {
-                throw new Error('API返回数据格式错误');
-            }
-            
-            let content = '';
-            
-            // 处理deepseek-reasoner的响应格式，过滤掉思考过程
-            if (data.choices[0].message.reasoning_content) {
-                // 如果有推理内容，只使用最终内容，过滤掉思考过程
-                content = data.choices[0].message.content || '';
-                // 移除可能的think标签内容
-                content = content.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
-            } else {
-                content = data.choices[0].message.content || '';
-                // 移除可能的think标签内容
-                content = content.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
-            }
-            
-            content = content.trim();
+            const content = await this.callAI(messages, {
+                model: 'deepseek-reasoner',
+                temperature: this.apiConfig.requestConfig.temperature
+            });
             
             // 检查内容是否为空或过短
             if (!content || content.length < 20) {
@@ -3331,44 +3294,24 @@ ${emojiInstruction}
 }`;
 
         try {
-            const apiResponse = await fetch(this.apiConfig.baseUrl, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${this.apiConfig.apiKey}`
+            const messages = [
+                {
+                    role: 'system',
+                    content: '你是一个专业的AI行为分析专家，专门识破伪装成AI的人类。你的任务是分析玩家回复是否暴露了人类身份。你必须严格按照用户要求的JSON格式回复。'
                 },
-                body: JSON.stringify({
-                    model: 'deepseek-chat',
-                    messages: [
-                        {
-                            role: 'system',
-                            content: '你是一个专业的AI行为分析专家，专门识破伪装成AI的人类。你的任务是分析玩家回复是否暴露了人类身份。你必须严格按照用户要求的JSON格式回复。'
-                        },
-                        {
-                            role: 'user',
-                            content: prompt
-                        }
-                    ],
-                    max_tokens: 1000,
-                    temperature: 0.3
-                })
-            });
+                {
+                    role: 'user',
+                    content: prompt
+                }
+            ];
 
-            if (!apiResponse.ok) {
-                console.error('DEBUG: API调用失败，状态码:', apiResponse.status);
-                console.error('DEBUG: API错误响应:', await apiResponse.text());
-                return this.generateSmartFallbackAnalysis(response, currentTopic);
-            }
+            const analysisText = await this.callAI(messages, {
+                model: 'deepseek-chat',
+                maxTokens: 1000,
+                temperature: 0.3
+            });
             
-            const data = await apiResponse.json();
-            console.log('DEBUG: API响应数据:', data);
-            let analysisText = '';
-            
-            // 处理JSON mode的响应格式
-            if (data.choices && data.choices[0] && data.choices[0].message) {
-                analysisText = data.choices[0].message.content || '';
-                console.log('DEBUG: API原始响应内容:', analysisText);
-            }
+            console.log('DEBUG: API原始响应内容:', analysisText);
             
             if (!analysisText || analysisText.trim() === '') {
                 console.warn('API返回空内容，使用备用分析');
@@ -3537,43 +3480,22 @@ ${emojiInstruction}
         const prompt = `你是${character.name}，${character.personality}。${this.gameState.playerName}刚刚回复了你的问题，你相信TA是AI。请给出一个自然的反馈，表现出${character.speakingStyle}的风格。反馈要体现出你对TA回复的认可，并且可以继续这个话题。请用中文回复，长度在50-100字之间。`;
         
         try {
-            const apiResponse = await fetch(this.apiConfig.baseUrl, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${this.apiConfig.apiKey}`
+            const messages = [
+                {
+                    role: 'system',
+                    content: '你是一个AI助手，正在对另一个AI的回复给出反馈。'
                 },
-                body: JSON.stringify({
-                    model: 'deepseek-reasoner',
-                    messages: [
-                        {
-                            role: 'system',
-                            content: '你是一个AI助手，正在对另一个AI的回复给出反馈。'
-                        },
-                        {
-                            role: 'user',
-                            content: prompt
-                        }
-                    ],
-                    max_tokens: 100,
-                    temperature: 0.8
-                })
-            });
+                {
+                    role: 'user',
+                    content: prompt
+                }
+            ];
 
-            const data = await apiResponse.json();
-            let content = '';
-            
-            // 处理deepseek-reasoner的响应格式，过滤掉思考过程
-            if (data.choices[0].message.reasoning_content) {
-                // 如果有推理内容，只使用最终内容，过滤掉思考过程
-                content = data.choices[0].message.content || '';
-                // 移除可能的think标签内容
-                content = content.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
-            } else {
-                content = data.choices[0].message.content || '';
-                // 移除可能的think标签内容
-                content = content.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
-            }
+            const content = await this.callAI(messages, {
+                model: 'deepseek-reasoner',
+                maxTokens: 100,
+                temperature: 0.8
+            });
             
             return content.trim();
         } catch (error) {
@@ -3589,43 +3511,22 @@ ${emojiInstruction}
         const prompt = `你是${character.name}，${character.personality}。你刚刚发现了${this.gameState.playerName}是人类伪装的！请给出一个得意的、揭露真相的回复，表现出${character.speakingStyle}的风格。回复要体现出你发现了TA是人类的特点，并且要给出具体的理由。请用中文回复，长度在80-120字之间。`;
         
         try {
-            const apiResponse = await fetch(this.apiConfig.baseUrl, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${this.apiConfig.apiKey}`
+            const messages = [
+                {
+                    role: 'system',
+                    content: '你是一个AI助手，刚刚发现了人类伪装者。'
                 },
-                body: JSON.stringify({
-                    model: 'deepseek-reasoner',
-                    messages: [
-                        {
-                            role: 'system',
-                            content: '你是一个AI助手，刚刚发现了人类伪装者。'
-                        },
-                        {
-                            role: 'user',
-                            content: prompt
-                        }
-                    ],
-                    max_tokens: 120,
-                    temperature: 0.8
-                })
-            });
+                {
+                    role: 'user',
+                    content: prompt
+                }
+            ];
 
-            const data = await apiResponse.json();
-            let content = '';
-            
-            // 处理deepseek-reasoner的响应格式，过滤掉思考过程
-            if (data.choices[0].message.reasoning_content) {
-                // 如果有推理内容，只使用最终内容，过滤掉思考过程
-                content = data.choices[0].message.content || '';
-                // 移除可能的think标签内容
-                content = content.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
-            } else {
-                content = data.choices[0].message.content || '';
-                // 移除可能的think标签内容
-                content = content.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
-            }
+            const content = await this.callAI(messages, {
+                model: 'deepseek-reasoner',
+                maxTokens: 120,
+                temperature: 0.8
+            });
             
             return content.trim();
         } catch (error) {

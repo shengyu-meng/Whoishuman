@@ -23,13 +23,18 @@ export async function onRequestGet(context) {
       });
     }
     
-    // 返回配置信息（不直接暴露完整的API Key）
+    // 返回配置信息（Cloudflare环境下不返回任何API Key信息）
     const config = {
       hasApiKey: true,
-      apiKeyPrefix: apiKey.substring(0, 7) + '***',
       environment: 'cloudflare-pages',
-      baseUrl: 'https://api.deepseek.com/v1/chat/completions',
-      model: 'deepseek-chat'
+      useProxy: true, // 标识使用代理模式
+      proxyEndpoint: '/api/chat',
+      model: 'deepseek-chat',
+      requestConfig: {
+        temperature: 0.8,
+        maxTokens: 1000,
+        timeout: 30000
+      }
     };
     
     return new Response(JSON.stringify(config), {

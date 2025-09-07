@@ -50,7 +50,7 @@ class EnvConfigManager {
                process.versions.node;
     }
 
-    // 从环境变量获取 API 配置
+    // 从环境变量获取 API 配置 (仅在本地Node.js环境中使用)
     getApiKeyFromEnv() {
         const envVars = [
             'DEEPSEEK_API_KEY',
@@ -70,44 +70,11 @@ class EnvConfigManager {
             }
         }
 
-        // 在 Cloudflare Pages 环境中 (通过全局变量或其他方式)
+        // Cloudflare环境下不再尝试从前端获取API Key
+        // 这是为了安全考虑，API Key只应在服务器端使用
         if (this.isCloudflarePages) {
-            // Cloudflare Pages 可能通过不同方式暴露环境变量
-            for (const envVar of envVars) {
-                // 检查全局变量
-                if (typeof globalThis !== 'undefined' && globalThis[envVar]) {
-                    const value = globalThis[envVar];
-                    if (value && value.trim() && value !== 'YOUR_API_KEY_HERE') {
-                        console.log(`✅ 从 Cloudflare 环境变量 ${envVar} 获取到 API Key`);
-                        return value.trim();
-                    }
-                }
-
-                // 检查 window 对象 (如果在浏览器环境中)
-                if (typeof window !== 'undefined' && window[envVar]) {
-                    const value = window[envVar];
-                    if (value && value.trim() && value !== 'YOUR_API_KEY_HERE') {
-                        console.log(`✅ 从 window.${envVar} 获取到 API Key`);
-                        return value.trim();
-                    }
-                }
-            }
-
-            // 尝试从 Cloudflare Pages 的特殊方式获取
-            try {
-                // Cloudflare Pages 可能将环境变量注入到特定位置
-                if (typeof CF_ENV !== 'undefined' && CF_ENV) {
-                    for (const envVar of envVars) {
-                        const value = CF_ENV[envVar];
-                        if (value && value.trim() && value !== 'YOUR_API_KEY_HERE') {
-                            console.log(`✅ 从 CF_ENV.${envVar} 获取到 API Key`);
-                            return value.trim();
-                        }
-                    }
-                }
-            } catch (e) {
-                // 静默忽略
-            }
+            console.log('🔒 Cloudflare环境下不在前端获取API Key，使用代理模式');
+            return null;
         }
 
         return null;
@@ -119,19 +86,36 @@ class EnvConfigManager {
             const response = await fetch('/api/config');
             if (response.ok) {
                 const config = await response.json();
-                if (config.hasApiKey && config.apiKey) {
-                    const serverType = this.isCloudflarePages ? 'Cloudflare Pages 函数' : '本地开发服务器';
-                    console.log(`✅ 从 ${serverType} 获取配置成功`);
-                    return {
-                        baseUrl: config.baseUrl,
-                        model: config.model,
-                        apiKey: config.apiKey,
-                        requestConfig: config.requestConfig || {
-                            temperature: 0.8,
-                            maxTokens: 1000,
-                            timeout: 30000
-                        }
-                    };
+                const serverType = this.isCloudflarePages ? 'Cloudflare Pages 函数' : '本地开发服务器';
+                
+                if (config.hasApiKey) {
+                    if (this.isCloudflarePages && config.useProxy) {
+                        // Cloudflare环境：使用代理模式，不需要API key
+                        console.log(`✅ 从 ${serverType} 获取代理配置成功`);
+                        return {
+                            useProxy: true,
+                            proxyEndpoint: config.proxyEndpoint || '/api/chat',
+                            model: config.model || 'deepseek-chat',
+                            requestConfig: config.requestConfig || {
+                                temperature: 0.8,
+                                maxTokens: 1000,
+                                timeout: 30000
+                            }
+                        };
+                    } else if (!this.isCloudflarePages && config.apiKey) {
+                        // 本地环境：直接使用API key
+                        console.log(`✅ 从 ${serverType} 获取配置成功`);
+                        return {
+                            baseUrl: config.baseUrl,
+                            model: config.model,
+                            apiKey: config.apiKey,
+                            requestConfig: config.requestConfig || {
+                                temperature: 0.8,
+                                maxTokens: 1000,
+                                timeout: 30000
+                            }
+                        };
+                    }
                 }
             }
         } catch (error) {
@@ -197,13 +181,24 @@ class EnvConfigManager {
 
         console.log(`🔍 环境检测结果: ${this.getEnvironmentInfo()}`);
 
-        // 1. 优先尝试从环境变量获取 API Key (Node.js环境)
-        const envApiKey = this.getApiKeyFromEnv();
-        
-        // 2. 尝试从服务器获取配置 (本地开发服务器 或 Cloudflare Pages函数)
+        // 1. 在Cloudflare环境下，优先尝试从服务器获取配置 (代理模式)
+        // 2. 在本地环境下，优先尝试从环境变量获取 API Key
+        let envApiKey = null;
         let serverConfig = null;
-        if (!envApiKey) {
+        
+        if (this.isCloudflarePages) {
+            // Cloudflare环境：优先使用服务器配置（代理模式）
             serverConfig = await this.getConfigFromServer();
+            // 只有在服务器配置失败时才尝试环境变量（用于开发测试）
+            if (!serverConfig) {
+                envApiKey = this.getApiKeyFromEnv();
+            }
+        } else {
+            // 本地环境：优先使用环境变量，然后尝试服务器配置
+            envApiKey = this.getApiKeyFromEnv();
+            if (!envApiKey) {
+                serverConfig = await this.getConfigFromServer();
+            }
         }
         
         // 3. 从配置文件获取其他配置 (fallback)
@@ -220,28 +215,61 @@ class EnvConfigManager {
             }
         };
 
-        // 合并配置，优先级：环境变量 > 服务器配置 > 配置文件 > 默认配置
-        this.apiConfig = {
-            ...defaultConfig,
-            ...(fileConfig || {}),
-            ...(serverConfig || {}),
-            apiKey: envApiKey || 
-                   (serverConfig && serverConfig.apiKey) ||
-                   (fileConfig && fileConfig.apiKey) || 
-                   'YOUR_API_KEY_HERE'
-        };
+        // 合并配置，优先级根据环境不同：
+        // Cloudflare环境：服务器配置 > 环境变量 > 配置文件 > 默认配置
+        // 本地环境：环境变量 > 服务器配置 > 配置文件 > 默认配置
+        if (this.isCloudflarePages) {
+            this.apiConfig = {
+                ...defaultConfig,
+                ...(fileConfig || {}),
+                ...(envApiKey ? { apiKey: envApiKey } : {}),
+                ...(serverConfig || {})
+            };
+        } else {
+            this.apiConfig = {
+                ...defaultConfig,
+                ...(fileConfig || {}),
+                ...(serverConfig || {}),
+                ...(envApiKey ? { apiKey: envApiKey } : {})
+            };
+        }
 
-        // 验证 API Key
-        if (!this.apiConfig.apiKey || this.apiConfig.apiKey === 'YOUR_API_KEY_HERE') {
-            console.error('❌ 未找到有效的 API Key，请设置环境变量或配置文件');
-            throw new Error('API Key 未配置');
+        // 处理API Key - 只在非代理模式下需要
+        if (!this.apiConfig.useProxy && !this.apiConfig.apiKey) {
+            // 如果不是代理模式且没有API Key，使用fallback获取方式
+            this.apiConfig.apiKey = envApiKey || 
+                                   (serverConfig && serverConfig.apiKey) ||
+                                   (fileConfig && fileConfig.apiKey) || 
+                                   'YOUR_API_KEY_HERE';
+        }
+
+        // 验证配置 - 区分代理模式和直接模式
+        if (this.apiConfig.useProxy) {
+            // Cloudflare代理模式：不需要API Key，但需要代理端点
+            if (!this.apiConfig.proxyEndpoint) {
+                console.error('❌ 代理模式下缺少代理端点配置');
+                throw new Error('代理端点未配置');
+            }
+            console.log('✅ 代理模式配置验证通过');
+        } else {
+            // 本地直接模式：需要API Key和baseUrl
+            if (!this.apiConfig.apiKey || this.apiConfig.apiKey === 'YOUR_API_KEY_HERE') {
+                console.error('❌ 未找到有效的 API Key，请设置环境变量或配置文件');
+                throw new Error('API Key 未配置');
+            }
+            if (!this.apiConfig.baseUrl) {
+                console.error('❌ 缺少API基础URL配置');
+                throw new Error('API baseUrl 未配置');
+            }
+            console.log('✅ 直接调用模式配置验证通过');
         }
 
         console.log(`✅ API 配置加载成功，使用 ${
-            envApiKey ? '环境变量' : 
-            serverConfig ? (this.isCloudflarePages ? 'Cloudflare Pages函数' : '本地开发服务器') : 
-            '配置文件'
-        } 中的 API Key`);
+            this.apiConfig.useProxy ? 'Cloudflare代理模式' :
+            envApiKey ? '环境变量API Key' : 
+            serverConfig ? '本地开发服务器API Key' : 
+            '配置文件API Key'
+        }`);
         return this.apiConfig;
     }
 
