@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>谁是人类 - 反乌托邦AI伪装游戏</title>
     <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/suspicion-meter.css">
 </head>
 <body>
     <!-- 欢迎卡片 -->
@@ -103,10 +104,17 @@
         <div class="game-header">
             <div class="group-info">
                 <span class="group-name">AI吐槽群 (9)</span>
-                <span class="round-info">第 <span id="gameRound">1</span> 轮</span>
-            </div>
-            <div class="group-members">
                 <span class="member-info">活跃成员: <span id="activeMembers">5</span>/9</span>
+            </div>
+            <div class="game-status">
+                <span class="round-info">第 <span id="gameRound">1</span> 轮</span>
+                <div class="suspicion-meter-compact">
+                    <span class="suspicion-label-compact">怀疑度</span>
+                    <div class="suspicion-bar-compact">
+                        <div class="suspicion-fill-compact" id="suspicionFill"></div>
+                    </div>
+                    <span class="suspicion-value-compact" id="suspicionValue">0%</span>
+                </div>
             </div>
         </div>
         
@@ -117,6 +125,10 @@
         <div id="suspicionNotice" class="suspicion-notice hidden">
             <div class="notice-content">
                 <h3>⚠️ AI们开始质疑你了！</h3>
+                <div class="suspicion-change-info">
+                    <span class="suspicion-change" id="suspicionChangeText">注意！回答暴露人类特征将增加怀疑度</span>
+                    <span class="suspicion-reason" id="suspicionReason"></span>
+                </div>
                 <p>请仔细思考你的回复，证明自己是AI而不是人类。记住：</p>
                 <ul>
                     <li>🤖 要像AI一样思考和回应</li>
@@ -173,6 +185,7 @@
             <div class="final-stats">
                 <h3>最终成绩</h3>
                 <p><strong>生存轮数：</strong> <span id="survivalRounds">0</span> 轮</p>
+                <p><strong>最终怀疑度：</strong> <span id="finalSuspicionLevel">0</span>%</p>
                 <p><strong>称号：</strong> <span id="playerTitle">新手AI</span></p>
                 <p><strong>评价：</strong> <span id="finalEvaluation">继续努力！</span></p>
             </div>

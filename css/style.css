@@ -440,23 +440,36 @@ body {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    flex-direction: column;
-    gap: 4px;
     box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
 }
 
 .group-info {
     display: flex;
-    align-items: center;
-    gap: 15px;
-    width: 100%;
-    justify-content: space-between;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 3px;
 }
 
 .group-name {
     font-weight: 500;
     color: #000;
     font-size: 16px;
+}
+
+.member-info {
+    color: #999;
+    font-size: 11px;
+    background: rgba(0, 0, 0, 0.05);
+    padding: 2px 6px;
+    border-radius: 8px;
+}
+
+/* 右侧游戏状态区域 */
+.game-status {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 5px;
 }
 
 .round-info {
@@ -468,17 +481,7 @@ body {
 }
 
 .group-members {
-    display: flex;
-    justify-content: flex-end;
-    width: 100%;
-}
-
-.member-info {
-    color: #999;
-    font-size: 11px;
-    background: rgba(0, 0, 0, 0.05);
-    padding: 2px 6px;
-    border-radius: 8px;
+    display: none; /* 隐藏重复的成员信息 */
 }
 
 /* 聊天容器样式 - 微信风格 */

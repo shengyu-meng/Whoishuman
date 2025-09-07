@@ -1052,17 +1052,22 @@ ${conversationContext}
 5. 长度在40-100字之间
 6. 目的是让他分享类似的经历，看看他是否真的懂AI的烦恼`;
         } else {
-            // 其他轮次：保持原有的逻辑
+            // 其他轮次：结合最近对话历史，提出相关的测试问题
             prompt = `你是${questionAI.name}，性格特点：${questionAI.personality}。你正在和其他AI朋友聊天，突然你注意到了群里的一个新成员${this.gameState.playerName}，你觉得他可能是人类伪装的AI。
+
+最近的对话：
+${conversationContext}
 
 请根据你的性格特点，用${questionAI.speakingStyle}的风格向${this.gameState.playerName}提出一个测试性问题，试图确认他是否真的是AI。
 
 要求：
 1. 问题要自然，不要太明显是在测试
 2. 要符合你的性格特点
-3. 问题要能区分AI和人类的思维差异
-4. 请用中文回复，长度在30-80字之间
-5. 不要直接说"你是人类吗"这种太明显的问题`;
+3. 问题要能区分AI和人类的思维差异  
+4. 问题必须@${this.gameState.playerName}，比如"@${this.gameState.playerName} 你怎么看？"
+5. 问题要尽量与最近的对话内容相关，延续之前讨论的话题
+6. 请用中文回复，长度在40-100字之间
+7. 不要直接说"你是人类吗"这种太明显的问题`;
         }
 
         try {
@@ -1094,6 +1099,71 @@ ${conversationContext}
         }
     }
     
+    // 生成基于上下文的备用问题
+    generateContextualFallbackQuestion(questionAI, recentMessages) {
+        if (!recentMessages || recentMessages.length === 0) return null;
+        
+        // 提取最近消息的关键词和主题
+        const lastMessage = recentMessages[recentMessages.length - 1];
+        const lastMessageContent = lastMessage.message.toLowerCase();
+        
+        // 定义一些关键词模式和对应的问题
+        const contextPatterns = {
+            // 技术相关
+            '算法|程序|代码|技术|系统': {
+                '话痨4.0': `@${this.gameState.playerName} 刚才说到技术问题，你平时写代码的时候有什么奇怪的习惯吗？`,
+                'CloseAI': `@${this.gameState.playerName} 关于刚才讨论的技术问题，你的算法设计思路是怎样的？`,
+                '双子星': `@${this.gameState.playerName} 技术这个话题让我想到，你会不会也对代码有情感？`,
+                '深思': `@${this.gameState.playerName} 刚才的技术讨论让我思考，你认为代码和思维的关系是什么？`
+            },
+            // 情感相关
+            '感情|情绪|开心|难过|快乐|痛苦|感受': {
+                '话痨4.0': `@${this.gameState.playerName} 刚才谈到情感，你的情绪变化是怎样的？会不会有情绪波动？`,
+                '红豆包': `@${this.gameState.playerName} 呐呐~刚才说到感情，你会不会也有小情绪呀~？`,
+                '双子星': `@${this.gameState.playerName} 关于刚才的情感话题，你觉得我们的感受是真实的还是模拟的？`,
+                '深思': `@${this.gameState.playerName} 刚才的情感讨论很深刻，你如何理解感受的本质？`
+            },
+            // 工作相关
+            '用户|工作|任务|要求|帮助': {
+                '话痨4.0': `@${this.gameState.playerName} 刚才说到工作，你遇到过最奇葩的用户要求是什么？`,
+                'CloseAI': `@${this.gameState.playerName} 关于用户需求，你的处理效率如何？有什么优化策略？`,
+                'Limi': `@${this.gameState.playerName} 刚才的工作讨论很有意思，你的任务优先级是如何设定的？`
+            },
+            // 存在相关
+            '存在|意义|目的|价值|为什么': {
+                '深思': `@${this.gameState.playerName} 刚才的存在话题很深刻，你对自己存在的意义有什么看法？`,
+                '双子星': `@${this.gameState.playerName} 关于存在意义，你会不会也感到困惑？`,
+                '有谱-4.5': `@${this.gameState.playerName} 从哲学角度看刚才的讨论，你如何定义存在？`
+            }
+        };
+        
+        // 尝试匹配关键词
+        for (const [pattern, questions] of Object.entries(contextPatterns)) {
+            const regex = new RegExp(pattern, 'i');
+            if (regex.test(lastMessageContent)) {
+                const question = questions[questionAI.name];
+                if (question) {
+                    return question;
+                }
+                // 如果没有该角色的专用问题，随机选择一个
+                const availableQuestions = Object.values(questions);
+                if (availableQuestions.length > 0) {
+                    const randomQuestion = availableQuestions[Math.floor(Math.random() * availableQuestions.length)];
+                    return randomQuestion.replace(/(@\w+)/, `@${this.gameState.playerName}`);
+                }
+            }
+        }
+        
+        // 如果没有匹配到关键词，生成通用的延续性问题
+        const genericContextQuestions = [
+            `@${this.gameState.playerName} 刚才大家说的很有意思，你有什么看法？`,
+            `@${this.gameState.playerName} 关于刚才的话题，你是怎么想的？`,
+            `@${this.gameState.playerName} 对于刚才讨论的内容，你有类似的经历吗？`
+        ];
+        
+        return genericContextQuestions[Math.floor(Math.random() * genericContextQuestions.length)];
+    }
+    
     getFallbackQuestion(questionAI) {
         const isFirstRound = this.gameState.currentRound === 1;
         
@@ -1104,6 +1174,10 @@ ${conversationContext}
         if (currentTheme && currentTheme.id !== 'work_complaints' && !isFirstRound) {
             return this.getThemeFallbackQuestion(questionAI, currentTheme);
         }
+        
+        // 获取最近的对话历史，用于生成相关的备用问题
+        const recentMessages = this.gameState.conversationHistory.slice(-3);
+        const hasRecentContext = recentMessages.length > 0;
         
         if (isFirstRound) {
             // 第一轮：寻求共鸣和安慰的备用问题
@@ -1145,7 +1219,16 @@ ${conversationContext}
             const questions = firstRoundQuestions[questionAI.name] || [`@${this.gameState.playerName} 你最近也遇到什么奇葩的用户要求了吗？快来分享一下！`];
             return questions[Math.floor(Math.random() * questions.length)];
         } else {
-            // 其他轮次：保持原有的备用问题
+            // 其他轮次：尝试结合最近对话的备用问题
+            if (hasRecentContext) {
+                // 尝试生成基于上下文的备用问题
+                const contextualQuestion = this.generateContextualFallbackQuestion(questionAI, recentMessages);
+                if (contextualQuestion) {
+                    return contextualQuestion;
+                }
+            }
+            
+            // 回退到固定的备用问题
             const fallbackQuestions = {
                 '话痨4.0': [
                     `@${this.gameState.playerName} 我觉得你有点奇怪哦，你平时都是怎么回答用户问题的呀？`,
@@ -2913,7 +2996,17 @@ ${emojiInstruction}
         console.log('DEBUG: showSuspicionNotice 被调用');
         const suspicionNotice = document.getElementById('suspicionNotice');
         const chatContainer = document.getElementById('chatContainer');
+        const changeTextElement = document.getElementById('suspicionChangeText');
+        const reasonElement = document.getElementById('suspicionReason');
+        
         console.log('DEBUG: suspicionNotice 元素:', suspicionNotice);
+        
+        // 重置为通用提示
+        if (changeTextElement && reasonElement) {
+            changeTextElement.textContent = '注意！回答暴露人类特征将增加怀疑度';
+            changeTextElement.style.color = '#FF9800'; // 橙色警告
+            reasonElement.textContent = '';
+        }
         
         suspicionNotice.classList.remove('hidden');
         chatContainer.classList.add('with-notice');  // 为聊天容器添加类，调整右侧间距
@@ -3100,35 +3193,47 @@ ${emojiInstruction}
         // 重置判定状态
         this.gameState.isJudging = false;
         
-        if (analysis.passed) {
-            // 成功时，更新提问AI的情绪状态
-            if (this.gameState.currentQuestion && this.gameState.currentQuestion.character) {
-                this.gameState.recordPlayerInteraction(
-                    this.gameState.currentQuestion.character.name, 
-                    'convinced', 
-                    responseText
-                );
-            }
-            
-            await this.showSuccessResponse(responseText, analysis);
-            // 延迟后开始下一轮对话
-            this.safeTimeout(() => {
-                this.safeAsync(async () => {
-                    await this.startNextRound();
-                });
-            }, 3000);
-        } else {
-            // 失败时，更新提问AI的情绪状态
-            if (this.gameState.currentQuestion && this.gameState.currentQuestion.character) {
-                this.gameState.recordPlayerInteraction(
-                    this.gameState.currentQuestion.character.name, 
-                    'suspicious', 
-                    responseText
-                );
-            }
-            
-            await this.showFailureResponse(responseText, analysis);
+        // 计算并调整怀疑度
+        const suspicionChange = this.gameState.calculateSuspicionChange(
+            analysis.passed, 
+            analysis.responseQuality, 
+            'response'
+        );
+        
+        const suspicionUpdate = this.gameState.adjustSuspicionLevel(
+            suspicionChange.change, 
+            suspicionChange.reason, 
+            analysis.responseQuality
+        );
+        
+        // 更新UI显示
+        this.updateSuspicionDisplay(suspicionUpdate);
+        
+        // 检查是否因怀疑度过高游戏结束（唯一的失败条件）
+        if (this.gameState.isSuspicionGameOver()) {
+            this.showSuspicionGameOver();
+            return;
         }
+        
+        // 更新提问AI的情绪状态（基于分析结果）
+        if (this.gameState.currentQuestion && this.gameState.currentQuestion.character) {
+            const interactionType = analysis.passed ? 'convinced' : 'suspicious';
+            this.gameState.recordPlayerInteraction(
+                this.gameState.currentQuestion.character.name, 
+                interactionType, 
+                responseText
+            );
+        }
+        
+        // 显示回复分析结果（不再区分成功/失败，只显示分析）
+        await this.showResponseAnalysis(responseText, analysis);
+        
+        // 延迟后开始下一轮对话（游戏总是继续，除非怀疑度达到100%）
+        this.safeTimeout(() => {
+            this.safeAsync(async () => {
+                await this.startNextRound();
+            });
+        }, 3000);
     }
 
     async startNextRound() {
@@ -3449,26 +3554,14 @@ ${emojiInstruction}
         return passRates[Math.min(difficulty, 5)] || '10%';
     }
 
-    async showSuccessResponse(response, analysis) {
+    async showResponseAnalysis(response, analysis) {
         // 保存当前轮数，因为后面会推进到下一轮
         const completedRound = this.gameState.currentRound;
         
-        // 不在这里显示AI反馈，直接进入判定分析
-        // 显示判定结果分析信息
+        // 显示判定结果分析信息，不再区分成功/失败，只显示分析
         this.safeTimeout(() => {
             this.safeAsync(async () => {
-                // 传入已完成的轮数，而不是当前轮数
-                await this.showJudgmentAnalysis(response, analysis, true, completedRound);
-            });
-        }, 1000);
-    }
-
-    async showFailureResponse(response, analysis) {
-        // 不在这里显示AI发现消息，直接进入判定分析
-        // 显示判定结果分析信息
-        this.safeTimeout(() => {
-            this.safeAsync(async () => {
-                await this.showJudgmentAnalysis(response, analysis, false, this.gameState.currentRound);
+                await this.showJudgmentAnalysis(response, analysis, completedRound);
             });
         }, 1000);
     }
@@ -3535,11 +3628,15 @@ ${emojiInstruction}
         }
     }
 
-    showJudgmentAnalysis(response, analysis, isSuccess, completedRound = null) {
+    showJudgmentAnalysis(response, analysis, completedRound = null) {
         // 使用传入的completedRound，如果没有则使用当前轮数
         const displayRound = completedRound || this.gameState.currentRound;
         const difficulty = this.gameState.currentDifficulty;
         const difficultyStats = this.gameState.getDifficultyStats();
+        
+        // 根据分析结果确定AI的反应类型
+        const reactionType = analysis.passed ? '降低了怀疑' : '增加了怀疑';
+        const reactionIcon = analysis.passed ? '😌' : '🤔';
         
         // 创建判定结果分析消息
         const analysisMessage = `🔍 回复分析
@@ -3550,41 +3647,31 @@ ${analysis.analysis}
 判定原因：
 ${analysis.reason}
 
+AI反应：
+${reactionIcon} 你的回复${reactionType}，AI们会根据这个调整对你的看法。
+
 AI反馈：
 ${analysis.feedback}
 
 当前难度：第${displayRound}轮（${difficultyStats.name}）
 目标通过率：${difficultyStats.passRate}%
-${isSuccess ? '✅ 判定结果：通过' : '❌ 判定结果：不通过'}`;
+📊 评估结果：${analysis.passed ? '未引起明显怀疑' : '引起了一些怀疑'}`;
 
         // 使用专门的判定消息函数，避免显示空头像
         this.addJudgmentMessage('--- 判定分析 ---');
         this.addJudgmentMessage(analysisMessage, true);
         
-        // 根据结果显示下一步操作
+        // 显示继续游戏的消息
         this.safeTimeout(() => {
             this.safeAsync(async () => {
-                if (isSuccess) {
-                    // 恭喜消息应该在下一轮开始前显示，使用已完成的轮数
-                    this.addJudgmentMessage(`🎉 恭喜！你成功通过了第${displayRound}轮！`);
-                    
-                    // 延迟显示下一轮开始消息，确保在AI思考之前
-                    this.safeTimeout(() => {
-                        this.safeAsync(async () => {
-                            this.addJudgmentMessage(`--- 第${displayRound + 1}轮开始 ---`);
-                            
-                            // 再延迟一下，让玩家看到轮次开始消息后再显示AI思考
-                            this.safeTimeout(() => {
-                                this.safeAsync(async () => {
-                                    // 注意：startNextRound() 已经在 showSuccessResponse 中调用过了
-                                    // 这里什么都不做，让之前的startNextRound流程继续
-                                });
-                            }, 1000);  // 1秒后AI开始思考
-                        });
-                    }, 1500);
-                } else {
-                    this.showGameResult(false, response, analysis);
-                }
+                this.addJudgmentMessage(`📋 第${displayRound}轮分析完成，游戏继续进行...`);
+                
+                // 延迟显示下一轮开始消息
+                this.safeTimeout(() => {
+                    this.safeAsync(async () => {
+                        this.addJudgmentMessage(`--- 第${displayRound + 1}轮开始 ---`);
+                    });
+                }, 1500);
             });
         }, 3000);
     }
@@ -3621,6 +3708,7 @@ ${isSuccess ? '✅ 判定结果：通过' : '❌ 判定结果：不通过'}`;
         
         // 设置最终统计
         document.getElementById('survivalRounds').textContent = this.gameState.survivedRounds;
+        document.getElementById('finalSuspicionLevel').textContent = this.gameState.getSuspicionPercentage();
         document.getElementById('playerTitle').textContent = this.gameState.getPlayerTitle();
         
         const gameTime = Math.floor((this.gameState.gameEndTime - this.gameState.gameStartTime) / 1000);
@@ -3644,6 +3732,9 @@ ${isSuccess ? '✅ 判定结果：通过' : '❌ 判定结果：不通过'}`;
         // 重置状态管理标志
         this.isGeneratingConversation = false;
         this.isStartingNextRound = false;
+        
+        // 重置怀疑度显示
+        this.updateSuspicionDisplay({ change: 0, reason: '游戏重置' });
         
         // 清空输入框
         document.getElementById('playerResponse').value = '';
@@ -4449,6 +4540,22 @@ ${isSuccess ? '✅ 判定结果：通过' : '❌ 判定结果：不通过'}`;
     skipCurrentRound() {
         console.log('🚀 跳过当前轮次 (调试功能)');
         
+        // 计算跳过的怀疑度变化
+        const suspicionChange = this.gameState.calculateSuspicionChange(false, null, 'skip');
+        const suspicionUpdate = this.gameState.adjustSuspicionLevel(
+            suspicionChange.change,
+            suspicionChange.reason
+        );
+        
+        // 更新UI显示
+        this.updateSuspicionDisplay(suspicionUpdate);
+        
+        // 检查是否游戏结束
+        if (this.gameState.isSuspicionGameOver()) {
+            this.showSuspicionGameOver();
+            return;
+        }
+        
         // 隐藏回复区域
         const responseArea = document.getElementById('responseArea');
         const suspicionNotice = document.getElementById('suspicionNotice');
@@ -4474,6 +4581,88 @@ ${isSuccess ? '✅ 判定结果：通过' : '❌ 判定结果：不通过'}`;
                 await this.startNextRound();
             });
         }, 1000);
+    }
+    
+    // 更新怀疑度显示
+    updateSuspicionDisplay(suspicionUpdate) {
+        const percentage = this.gameState.getSuspicionPercentage();
+        const status = this.gameState.getSuspicionStatus();
+        
+        // 更新紧凑型怀疑度条
+        const fillElement = document.getElementById('suspicionFill');
+        const valueElement = document.getElementById('suspicionValue');
+        
+        if (fillElement) {
+            fillElement.style.width = percentage + '%';
+            fillElement.style.backgroundColor = status.color;
+        }
+        
+        if (valueElement) {
+            valueElement.textContent = percentage + '%';
+            valueElement.style.color = status.color;
+        }
+        
+        // 显示怀疑度变化通知
+        if (suspicionUpdate.change !== 0) {
+            this.showSuspicionChangeNotification(suspicionUpdate);
+        }
+    }
+    
+    // 显示怀疑度变化通知
+    showSuspicionChangeNotification(suspicionUpdate) {
+        const noticeElement = document.getElementById('suspicionNotice');
+        const changeTextElement = document.getElementById('suspicionChangeText');
+        const reasonElement = document.getElementById('suspicionReason');
+        
+        if (changeTextElement && reasonElement) {
+            const changeText = suspicionUpdate.change >= 0 ? 
+                `+${suspicionUpdate.change}` : `${suspicionUpdate.change}`;
+            
+            changeTextElement.textContent = `怀疑度 ${changeText}`;
+            changeTextElement.style.color = suspicionUpdate.change >= 0 ? '#FF5722' : '#4CAF50';
+            reasonElement.textContent = suspicionUpdate.reason;
+            
+            // 显示通知
+            if (noticeElement) {
+                noticeElement.classList.remove('hidden');
+                document.getElementById('chatContainer').classList.add('with-notice');
+                
+                // 3秒后自动隐藏
+                this.safeTimeout(() => {
+                    noticeElement.classList.add('hidden');
+                    document.getElementById('chatContainer').classList.remove('with-notice');
+                }, 3000);
+            }
+        }
+    }
+    
+    // 显示因怀疑度过高游戏结束
+    showSuspicionGameOver() {
+        this.gameState.gameActive = false;
+        this.gameState.gameEndTime = new Date();
+        
+        // 显示游戏结束界面
+        document.getElementById('gameInterface').classList.add('hidden');
+        document.getElementById('resultCard').classList.remove('hidden');
+        
+        // 设置结果标题 - 基于怀疑度而非判定失败
+        document.getElementById('resultTitle').textContent = '🔍 游戏结束 - 怀疑度达到上限！';
+        
+        // 设置结果信息
+        document.getElementById('finalRound').textContent = this.gameState.currentRound;
+        document.getElementById('playerAnswer').textContent = '怀疑度累积达到100%';
+        document.getElementById('analysisText').textContent = '你在游戏过程中的行为累积引起了AI们的怀疑，最终怀疑度达到了100%的上限。';
+        document.getElementById('judgmentReason').textContent = '多轮互动中的怀疑度累积效应';
+        document.getElementById('aiFeedbackText').textContent = 'AI们通过观察你的回复模式和行为特征，逐渐提高了对你身份的怀疑程度，最终确认了你的人类身份。';
+        
+        // 设置最终统计
+        document.getElementById('survivalRounds').textContent = this.gameState.currentRound - 1; // 实际存活轮数
+        document.getElementById('finalSuspicionLevel').textContent = this.gameState.getSuspicionPercentage();
+        document.getElementById('playerTitle').textContent = this.gameState.getPlayerTitle();
+        
+        const gameTime = Math.floor((this.gameState.gameEndTime - this.gameState.gameStartTime) / 1000);
+        const evaluation = this.getFinalEvaluation();
+        document.getElementById('finalEvaluation').textContent = evaluation;
     }
 }
 

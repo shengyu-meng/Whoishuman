@@ -30,6 +30,11 @@ class GameState {
         this.themeHistory = []; // 历史主题记录
         this.themeEmotionalContext = {}; // 主题情绪上下文
         this.themeTransitionInProgress = false; // 主题转换进行中标志
+        
+        // 怀疑度HP系统
+        this.suspicionLevel = 0; // 当前怀疑度 (0-100)
+        this.suspicionHistory = []; // 怀疑度变化历史
+        this.maxSuspicion = 100; // 最大怀疑度阈值
     }
 
     reset() {
@@ -59,6 +64,10 @@ class GameState {
         this.themeHistory = [];
         this.themeEmotionalContext = {};
         this.themeTransitionInProgress = false;
+        
+        // 重置怀疑度系统
+        this.suspicionLevel = 0;
+        this.suspicionHistory = [];
     }
 
     setPlayerName(name) {
@@ -667,6 +676,126 @@ class GameState {
             response,
             timestamp: new Date().toISOString()
         });
+    }
+    
+    // ==============================================
+    // 怀疑度HP系统管理方法
+    // ==============================================
+    
+    // 调整怀疑度
+    adjustSuspicionLevel(change, reason, responseQuality = null) {
+        const oldLevel = this.suspicionLevel;
+        this.suspicionLevel = Math.max(0, Math.min(this.maxSuspicion, this.suspicionLevel + change));
+        
+        // 记录怀疑度变化历史
+        const suspicionChange = {
+            round: this.currentRound,
+            change: change,
+            oldLevel: oldLevel,
+            newLevel: this.suspicionLevel,
+            reason: reason,
+            responseQuality: responseQuality,
+            timestamp: new Date().toISOString()
+        };
+        
+        this.suspicionHistory.push(suspicionChange);
+        
+        // 只保留最近20次记录
+        if (this.suspicionHistory.length > 20) {
+            this.suspicionHistory.shift();
+        }
+        
+        console.log(`🔍 怀疑度变化: ${oldLevel} → ${this.suspicionLevel} (${change >= 0 ? '+' : ''}${change}) - ${reason}`);
+        
+        return suspicionChange;
+    }
+    
+    // 获取当前怀疑度
+    getSuspicionLevel() {
+        return this.suspicionLevel;
+    }
+    
+    // 获取怀疑度百分比
+    getSuspicionPercentage() {
+        return Math.round((this.suspicionLevel / this.maxSuspicion) * 100);
+    }
+    
+    // 获取怀疑度状态描述
+    getSuspicionStatus() {
+        const percentage = this.getSuspicionPercentage();
+        
+        if (percentage <= 20) {
+            return { level: 'safe', text: '安全', color: '#4CAF50' };
+        } else if (percentage <= 40) {
+            return { level: 'caution', text: '注意', color: '#FF9800' };
+        } else if (percentage <= 60) {
+            return { level: 'warning', text: '警告', color: '#FF5722' };
+        } else if (percentage <= 80) {
+            return { level: 'danger', text: '危险', color: '#F44336' };
+        } else {
+            return { level: 'critical', text: '临界', color: '#9C27B0' };
+        }
+    }
+    
+    // 检查是否已达到游戏结束条件
+    isSuspicionGameOver() {
+        return this.suspicionLevel >= this.maxSuspicion;
+    }
+    
+    // 获取怀疑度历史记录
+    getSuspicionHistory() {
+        return this.suspicionHistory;
+    }
+    
+    // 获取最近的怀疑度变化
+    getRecentSuspicionChange() {
+        return this.suspicionHistory.length > 0 ? this.suspicionHistory[this.suspicionHistory.length - 1] : null;
+    }
+    
+    // 计算基于回复质量的怀疑度变化
+    calculateSuspicionChange(isSuccess, responseQuality = null, actionType = 'response') {
+        let change = 0;
+        let reason = '';
+        
+        if (actionType === 'timeout') {
+            change = 30;
+            reason = '超时未回答';
+        } else if (actionType === 'skip') {
+            change = 35;
+            reason = '跳过问题';
+        } else if (isSuccess) {
+            // 成功回答：-10 到 +15（根据回答质量）
+            if (responseQuality && responseQuality.score) {
+                // 质量分数越高，怀疑度减少越多
+                if (responseQuality.score >= 0.9) {
+                    change = -10; // 优秀回答
+                } else if (responseQuality.score >= 0.7) {
+                    change = -5;  // 良好回答
+                } else {
+                    change = Math.floor(Math.random() * 26) - 10; // -10 to +15 随机
+                }
+            } else {
+                change = Math.floor(Math.random() * 26) - 10; // -10 to +15
+            }
+            reason = `成功回答 (质量${responseQuality?.score ? (responseQuality.score * 100).toFixed(0) + '%' : '未知'})`;
+        } else {
+            // 失败回答：+35 到 +50（根据暴露程度）
+            if (responseQuality && responseQuality.exposureLevel) {
+                // 暴露程度越高，怀疑度增加越多
+                if (responseQuality.exposureLevel >= 0.8) {
+                    change = 50; // 严重暴露
+                } else if (responseQuality.exposureLevel >= 0.6) {
+                    change = 45; // 明显暴露
+                } else {
+                    change = 35 + Math.floor(Math.random() * 16); // 35-50
+                }
+            } else {
+                change = 35 + Math.floor(Math.random() * 16); // 35-50
+            }
+            reason = `失败回答 (暴露程度${responseQuality?.exposureLevel ? (responseQuality.exposureLevel * 100).toFixed(0) + '%' : '未知'})`;
+        }
+        
+        return { change, reason };
     }
 }
 
