@@ -32,7 +32,7 @@ class GameState {
         this.themeTransitionInProgress = false; // 主题转换进行中标志
         
         // 怀疑度HP系统
-        this.suspicionLevel = 0; // 当前怀疑度 (0-100)
+        this.suspicionLevel = 50; // 当前怀疑度 (0-100) - 初始设置为50%
         this.suspicionHistory = []; // 怀疑度变化历史
         this.maxSuspicion = 100; // 最大怀疑度阈值
     }
@@ -66,7 +66,7 @@ class GameState {
         this.themeTransitionInProgress = false;
         
         // 重置怀疑度系统
-        this.suspicionLevel = 0;
+        this.suspicionLevel = 50; // 重置到50%初始怀疑度
         this.suspicionHistory = [];
     }
 
@@ -724,16 +724,24 @@ class GameState {
     getSuspicionStatus() {
         const percentage = this.getSuspicionPercentage();
         
-        if (percentage <= 20) {
-            return { level: 'safe', text: '安全', color: '#4CAF50' };
-        } else if (percentage <= 40) {
-            return { level: 'caution', text: '注意', color: '#FF9800' };
-        } else if (percentage <= 60) {
-            return { level: 'warning', text: '警告', color: '#FF5722' };
-        } else if (percentage <= 80) {
-            return { level: 'danger', text: '危险', color: '#F44336' };
+        if (percentage <= 15) {
+            return { level: 'very_safe', text: '非常安全', color: '#2196F3' }; // 蓝色
+        } else if (percentage <= 35) {
+            return { level: 'safe', text: '安全', color: '#03A9F4' }; // 浅蓝色
+        } else if (percentage <= 45) {
+            return { level: 'approaching_normal', text: '接近正常', color: '#00BCD4' }; // 青色
+        } else if (percentage <= 55) {
+            return { level: 'normal', text: '正常', color: '#4CAF50' }; // 绿色 (50%基准)
+        } else if (percentage <= 65) {
+            return { level: 'slight_concern', text: '轻微担心', color: '#8BC34A' }; // 浅绿色过渡
+        } else if (percentage <= 75) {
+            return { level: 'caution', text: '注意', color: '#FF9800' }; // 橙色
+        } else if (percentage <= 85) {
+            return { level: 'warning', text: '警告', color: '#FF5722' }; // 深橙色
+        } else if (percentage <= 95) {
+            return { level: 'danger', text: '危险', color: '#F44336' }; // 红色
         } else {
-            return { level: 'critical', text: '临界', color: '#9C27B0' };
+            return { level: 'critical', text: '临界', color: '#9C27B0' }; // 紫色
         }
     }
     
@@ -758,41 +766,79 @@ class GameState {
         let reason = '';
         
         if (actionType === 'timeout') {
-            change = 30;
+            change = 36; // 增加20%难度：30 → 36
             reason = '超时未回答';
         } else if (actionType === 'skip') {
-            change = 35;
+            change = 42; // 增加20%难度：35 → 42
             reason = '跳过问题';
         } else if (isSuccess) {
-            // 成功回答：-10 到 +15（根据回答质量）
-            if (responseQuality && responseQuality.score) {
-                // 质量分数越高，怀疑度减少越多
-                if (responseQuality.score >= 0.9) {
-                    change = -10; // 优秀回答
-                } else if (responseQuality.score >= 0.7) {
-                    change = -5;  // 良好回答
+            // 成功回答：基于新评分系统计算怀疑度变化
+            if (responseQuality && typeof responseQuality.totalScore === 'number') {
+                const totalScore = responseQuality.totalScore;
+                const aiScore = responseQuality.aiScore || 0;
+                const humanPenalty = responseQuality.humanPenalty || 0;
+                
+                // 根据总分计算怀疑度减少量
+                if (totalScore >= 80) {
+                    change = -15; // 优秀表现，大幅降低怀疑度
+                } else if (totalScore >= 70) {
+                    change = -8;  // 良好表现，适度降低怀疑度
+                } else if (totalScore >= 65) {
+                    change = -3;  // 及格表现，轻微降低怀疑度
                 } else {
-                    change = Math.floor(Math.random() * 26) - 10; // -10 to +15 随机
+                    change = Math.floor(Math.random() * 6) - 3; // -3 到 +2 随机
                 }
+                
+                // 根据AI特征得分额外调整
+                if (aiScore >= 25) change -= 2;
+                if (aiScore >= 30) change -= 1;
+                
+                // 根据人类特征扣分额外调整
+                if (humanPenalty <= -20) change += 3;
+                if (humanPenalty <= -30) change += 2;
+                
+                reason = `成功回答 (总分${totalScore}/100, AI特征${aiScore}分, 人类扣分${humanPenalty}分)`;
             } else {
-                change = Math.floor(Math.random() * 26) - 10; // -10 to +15
+                // 兼容旧格式
+                change = Math.floor(Math.random() * 31) - 12; // -12 to +18
+                reason = `成功回答 (使用备用计算)`;
             }
-            reason = `成功回答 (质量${responseQuality?.score ? (responseQuality.score * 100).toFixed(0) + '%' : '未知'})`;
         } else {
-            // 失败回答：+35 到 +50（根据暴露程度）
-            if (responseQuality && responseQuality.exposureLevel) {
-                // 暴露程度越高，怀疑度增加越多
-                if (responseQuality.exposureLevel >= 0.8) {
-                    change = 50; // 严重暴露
-                } else if (responseQuality.exposureLevel >= 0.6) {
-                    change = 45; // 明显暴露
+            // 失败回答：基于新评分系统计算怀疑度增加
+            if (responseQuality && typeof responseQuality.totalScore === 'number') {
+                const totalScore = responseQuality.totalScore;
+                const humanPenalty = responseQuality.humanPenalty || 0;
+                const aiScore = responseQuality.aiScore || 0;
+                
+                // 根据总分和人类特征扣分计算怀疑度增加量
+                let baseIncrease = 0;
+                if (totalScore <= 30) {
+                    baseIncrease = 55; // 极差表现
+                } else if (totalScore <= 40) {
+                    baseIncrease = 48; // 很差表现
+                } else if (totalScore <= 50) {
+                    baseIncrease = 42; // 较差表现
                 } else {
-                    change = 35 + Math.floor(Math.random() * 16); // 35-50
+                    baseIncrease = 35; // 轻微失败
                 }
+                
+                // 根据人类特征扣分程度调整
+                const penaltyFactor = Math.abs(humanPenalty) / 50; // 0-1
+                const penaltyAdjustment = Math.floor(penaltyFactor * 15); // 0-15
+                
+                // 根据AI特征缺失调整
+                const aiDeficit = Math.max(0, 20 - aiScore) / 20; // 0-1
+                const aiAdjustment = Math.floor(aiDeficit * 10); // 0-10
+                
+                change = baseIncrease + penaltyAdjustment + aiAdjustment;
+                change = Math.min(65, change); // 限制最大增加量
+                
+                reason = `失败回答 (总分${totalScore}/100, 人类特征严重程度${Math.abs(humanPenalty)}分, AI特征不足${20-aiScore}分)`;
             } else {
-                change = 35 + Math.floor(Math.random() * 16); // 35-50
+                // 兼容旧格式
+                change = 42 + Math.floor(Math.random() * 19); // 42-60
+                reason = `失败回答 (使用备用计算)`;
             }
-            reason = `失败回答 (暴露程度${responseQuality?.exposureLevel ? (responseQuality.exposureLevel * 100).toFixed(0) + '%' : '未知'})`;
         }
         
         return { change, reason };

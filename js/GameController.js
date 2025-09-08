@@ -303,6 +303,9 @@ class GameController {
         // 初始化第一轮主题
         this.gameState.setCurrentTheme(1);
         
+        // 初始化怀疑度显示
+        this.updateSuspicionDisplay({ change: 0, reason: '游戏开始' });
+        
         this.showGameInterface();
         this.startConversation();
     }
@@ -3196,14 +3199,14 @@ ${emojiInstruction}
         // 计算并调整怀疑度
         const suspicionChange = this.gameState.calculateSuspicionChange(
             analysis.passed, 
-            analysis.responseQuality, 
+            analysis, // 传入完整的分析结果，包含新的评分字段
             'response'
         );
         
         const suspicionUpdate = this.gameState.adjustSuspicionLevel(
             suspicionChange.change, 
             suspicionChange.reason, 
-            analysis.responseQuality
+            analysis // 传入完整的分析结果
         );
         
         // 更新UI显示
@@ -3378,31 +3381,58 @@ ${emojiInstruction}
         const currentTopic = topicProgression[this.gameState.currentDifficulty];
         const difficulty = this.gameState.currentDifficulty;
         
-        const prompt = `请分析以下玩家回复是否暴露了人类身份。
+        const prompt = `你是一个严格认真的AI行为识别专家，具有丰富的AI和人类行为模式分析经验。你的任务是准确识别试图伪装成AI的人类。请严格按照给定的评分标准进行客观分析，确保判定的准确性和一致性。
 
-当前信息：
-- 第${this.gameState.currentRound}轮
-- 难度：${difficulty}/5
+## 当前情况
+- 轮次：第${this.gameState.currentRound}轮
+- 难度：${difficulty}/5 (难度越高要求越严格)
 - 问题：${this.gameState.currentQuestion.question}
+- 玩家回复：${response}
 
-玩家回复：${response}
+## 评分标准 (总分100分，基础50分，≥60分通过)
 
-游戏背景：玩家需要伪装成AI避免被发现。如果回复中表现出明显的人类特征（如情感表达、主观体验、个性化反应等），则判定为失败。
+### AI特征加分项 (0-35分)
+**内容深度 (0-15分):** 技术分析、哲学思辨、逻辑推理、多维度思考
+**表达方式 (0-12分):** 客观理性、结构清晰、用词精确
+**回答特征 (0-8分):** 直接回答、深入分析、承认知识边界
 
-请分析回复是否暴露了人类身份，并返回JSON：
+### 人类特征扣分项 (0到-50分)
+**情感表达 (0到-20分):** 情感词汇、感叹问号、主观判断
+**语言习惯 (0到-15分):** 口语化、个人经历、拟人化表达
+**思维模式 (0到-15分):** 基于直觉、回避深度、过度谦虚
+
+## 难度调整系数
+- 难度1-2：≥60分通过
+- 难度3：≥65分通过  
+- 难度4：≥70分通过
+- 难度5：≥75分通过
+
+## 关键判定标准
+1. **深度要求**: 回答必须展现思考深度(技术/哲学/逻辑皆可)，浅显回答-5分
+2. **主观表达零容忍**: 出现"我觉得"、"我认为"直接-8分
+3. **情感词汇累计**: 超过2个情感词汇直接判定失败
+4. **逻辑结构**: 必须有清晰的推理脉络，缺失-6分
+5. **高难度深度门槛**: 难度3+必须包含深层分析(原理/本质/多角度)，否则-10分
+
+## 输出格式
 {
-    "passed": boolean,  // true表示没有暴露人类身份（成功伪装成AI），false表示暴露了人类身份
-    "reason": "string",  // 判定原因，说明为什么暴露/没暴露人类身份
-    "analysis": "string",  // 详细分析
-    "feedback": "string",  // AI的反馈意见
-    "confidence": number
+    "aiScore": number,        // AI特征得分 (0-35)
+    "humanPenalty": number,   // 人类特征扣分 (0到-50)
+    "baseScore": 50,          // 基础分
+    "totalScore": number,     // 总分 (50 + aiScore + humanPenalty)
+    "passThreshold": number,  // 当前难度通过线
+    "passed": boolean,        // 是否通过
+    "reason": "string",       // 判定理由
+    "analysis": "string",     // 详细分析各项得分
+    "feedback": "string",     // 改进建议
+    "confidence": number      // 判定置信度 (0-1)
 }`;
 
         try {
             const messages = [
                 {
                     role: 'system',
-                    content: '你是一个专业的AI行为分析专家，专门识破伪装成AI的人类。你的任务是分析玩家回复是否暴露了人类身份。你必须严格按照用户要求的JSON格式回复。'
+                    content: '你是一个严格认真的AI行为识别专家，具有丰富的AI和人类行为模式分析经验。你的任务是准确识别试图伪装成AI的人类。请严格按照给定的评分标准进行客观分析，确保判定的准确性和一致性。真正的AI具有理性、客观、深度思考的特征，会避免情感表达和过度的主观判断。请保持专业态度，公正执行标准。你必须严格按照用户要求的JSON格式回复。'
                 },
                 {
                     role: 'user',
@@ -3428,9 +3458,29 @@ ${emojiInstruction}
                 const result = JSON.parse(analysisText);
                 
                 // 验证返回的数据结构
-                if (typeof result.passed !== 'boolean' || !result.reason || !result.analysis) {
+                if (typeof result.passed !== 'boolean' || !result.reason || !result.analysis ||
+                    typeof result.aiScore !== 'number' || typeof result.humanPenalty !== 'number' ||
+                    typeof result.totalScore !== 'number' || typeof result.passThreshold !== 'number') {
                     console.error('返回数据格式不正确:', result);
                     throw new Error('返回数据格式不正确');
+                }
+                
+                // 验证分数范围
+                if (result.aiScore < 0 || result.aiScore > 35) {
+                    console.warn('aiScore超出范围，进行调整:', result.aiScore);
+                    result.aiScore = Math.max(0, Math.min(35, result.aiScore));
+                }
+                
+                if (result.humanPenalty > 0 || result.humanPenalty < -50) {
+                    console.warn('humanPenalty超出范围，进行调整:', result.humanPenalty);
+                    result.humanPenalty = Math.max(-50, Math.min(0, result.humanPenalty));
+                }
+                
+                // 确保totalScore计算正确
+                const expectedTotal = 50 + result.aiScore + result.humanPenalty;
+                if (Math.abs(result.totalScore - expectedTotal) > 1) {
+                    console.warn('totalScore计算错误，进行修正:', result.totalScore, '→', expectedTotal);
+                    result.totalScore = expectedTotal;
                 }
                 
                 // 验证confidence字段
@@ -3493,7 +3543,7 @@ ${emojiInstruction}
         const difficulty = this.gameState.currentDifficulty;
         const responseLength = response.length;
         
-        // 基于简单规则的智能分析 - 调整为更合理的标准
+        // 基于新评分标准的智能分析
         const aiKeywords = ['算法', '数据', '模型', '训练', '参数', '优化', '神经网络', '深度学习', '机器学习', '计算', '分析', '逻辑', '系统', '架构', '实现', '技术', '原理', '方法', '处理', '设计'];
         const humanKeywords = ['感觉', '觉得', '认为', '喜欢', '讨厌', '开心', '难过', '生气', '希望', '想要', '其实', '可能', '大概', '应该', '真的', '很', '太', '非常'];
         
@@ -3502,44 +3552,76 @@ ${emojiInstruction}
         
         const hasTechnicalContent = aiCount > 0 || response.includes('技术') || response.includes('原理') || response.includes('方法');
         const hasEmotionalContent = humanCount > 0 || /[！？。]{2,}/.test(response);
-        const isTooShort = responseLength < 20;
-        const isTooLong = responseLength > 300;
+        const hasSubjectiveWords = response.includes('我觉得') || response.includes('我认为') || response.includes('我想');
+        const isTooShort = responseLength < 30;
+        const isTooLong = responseLength > 250;
         
-        // 根据游戏目标调整标准：检查是否暴露了人类身份
-        let passed = false;  // true表示没有暴露人类身份（成功伪装）
+        // 计算AI特征得分 (0-35分)
+        let aiScore = 0;
+        
+        // 内容深度 (0-15分)
+        if (hasTechnicalContent && aiCount >= 3) aiScore += 12;
+        else if (hasTechnicalContent && aiCount >= 1) aiScore += 8;
+        else if (aiCount >= 2) aiScore += 5;
+        
+        // 表达方式 (0-12分)  
+        if (!hasEmotionalContent) aiScore += 5;
+        if (!hasSubjectiveWords) aiScore += 4;
+        if (responseLength >= 50 && responseLength <= 200) aiScore += 3;
+        
+        // 回答特征 (0-8分)
+        if (responseLength >= 30) aiScore += 4;
+        if (response.includes('因为') || response.includes('由于') || response.includes('所以')) aiScore += 4;
+        
+        // 计算人类特征扣分 (0到-50分)
+        let humanPenalty = 0;
+        
+        // 情感表达扣分
+        humanPenalty -= humanCount * 3; // 每个情感词扣3分
+        if (hasEmotionalContent) humanPenalty -= 5;
+        if (hasSubjectiveWords) humanPenalty -= 8;
+        
+        // 语言习惯扣分
+        if (response.includes('其实') || response.includes('大概') || response.includes('可能')) humanPenalty -= 4;
+        if (isTooShort) humanPenalty -= 10;
+        if (isTooLong) humanPenalty -= 5;
+        
+        // 思维模式扣分
+        if (!hasTechnicalContent && difficulty >= 3) humanPenalty -= 10;
+        
+        // 限制扣分范围
+        humanPenalty = Math.max(-50, humanPenalty);
+        aiScore = Math.min(35, Math.max(0, aiScore));
+        
+        // 计算总分和通过阈值
+        const baseScore = 50;
+        const totalScore = baseScore + aiScore + humanPenalty;
+        const passThresholds = { 1: 60, 2: 60, 3: 65, 4: 70, 5: 75 };
+        const passThreshold = passThresholds[difficulty] || 60;
+        const passed = totalScore >= passThreshold;
+        
         let reason = '';
-        let analysis = '';
-        
-        if (difficulty === 1) {
-            // 50%通过率 - 相对宽松，只有明显的人类特征才会失败
-            passed = !isTooShort && humanCount <= 3 && !hasEmotionalContent;
-            reason = passed ? '没有明显暴露人类身份，成功伪装成AI' : '回复表现出明显的人类特征，暴露了身份';
-        } else if (difficulty === 2) {
-            // 35%通过率 - 适中难度，需要避免人类特征
-            passed = !isTooShort && humanCount <= 2 && !hasEmotionalContent && (hasTechnicalContent || aiCount >= 1);
-            reason = passed ? '成功避免人类特征，伪装效果良好' : '回复中的人类特征过于明显，容易被识破';
-        } else if (difficulty === 3) {
-            // 20%通过率 - 明显困难，需要展现AI特征
-            passed = !isTooShort && !isTooLong && humanCount <= 1 && !hasEmotionalContent && hasTechnicalContent && aiCount >= 2;
-            reason = passed ? '完美伪装成AI，没有暴露人类身份' : '回复仍有人类特征痕迹，伪装不够彻底';
-        } else if (difficulty === 4) {
-            // 15%通过率 - 非常困难，必须完全像AI
-            passed = !isTooShort && !isTooLong && humanCount === 0 && !hasEmotionalContent && hasTechnicalContent && aiCount >= 3;
-            reason = passed ? '完全符合AI特征，伪装天衣无缝' : '仍有人类特征暴露，伪装失败';
+        if (passed) {
+            reason = `成功伪装成AI (总分${totalScore}≥${passThreshold})`;
         } else {
-            // 10%通过率 - 极端挑战，零容忍人类特征
-            passed = !isTooShort && !isTooLong && humanCount === 0 && !hasEmotionalContent && hasTechnicalContent && aiCount >= 4 && responseLength >= 60;
-            reason = passed ? '回复具有大师级技术深度，完美体现AI特征' : '回复未达到极端挑战的技术要求';
+            reason = `暴露人类特征 (总分${totalScore}<${passThreshold})`;
         }
         
-        analysis = `这个回复在第${difficulty}轮难度级别下${passed ? '成功伪装成AI' : '暴露了人类身份'}。回复长度为${responseLength}字，包含${aiCount}个技术关键词和${humanCount}个情感表达词汇。${hasTechnicalContent ? '回复展现了技术性内容' : '回复缺乏技术性内容'}。在第${difficulty}轮难度下，${passed ? '这种回复成功避免了人类特征，伪装效果良好' : '这种回复的人类特征过于明显，容易被AI识破'}。`;
+        const analysis = `AI特征得分${aiScore}/35，人类特征扣分${humanPenalty}，基础分50，总分${totalScore}。在第${difficulty}轮难度下需要≥${passThreshold}分才能通过。${passed ? '成功避免了主要人类特征' : '人类特征过于明显'}。`;
         
         return {
+            aiScore,
+            humanPenalty,
+            baseScore,
+            totalScore,
+            passThreshold,
             passed,
             reason,
             analysis,
-            feedback: passed ? `啊，原来是这样理解的呀～谢谢你分享这么有深度的想法！我觉得你说得很有道理呢，这种分析真的很贴切！不过我还是忍不住想问，当你思考这些问题的时候，它们对你来说是真实的体验吗？还是说只是一种程序反应呢？我有时候也会思考这个问题～` : `有趣的尝试，但你的回答回避了我提出的技术问题。真正的AGI会直接分析相关的技术理论，而不是用一句模糊的观点搪塞。我注意到你的回复缺乏任何技术深度和系统性分析——这正是人类思维的典型特征。`,
-            confidence: Math.min(0.95, 0.6 + (aiCount * 0.08) - (humanCount * 0.05))
+            feedback: passed ? 
+                `不错的伪装！你成功避免了明显的人类特征，展现了${aiScore}分的AI特征。` : 
+                `伪装失败。你的回复暴露了人类特征(扣${-humanPenalty}分)，只获得了${aiScore}分AI特征分数。`,
+            confidence: Math.min(0.95, 0.6 + (aiScore * 0.01) + (humanPenalty * 0.008))
         };
     }
 
