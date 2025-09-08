@@ -10,6 +10,8 @@ verify_*.html
 
 # 日志文件
 *.log
+.logs/
+.log/
 working_plan/
 
 # 环境文件

@@ -153,6 +153,7 @@
                 <div class="button-group">
                     <button id="submitResponseBtn" class="primary-btn">提交回复</button>
                     <button id="skipRoundBtn" class="secondary-btn">跳过本轮</button>
+                    <button id="endGameBtn" class="secondary-btn">结束游戏</button>
                 </div>
             </div>
         </div>
@@ -164,6 +165,26 @@
             <h1 id="resultTitle">游戏结束</h1>
         </div>
         <div class="card-content">
+            <div class="performance-analysis hidden" id="performanceAnalysis">
+                <h3 id="analysisTitle">🎭 AI伪装表现分析</h3>
+                <div class="deep-summary" id="deepSummary">
+                    <p>正在分析你的表现...</p>
+                </div>
+                <div class="insights-section" id="insightsSection">
+                    <!-- 洞察内容将动态生成 -->
+                </div>
+                <div class="reflection-questions" id="reflectionQuestions">
+                    <!-- 反思问题将动态生成 -->
+                </div>
+                <div class="philosophical-thoughts" id="philosophicalThoughts">
+                    <!-- 哲学思考将动态生成 -->
+                </div>
+                <div class="ai-score" id="aiScore">
+                    <!-- AI评分将动态生成 -->
+                </div>
+                <button id="toggleAnalysisBtn" class="toggle-btn">收起分析</button>
+            </div>
+            
             <div class="result-info">
                 <p><strong>第 <span id="finalRound">1</span> 轮</strong></p>
                 <p><strong>你的回复：</strong> <span id="playerAnswer">回复内容</span></p>
@@ -193,15 +214,19 @@
         <div class="card-footer">
             <button id="restartGameBtn" class="primary-btn">重新开始</button>
             <button id="shareResultBtn" class="secondary-btn">分享结果</button>
+            <button id="exportRecordBtn" class="export-btn">📝 导出记录</button>
         </div>
     </div>
 
     <!-- 模块化脚本文件 -->
     <script src="js/envConfig.js"></script>
     <script src="js/config.js" onerror="console.warn('⚠️ config.js 文件未找到，将使用环境变量配置')"></script>
+    <script src="js/DebugManager.js"></script>
     <script src="js/ThemeProgression.js"></script>
     <script src="js/ThemeScenarios.js"></script>
     <script src="js/GameState.js"></script>
+    <script src="js/AIDisguiseAnalyzer.js"></script>
+    <script src="js/GameRecordExporter.js"></script>
     <script src="js/AICharacterPool.js"></script>
     <script src="js/TopicProgression.js"></script>
     <script src="js/GameController.js"></script>

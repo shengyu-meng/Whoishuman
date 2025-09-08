@@ -15,6 +15,9 @@ class GameController {
         // 异步初始化配置
         this.initializeConfig();
         
+        // 初始化调试管理器
+        this.debugManager = new DebugManager();
+        
         this.initializeEventListeners();
         
         // 全局错误处理，防止页面刷新
@@ -248,6 +251,11 @@ class GameController {
         document.getElementById('skipRoundBtn').addEventListener('click', () => {
             this.skipCurrentRound();
         });
+        
+        // 结束游戏按钮（用于调试）
+        document.getElementById('endGameBtn').addEventListener('click', () => {
+            this.endGameManually();
+        });
 
         // 字符计数
         document.getElementById('playerResponse').addEventListener('input', (e) => {
@@ -355,6 +363,11 @@ class GameController {
         messageDiv.textContent = message;
         chatContainer.appendChild(messageDiv);
         this.scrollToBottom();
+        
+        // 添加到调试日志
+        if (this.debugManager) {
+            this.debugManager.addSystemLog('SYSTEM', message, { type: 'system_message', round: this.gameState.currentRound });
+        }
     }
 
     // 添加闪烁的判定提示
@@ -488,6 +501,22 @@ class GameController {
         
         // 添加到对话历史
         this.gameState.addMessageToHistory(character.name, message);
+        
+        // 添加到调试对话日志
+        if (this.debugManager) {
+            const messageType = isPlayer ? 'player_message' : 'ai_message';
+            this.debugManager.addConversationLog(
+                messageType, 
+                character.name, 
+                message,
+                { 
+                    round: this.gameState.currentRound,
+                    isPlayer: isPlayer,
+                    avatarColor: character.avatarColor,
+                    quotedMessage: quotedMessage
+                }
+            );
+        }
     }
 
     // 查找可引用的消息（安慰时引用被安慰者的消息）
@@ -3172,6 +3201,20 @@ ${emojiInstruction}
             responseText
         );
         
+        // 添加到调试对话日志
+        if (this.debugManager) {
+            this.debugManager.addConversationLog(
+                'player_response', 
+                this.gameState.playerName, 
+                responseText,
+                { 
+                    round: this.gameState.currentRound,
+                    questionFrom: this.gameState.currentQuestion?.character?.name,
+                    question: this.gameState.currentQuestion?.question
+                }
+            );
+        }
+        
         // 记录与提问AI的互动
         if (this.gameState.currentQuestion && this.gameState.currentQuestion.character) {
             this.gameState.recordPlayerInteraction(
@@ -3781,6 +3824,9 @@ ${analysis.feedback}
         // 设置结果标题
         document.getElementById('resultTitle').textContent = isWin ? '🎉 恭喜通关！' : '💥 游戏结束！你被识破了！';
         
+        // 生成并显示AI伪装分析
+        this.showPerformanceAnalysis();
+        
         // 设置结果信息
         document.getElementById('finalRound').textContent = this.gameState.currentRound;
         document.getElementById('playerAnswer').textContent = finalResponse;
@@ -3796,6 +3842,14 @@ ${analysis.feedback}
         const gameTime = Math.floor((this.gameState.gameEndTime - this.gameState.gameStartTime) / 1000);
         const evaluation = this.getFinalEvaluation();
         document.getElementById('finalEvaluation').textContent = evaluation;
+        
+        // 初始化导出功能
+        this.initializeExportFunction();
+        
+        // 在游戏结束时保存调试日志
+        if (this.debugManager) {
+            this.debugManager.saveLogsToFile();
+        }
     }
 
     getFinalEvaluation() {
@@ -3805,6 +3859,99 @@ ${analysis.feedback}
         if (rounds >= 4) return '不错的表现，继续努力！';
         if (rounds >= 2) return '还有提升空间，多练习！';
         return '刚开始就结束了，再试一次吧！';
+    }
+    
+    // 显示AI伪装表现分析
+    showPerformanceAnalysis() {
+        try {
+            // 创建分析器实例
+            const analyzer = new AIDisguiseAnalyzer(this.gameState);
+            
+            // 生成分析结果
+            const analysis = analyzer.generatePerformanceAnalysis();
+            
+            // 获取分析界面元素
+            const analysisElement = document.getElementById('performanceAnalysis');
+            const titleElement = document.getElementById('analysisTitle');
+            const summaryElement = document.getElementById('deepSummary');
+            const insightsElement = document.getElementById('insightsSection');
+            const questionsElement = document.getElementById('reflectionQuestions');
+            const thoughtsElement = document.getElementById('philosophicalThoughts');
+            const scoreElement = document.getElementById('aiScore');
+            
+            if (!analysisElement) {
+                console.warn('分析界面元素未找到');
+                return;
+            }
+            
+            // 设置分析标题
+            titleElement.textContent = analysis.title;
+            
+            // 设置深度总结
+            summaryElement.innerHTML = `<p>${analysis.summary}</p>`;
+            
+            // 设置洞察分析
+            insightsElement.innerHTML = '';
+            analysis.insights.forEach(insight => {
+                const insightDiv = document.createElement('div');
+                insightDiv.className = 'insight-item';
+                insightDiv.innerHTML = `
+                    <div class="insight-category">${insight.category}</div>
+                    <div class="insight-content">${insight.content}</div>
+                `;
+                insightsElement.appendChild(insightDiv);
+            });
+            
+            // 设置反思问题
+            questionsElement.innerHTML = '<h4>🤔 值得深思的问题</h4>';
+            analysis.reflectionQuestions.forEach((question, index) => {
+                const questionDiv = document.createElement('div');
+                questionDiv.className = 'reflection-question';
+                questionDiv.textContent = `${index + 1}. ${question}`;
+                questionsElement.appendChild(questionDiv);
+            });
+            
+            // 设置哲学思考
+            thoughtsElement.innerHTML = `
+                <h4>💭 哲学思辨</h4>
+                <div class="philosophical-content">${analysis.philosophicalThoughts}</div>
+            `;
+            
+            // 设置AI评分
+            scoreElement.innerHTML = `
+                <h4>AI伪装综合评分</h4>
+                <div class="score-value">${analysis.aiScore}</div>
+                <div>满分 100 分</div>
+            `;
+            
+            // 显示分析界面
+            analysisElement.classList.remove('hidden');
+            
+            // 绑定展开/收起按钮事件
+            const toggleBtn = document.getElementById('toggleAnalysisBtn');
+            if (toggleBtn) {
+                toggleBtn.addEventListener('click', () => {
+                    if (analysisElement.classList.contains('collapsed')) {
+                        analysisElement.classList.remove('collapsed');
+                        toggleBtn.textContent = '收起分析';
+                    } else {
+                        analysisElement.classList.add('collapsed');
+                        toggleBtn.textContent = '展开分析';
+                    }
+                });
+            }
+            
+            // 存储分析结果供导出使用
+            this.performanceAnalysis = analysis;
+            
+        } catch (error) {
+            console.error('生成表现分析时出错:', error);
+            // 隐藏分析界面
+            const analysisElement = document.getElementById('performanceAnalysis');
+            if (analysisElement) {
+                analysisElement.classList.add('hidden');
+            }
+        }
     }
 
     restartGame() {
@@ -4665,6 +4812,65 @@ ${analysis.feedback}
         }, 1000);
     }
     
+    // 手动结束游戏（用于调试）
+    endGameManually() {
+        console.log('🎮 手动结束游戏 (调试功能)');
+        
+        // 设置游戏结束状态
+        this.gameState.gameActive = false;
+        this.gameState.gameEndTime = new Date();
+        
+        // 隐藏回复区域和通知
+        const responseArea = document.getElementById('responseArea');
+        const suspicionNotice = document.getElementById('suspicionNotice');
+        
+        if (responseArea) {
+            responseArea.classList.add('hidden');
+        }
+        
+        if (suspicionNotice) {
+            suspicionNotice.classList.add('hidden');
+        }
+        
+        // 重置等待状态
+        this.gameState.waitingForResponse = false;
+        this.gameState.isJudging = false;
+        
+        // 添加系统消息表示手动结束
+        this.addSystemMessage('🔧 调试模式：游戏手动结束');
+        
+        // 显示游戏结束界面
+        setTimeout(() => {
+            // 隐藏游戏界面
+            document.getElementById('gameInterface').classList.add('hidden');
+            document.getElementById('resultCard').classList.remove('hidden');
+            
+            // 设置调试结束的结果信息
+            document.getElementById('resultTitle').textContent = '🔧 调试模式 - 游戏手动结束';
+            
+            // 生成并显示AI伪装分析
+            this.showPerformanceAnalysis();
+            
+            // 设置结果信息
+            document.getElementById('finalRound').textContent = this.gameState.currentRound;
+            document.getElementById('playerAnswer').textContent = '调试模式手动结束';
+            document.getElementById('analysisText').textContent = '通过调试模式手动结束游戏，用于测试和开发目的。';
+            document.getElementById('judgmentReason').textContent = '调试功能触发的游戏结束';
+            document.getElementById('aiFeedbackText').textContent = '这是调试模式下的手动结束，不是正常游戏流程的结果。';
+            
+            // 设置最终统计
+            document.getElementById('survivalRounds').textContent = this.gameState.currentRound;
+            document.getElementById('finalSuspicionLevel').textContent = this.gameState.getSuspicionPercentage();
+            document.getElementById('playerTitle').textContent = '调试者 - ' + this.gameState.getPlayerTitle();
+            
+            const gameTime = Math.floor((this.gameState.gameEndTime - this.gameState.gameStartTime) / 1000);
+            document.getElementById('finalEvaluation').textContent = '调试模式结束 - 功能测试完成';
+            
+            // 初始化导出功能
+            this.initializeExportFunction();
+        }, 1000);
+    }
+    
     // 更新怀疑度显示
     updateSuspicionDisplay(suspicionUpdate) {
         const percentage = this.gameState.getSuspicionPercentage();
@@ -4730,6 +4936,9 @@ ${analysis.feedback}
         // 设置结果标题 - 基于怀疑度而非判定失败
         document.getElementById('resultTitle').textContent = '🔍 游戏结束 - 怀疑度达到上限！';
         
+        // 生成并显示AI伪装分析
+        this.showPerformanceAnalysis();
+        
         // 设置结果信息
         document.getElementById('finalRound').textContent = this.gameState.currentRound;
         document.getElementById('playerAnswer').textContent = '怀疑度累积达到100%';
@@ -4745,6 +4954,74 @@ ${analysis.feedback}
         const gameTime = Math.floor((this.gameState.gameEndTime - this.gameState.gameStartTime) / 1000);
         const evaluation = this.getFinalEvaluation();
         document.getElementById('finalEvaluation').textContent = evaluation;
+        
+        // 初始化导出功能
+        this.initializeExportFunction();
+    }
+    
+    // 初始化导出功能
+    initializeExportFunction() {
+        // 创建导出器实例
+        this.recordExporter = new GameRecordExporter(this.gameState, this);
+        
+        // 绑定导出按钮事件
+        const exportBtn = document.getElementById('exportRecordBtn');
+        if (exportBtn) {
+            // 移除之前的事件监听器（如果有的话）
+            exportBtn.replaceWith(exportBtn.cloneNode(true));
+            
+            // 重新获取按钮引用并绑定新的事件监听器
+            const newExportBtn = document.getElementById('exportRecordBtn');
+            newExportBtn.addEventListener('click', () => {
+                this.exportGameRecord();
+            });
+        }
+    }
+    
+    // 导出游戏记录
+    exportGameRecord() {
+        try {
+            // 验证导出数据完整性
+            const validation = this.recordExporter.validateExportData();
+            if (!validation.isValid) {
+                console.warn('导出数据不完整:', validation.issues);
+                alert(`导出数据不完整:\n${validation.issues.join('\n')}\n\n将继续导出可用数据。`);
+            }
+            
+            // 执行导出
+            const result = this.recordExporter.exportToMarkdown();
+            
+            if (result.success) {
+                console.log('✅ 导出成功:', result.filename);
+                
+                // 显示成功提示
+                this.showExportSuccess(result);
+                
+                // 记录导出事件到系统消息
+                this.gameState.addMessageToHistory('系统', `游戏记录已导出: ${result.filename}`, 'system');
+            } else {
+                console.error('❌ 导出失败:', result.error);
+                alert(`导出失败: ${result.error}\n\n请稍后重试或联系技术支持。`);
+            }
+        } catch (error) {
+            console.error('❌ 导出过程中发生错误:', error);
+            alert(`导出过程中发生错误: ${error.message}\n\n请稍后重试。`);
+        }
+    }
+    
+    // 显示导出成功提示
+    showExportSuccess(result) {
+        // 创建成功提示
+        const message = `✅ 导出成功！\n\n文件名: ${result.filename}\n文件大小: ${Math.round(result.size / 1024)} KB\n\n文件已保存到您的下载文件夹。`;
+        
+        // 显示提示
+        alert(message);
+        
+        // 可选：显示预览（调试用）
+        if (window.location.hash === '#debug') {
+            console.log('📄 导出预览:');
+            console.log(this.recordExporter.getExportPreview());
+        }
     }
 }
 
