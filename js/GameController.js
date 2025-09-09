@@ -3814,7 +3814,7 @@ ${analysis.feedback}
         }, 1000);
     }
 
-    showGameResult(isWin, finalResponse, analysis) {
+    async showGameResult(isWin, finalResponse, analysis) {
         this.gameState.gameActive = false;
         this.gameState.gameEndTime = new Date();
         
@@ -3848,7 +3848,7 @@ ${analysis.feedback}
         
         // 在游戏结束时保存调试日志
         if (this.debugManager) {
-            this.debugManager.saveLogsToFile();
+            await this.debugManager.saveLogsToFile();
         }
     }
 
@@ -4813,12 +4813,17 @@ ${analysis.feedback}
     }
     
     // 手动结束游戏（用于调试）
-    endGameManually() {
+    async endGameManually() {
         console.log('🎮 手动结束游戏 (调试功能)');
         
         // 设置游戏结束状态
         this.gameState.gameActive = false;
         this.gameState.gameEndTime = new Date();
+        
+        // 在游戏结束时保存调试日志
+        if (this.debugManager) {
+            await this.debugManager.saveLogsToFile();
+        }
         
         // 隐藏回复区域和通知
         const responseArea = document.getElementById('responseArea');
@@ -4925,9 +4930,14 @@ ${analysis.feedback}
     }
     
     // 显示因怀疑度过高游戏结束
-    showSuspicionGameOver() {
+    async showSuspicionGameOver() {
         this.gameState.gameActive = false;
         this.gameState.gameEndTime = new Date();
+        
+        // 在游戏结束时保存调试日志
+        if (this.debugManager) {
+            await this.debugManager.saveLogsToFile();
+        }
         
         // 显示游戏结束界面
         document.getElementById('gameInterface').classList.add('hidden');

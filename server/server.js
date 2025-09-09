@@ -1,9 +1,25 @@
 const express = require('express');
+const cors = require('cors');
 const path = require('path');
 const LogSaver = require('./logSaver');
 
 const app = express();
 const port = process.env.PORT || 3001;
+
+// CORS配置 - 允许所有本地开发地址
+app.use(cors({
+    origin: [
+        'http://localhost:8000', 
+        'http://127.0.0.1:8000', 
+        'http://localhost:3000', 
+        'http://127.0.0.1:3000',
+        'http://localhost:5500',  // Live Server默认端口
+        'http://127.0.0.1:5500'   // Live Server默认端口
+    ],
+    methods: ['GET', 'POST', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+    credentials: true
+}));
 
 // 中间件
 app.use(express.json({ limit: '10mb' }));

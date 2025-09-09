@@ -194,7 +194,13 @@ class DebugManager {
     // 服务器端保存日志
     async saveLogsToServer() {
         try {
-            const response = await fetch('http://localhost:3001/api/save-logs', {
+            // 使用相同的主机名避免CORS问题，但确保使用正确的服务器地址
+            const currentHost = window.location.hostname;
+            // 如果是localhost，也尝试使用127.0.0.1（服务器在两个地址都监听）
+            const serverHost = currentHost === 'localhost' ? 'localhost' : currentHost;
+            const serverUrl = `http://${serverHost}:3001/api/save-logs`;
+            
+            const response = await fetch(serverUrl, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
