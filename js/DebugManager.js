@@ -145,7 +145,7 @@ class DebugManager {
             const noop = () => {};
             console.log = noop;
             console.warn = noop;
-            console.error = this.originalConsole.error || console.error; // 保留error以便调试
+            console.error = noop;
             console.info = noop;
             console.debug = noop;
         }
