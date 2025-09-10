@@ -7,6 +7,43 @@ class EnvConfigManager {
         this.config = null;
         this.apiConfig = null;
         this.gameConfig = null;
+        this.debugConfig = null;
+        
+        // 静默日志系统
+        this.silentMode = true;
+        this.pendingLogs = [];
+    }
+    
+    // 静默日志方法
+    log(level, message, ...args) {
+        const logEntry = {
+            level,
+            message,
+            args,
+            timestamp: new Date().toISOString()
+        };
+        
+        if (this.silentMode) {
+            this.pendingLogs.push(logEntry);
+        } else {
+            // 根据调试配置决定是否输出
+            if (this.debugConfig && this.debugConfig.enabled && 
+                this.debugConfig.features && this.debugConfig.features.showConsoleLogs) {
+                console[level](message, ...args);
+            }
+        }
+    }
+    
+    // 刷新待处理的日志
+    flushPendingLogs() {
+        if (this.debugConfig && this.debugConfig.enabled && 
+            this.debugConfig.features && this.debugConfig.features.showConsoleLogs) {
+            this.pendingLogs.forEach(entry => {
+                console[entry.level](entry.message, ...entry.args);
+            });
+        }
+        this.pendingLogs = [];
+        this.silentMode = false;
     }
 
     // 检测是否为 Cloudflare Pages 环境
@@ -64,7 +101,7 @@ class EnvConfigManager {
             for (const envVar of envVars) {
                 const value = process.env[envVar];
                 if (value && value.trim() && value !== 'YOUR_API_KEY_HERE') {
-                    console.log(`✅ 从环境变量 ${envVar} 获取到 API Key`);
+                    this.log('log', `✅ 从环境变量 ${envVar} 获取到 API Key`);
                     return value.trim();
                 }
             }
@@ -73,7 +110,7 @@ class EnvConfigManager {
         // Cloudflare环境下不再尝试从前端获取API Key
         // 这是为了安全考虑，API Key只应在服务器端使用
         if (this.isCloudflarePages) {
-            console.log('🔒 Cloudflare环境下不在前端获取API Key，使用代理模式');
+            this.log('log', '🔒 Cloudflare环境下不在前端获取API Key，使用代理模式');
             return null;
         }
 
@@ -91,7 +128,7 @@ class EnvConfigManager {
                 if (config.hasApiKey) {
                     if (this.isCloudflarePages && config.useProxy) {
                         // Cloudflare环境：使用代理模式，不需要API key
-                        console.log(`✅ 从 ${serverType} 获取代理配置成功`);
+                        this.log('log', `✅ 从 ${serverType} 获取代理配置成功`);
                         return {
                             useProxy: true,
                             proxyEndpoint: config.proxyEndpoint || '/api/chat',
@@ -104,7 +141,7 @@ class EnvConfigManager {
                         };
                     } else if (!this.isCloudflarePages && config.apiKey) {
                         // 本地环境：直接使用API key
-                        console.log(`✅ 从 ${serverType} 获取配置成功`);
+                        this.log('log', `✅ 从 ${serverType} 获取配置成功`);
                         return {
                             baseUrl: config.baseUrl,
                             model: config.model,
@@ -120,7 +157,7 @@ class EnvConfigManager {
             }
         } catch (error) {
             const serverType = this.isCloudflarePages ? 'Cloudflare Pages 函数' : '本地开发服务器';
-            console.warn(`⚠️ 无法从 ${serverType} 获取配置:`, error.message);
+            this.log('warn', `⚠️ 无法从 ${serverType} 获取配置:`, error.message);
         }
 
         return null;
@@ -179,7 +216,7 @@ class EnvConfigManager {
             return this.apiConfig;
         }
 
-        console.log(`🔍 环境检测结果: ${this.getEnvironmentInfo()}`);
+        this.log('log', `🔍 环境检测结果: ${this.getEnvironmentInfo()}`);
 
         // 1. 在Cloudflare环境下，优先尝试从服务器获取配置 (代理模式)
         // 2. 在本地环境下，优先尝试从环境变量获取 API Key
@@ -250,7 +287,7 @@ class EnvConfigManager {
                 console.error('❌ 代理模式下缺少代理端点配置');
                 throw new Error('代理端点未配置');
             }
-            console.log('✅ 代理模式配置验证通过');
+            this.log('log', '✅ 代理模式配置验证通过');
         } else {
             // 本地直接模式：需要API Key和baseUrl
             if (!this.apiConfig.apiKey || this.apiConfig.apiKey === 'YOUR_API_KEY_HERE') {
@@ -261,10 +298,10 @@ class EnvConfigManager {
                 console.error('❌ 缺少API基础URL配置');
                 throw new Error('API baseUrl 未配置');
             }
-            console.log('✅ 直接调用模式配置验证通过');
+            this.log('log', '✅ 直接调用模式配置验证通过');
         }
 
-        console.log(`✅ API 配置加载成功，使用 ${
+        this.log('log', `✅ API 配置加载成功，使用 ${
             this.apiConfig.useProxy ? 'Cloudflare代理模式' :
             envApiKey ? '环境变量API Key' : 
             serverConfig ? '本地开发服务器API Key' : 
@@ -281,11 +318,11 @@ class EnvConfigManager {
                 const response = await fetch('/api/debug');
                 if (response.ok) {
                     const debugConfig = await response.json();
-                    console.log(`✅ 从Cloudflare环境变量获取调试配置: ${debugConfig.enabled} (来源: ${debugConfig.source})`);
+                    this.log('log', `✅ 从Cloudflare环境变量获取调试配置: ${debugConfig.enabled} (来源: ${debugConfig.source})`);
                     return debugConfig;
                 }
             } catch (error) {
-                console.warn('⚠️ 无法从调试端点获取配置:', error.message);
+                this.log('warn', '⚠️ 无法从调试端点获取配置:', error.message);
             }
             
             // 备用：从主配置端点获取
@@ -294,12 +331,12 @@ class EnvConfigManager {
                 if (response.ok) {
                     const config = await response.json();
                     if (config.debugConfig) {
-                        console.log(`✅ 从主配置端点获取调试配置: ${config.debugConfig.enabled}`);
+                        this.log('log', `✅ 从主配置端点获取调试配置: ${config.debugConfig.enabled}`);
                         return config.debugConfig;
                     }
                 }
             } catch (error) {
-                console.warn('⚠️ 无法从主配置端点获取调试配置:', error.message);
+                this.log('warn', '⚠️ 无法从主配置端点获取调试配置:', error.message);
             }
         }
 
@@ -309,7 +346,7 @@ class EnvConfigManager {
                            process.env.DEBUG_MODE === 'true' || 
                            process.env.ENABLE_DEBUG === 'true';
             if (process.env.DEBUG || process.env.DEBUG_MODE || process.env.ENABLE_DEBUG) {
-                console.log(`✅ 从本地环境变量获取调试配置: ${envDebug}`);
+                this.log('log', `✅ 从本地环境变量获取调试配置: ${envDebug}`);
                 return { enabled: envDebug, source: 'environment' };
             }
         }
@@ -319,7 +356,7 @@ class EnvConfigManager {
             const urlParams = new URLSearchParams(window.location.search);
             if (urlParams.has('debug')) {
                 const debugValue = urlParams.get('debug') !== 'false';
-                console.log(`✅ 从URL参数获取调试配置: ${debugValue}`);
+                this.log('log', `✅ 从URL参数获取调试配置: ${debugValue}`);
                 return { enabled: debugValue, source: 'url' };
             }
         }
@@ -337,7 +374,7 @@ class EnvConfigManager {
                 }
             }
         } catch (error) {
-            console.warn('⚠️ 加载调试配置文件时出错:', error.message);
+            this.log('warn', '⚠️ 加载调试配置文件时出错:', error.message);
         }
 
         // 5. 默认配置
@@ -432,16 +469,22 @@ class EnvConfigManager {
             return this.config;
         }
 
-        const [apiConfig, gameConfig, debugConfig] = await Promise.all([
+        // 先获取调试配置
+        this.debugConfig = await this.getDebugConfig();
+        
+        // 刷新待处理的日志
+        this.flushPendingLogs();
+        
+        // 然后获取其他配置
+        const [apiConfig, gameConfig] = await Promise.all([
             this.getApiConfig(),
-            this.getGameConfig(),
-            this.getDebugConfig()
+            this.getGameConfig()
         ]);
 
         this.config = {
             API_CONFIG: apiConfig,
             GAME_CONFIG: gameConfig,
-            DEBUG_CONFIG: debugConfig,
+            DEBUG_CONFIG: this.debugConfig,
             ENVIRONMENT: {
                 isCloudflarePages: this.isCloudflarePages,
                 isNodeJS: this.isNodeJS,

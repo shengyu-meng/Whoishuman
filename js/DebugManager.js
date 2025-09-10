@@ -27,12 +27,19 @@ class DebugManager {
             }
             
             this.isDebugEnabled = this.config.enabled;
-            console.log(`🐛 调试配置加载完成: ${this.isDebugEnabled ? '启用' : '禁用'} (来源: ${this.config.source || 'unknown'})`);
+            // 只在调试模式启用时输出日志
+            if (this.isDebugEnabled && this.config.features && this.config.features.showConsoleLogs) {
+                console.log(`🐛 调试配置加载完成: 启用 (来源: ${this.config.source || 'unknown'})`);
+            }
             
             this.init();
             this.initialized = true;
         } catch (error) {
-            console.warn('⚠️ 调试管理器初始化失败，使用默认配置:', error.message);
+            // 初始化失败时的警告只在开发环境输出
+            if (typeof window !== 'undefined' && window.location && 
+                (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
+                console.warn('⚠️ 调试管理器初始化失败，使用默认配置:', error.message);
+            }
             this.config = { enabled: false };
             this.isDebugEnabled = false;
             this.init();
