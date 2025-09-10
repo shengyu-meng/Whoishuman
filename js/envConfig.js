@@ -2,6 +2,7 @@
 // 支持 Windows 本地环境和 Cloudflare Pages 环境
 class EnvConfigManager {
     constructor() {
+        this.isProductionEnvironment = this.detectProductionEnvironment();
         this.isCloudflarePages = this.detectCloudflarePages();
         this.isNodeJS = this.detectNodeJS();
         this.config = null;
@@ -46,28 +47,38 @@ class EnvConfigManager {
         this.silentMode = false;
     }
 
-    // 检测是否为 Cloudflare Pages 环境
+    // 检测是否为生产环境（非本地开发环境）
+    detectProductionEnvironment() {
+        if (typeof window !== 'undefined' && window.location) {
+            const hostname = window.location.hostname;
+            
+            // 本地开发环境识别
+            const localHosts = [
+                'localhost',
+                '127.0.0.1',
+                '0.0.0.0'
+            ];
+            
+            // 检查是否为本地IP地址
+            const isLocalIP = localHosts.includes(hostname) || 
+                            hostname.startsWith('192.168.') || 
+                            hostname.startsWith('10.') ||
+                            hostname.startsWith('172.');
+            
+            // 如果不是本地地址，则认为是生产环境
+            return !isLocalIP;
+        }
+        
+        return false;
+    }
+
+    // 检测是否为 Cloudflare Pages 环境（保留用于特定Cloudflare功能）
     detectCloudflarePages() {
         // Cloudflare Pages 环境变量检测
         if (typeof globalThis !== 'undefined' && globalThis.CF_PAGES) {
             return true;
         }
         
-        // 检测是否存在 Cloudflare Workers/Pages 特有的全局对象
-        if (typeof caches !== 'undefined' && typeof Response !== 'undefined' && 
-            typeof Request !== 'undefined' && typeof fetch !== 'undefined') {
-            // 进一步检查是否有 CF 特有属性
-            try {
-                // Cloudflare Pages 通常会有这些环境信息
-                if (typeof navigator !== 'undefined' && navigator.userAgent && 
-                    navigator.userAgent.includes('Cloudflare')) {
-                    return true;
-                }
-            } catch (e) {
-                // 静默忽略
-            }
-        }
-
         // 检查 URL 中是否包含 pages.dev 或 workers.dev
         if (typeof window !== 'undefined' && window.location) {
             const hostname = window.location.hostname;
@@ -77,29 +88,8 @@ class EnvConfigManager {
             }
         }
 
-        // 尝试通过检测API端点来判断是否为Cloudflare环境
-        // 这是一个更可靠的方法，因为Cloudflare Pages总是会有这些API端点
-        if (typeof window !== 'undefined') {
-            try {
-                // 检查是否能访问 /api/config 端点（Cloudflare Pages Functions特有）
-                // 这里不实际发送请求，只是检查当前域名是否可能托管在Cloudflare上
-                const protocol = window.location.protocol;
-                const hostname = window.location.hostname;
-                
-                // 如果不是localhost或127.0.0.1，且是HTTPS，可能是Cloudflare部署
-                if (hostname !== 'localhost' && hostname !== '127.0.0.1' && 
-                    !hostname.startsWith('192.168.') && !hostname.startsWith('10.') &&
-                    protocol === 'https:') {
-                    // 进一步验证：检查是否存在典型的Cloudflare响应头
-                    // 由于无法直接访问响应头，我们通过其他方式判断
-                    return true;
-                }
-            } catch (e) {
-                // 静默忽略
-            }
-        }
-
-        return false;
+        // 如果是生产环境，可能也是Cloudflare（但不一定）
+        return this.detectProductionEnvironment();
     }
 
     // 检测是否为 Node.js 环境
@@ -129,10 +119,10 @@ class EnvConfigManager {
             }
         }
 
-        // Cloudflare环境下不再尝试从前端获取API Key
+        // 生产环境下不再尝试从前端获取API Key
         // 这是为了安全考虑，API Key只应在服务器端使用
-        if (this.isCloudflarePages) {
-            this.log('log', '🔒 Cloudflare环境下不在前端获取API Key，使用代理模式');
+        if (this.isProductionEnvironment) {
+            this.log('log', '🔒 生产环境下不在前端获取API Key，使用代理模式');
             return null;
         }
 
@@ -148,8 +138,8 @@ class EnvConfigManager {
                 const serverType = this.isCloudflarePages ? 'Cloudflare Pages 函数' : '本地开发服务器';
                 
                 if (config.hasApiKey) {
-                    if (this.isCloudflarePages && config.useProxy) {
-                        // Cloudflare环境：使用代理模式，不需要API key
+                    if (this.isProductionEnvironment && config.useProxy) {
+                        // 生产环境：使用代理模式，不需要API key
                         this.log('log', `✅ 从 ${serverType} 获取代理配置成功`);
                         return {
                             useProxy: true,
@@ -161,7 +151,7 @@ class EnvConfigManager {
                                 timeout: 30000
                             }
                         };
-                    } else if (!this.isCloudflarePages && config.apiKey) {
+                    } else if (!this.isProductionEnvironment && config.apiKey) {
                         // 本地环境：直接使用API key
                         this.log('log', `✅ 从 ${serverType} 获取配置成功`);
                         return {
@@ -240,13 +230,13 @@ class EnvConfigManager {
 
         this.log('log', `🔍 环境检测结果: ${this.getEnvironmentInfo()}`);
 
-        // 1. 在Cloudflare环境下，优先尝试从服务器获取配置 (代理模式)
+        // 1. 在生产环境下，优先尝试从服务器获取配置 (代理模式)
         // 2. 在本地环境下，优先尝试从环境变量获取 API Key
         let envApiKey = null;
         let serverConfig = null;
         
-        if (this.isCloudflarePages) {
-            // Cloudflare环境：优先使用服务器配置（代理模式）
+        if (this.isProductionEnvironment) {
+            // 生产环境：优先使用服务器配置（代理模式）
             serverConfig = await this.getConfigFromServer();
             // 只有在服务器配置失败时才尝试环境变量（用于开发测试）
             if (!serverConfig) {
@@ -275,9 +265,9 @@ class EnvConfigManager {
         };
 
         // 合并配置，优先级根据环境不同：
-        // Cloudflare环境：服务器配置 > 环境变量 > 配置文件 > 默认配置
+        // 生产环境：服务器配置 > 环境变量 > 配置文件 > 默认配置
         // 本地环境：环境变量 > 服务器配置 > 配置文件 > 默认配置
-        if (this.isCloudflarePages) {
+        if (this.isProductionEnvironment) {
             this.apiConfig = {
                 ...defaultConfig,
                 ...(fileConfig || {}),
@@ -324,9 +314,9 @@ class EnvConfigManager {
         }
 
         this.log('log', `✅ API 配置加载成功，使用 ${
-            this.apiConfig.useProxy ? 'Cloudflare代理模式' :
+            this.apiConfig.useProxy ? '代理模式' :
             envApiKey ? '环境变量API Key' : 
-            serverConfig ? '本地开发服务器API Key' : 
+            serverConfig ? '服务器API Key' : 
             '配置文件API Key'
         }`);
         return this.apiConfig;
@@ -334,13 +324,13 @@ class EnvConfigManager {
 
     // 获取调试配置
     async getDebugConfig() {
-        // 1. 优先从专用调试端点获取环境变量配置（Cloudflare环境）
-        if (this.isCloudflarePages) {
+        // 1. 优先从专用调试端点获取环境变量配置（生产环境）
+        if (this.isProductionEnvironment) {
             try {
                 const response = await fetch('/api/debug');
                 if (response.ok) {
                     const debugConfig = await response.json();
-                    this.log('log', `✅ 从Cloudflare环境变量获取调试配置: ${debugConfig.enabled} (来源: ${debugConfig.source})`);
+                    this.log('log', `✅ 从生产环境变量获取调试配置: ${debugConfig.enabled} (来源: ${debugConfig.source})`);
                     return debugConfig;
                 }
             } catch (error) {
@@ -470,6 +460,12 @@ class EnvConfigManager {
     getEnvironmentInfo() {
         const info = [];
         
+        if (this.isProductionEnvironment) {
+            info.push('Production');
+        } else {
+            info.push('Local');
+        }
+        
         if (this.isCloudflarePages) {
             info.push('Cloudflare Pages');
         }
@@ -508,6 +504,7 @@ class EnvConfigManager {
             GAME_CONFIG: gameConfig,
             DEBUG_CONFIG: this.debugConfig,
             ENVIRONMENT: {
+                isProductionEnvironment: this.isProductionEnvironment,
                 isCloudflarePages: this.isCloudflarePages,
                 isNodeJS: this.isNodeJS,
                 info: this.getEnvironmentInfo()
