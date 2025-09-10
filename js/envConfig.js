@@ -273,6 +273,86 @@ class EnvConfigManager {
         return this.apiConfig;
     }
 
+    // 获取调试配置
+    async getDebugConfig() {
+        // 1. 优先从专用调试端点获取环境变量配置（Cloudflare环境）
+        if (this.isCloudflarePages) {
+            try {
+                const response = await fetch('/api/debug');
+                if (response.ok) {
+                    const debugConfig = await response.json();
+                    console.log(`✅ 从Cloudflare环境变量获取调试配置: ${debugConfig.enabled} (来源: ${debugConfig.source})`);
+                    return debugConfig;
+                }
+            } catch (error) {
+                console.warn('⚠️ 无法从调试端点获取配置:', error.message);
+            }
+            
+            // 备用：从主配置端点获取
+            try {
+                const response = await fetch('/api/config');
+                if (response.ok) {
+                    const config = await response.json();
+                    if (config.debugConfig) {
+                        console.log(`✅ 从主配置端点获取调试配置: ${config.debugConfig.enabled}`);
+                        return config.debugConfig;
+                    }
+                }
+            } catch (error) {
+                console.warn('⚠️ 无法从主配置端点获取调试配置:', error.message);
+            }
+        }
+
+        // 2. 本地环境：检查环境变量
+        if (this.isNodeJS && typeof process !== 'undefined') {
+            const envDebug = process.env.DEBUG === 'true' || 
+                           process.env.DEBUG_MODE === 'true' || 
+                           process.env.ENABLE_DEBUG === 'true';
+            if (process.env.DEBUG || process.env.DEBUG_MODE || process.env.ENABLE_DEBUG) {
+                console.log(`✅ 从本地环境变量获取调试配置: ${envDebug}`);
+                return { enabled: envDebug, source: 'environment' };
+            }
+        }
+
+        // 3. 浏览器环境：检查URL参数
+        if (typeof window !== 'undefined') {
+            const urlParams = new URLSearchParams(window.location.search);
+            if (urlParams.has('debug')) {
+                const debugValue = urlParams.get('debug') !== 'false';
+                console.log(`✅ 从URL参数获取调试配置: ${debugValue}`);
+                return { enabled: debugValue, source: 'url' };
+            }
+        }
+
+        // 4. 从配置文件获取默认值
+        try {
+            if (typeof window !== 'undefined' && window.DEBUG_CONFIG) {
+                return { ...window.DEBUG_CONFIG, source: 'config_file' };
+            } else if (this.isNodeJS) {
+                try {
+                    const { DEBUG_CONFIG } = require('./config.js');
+                    return { ...DEBUG_CONFIG, source: 'config_file' };
+                } catch (e) {
+                    // 配置文件不存在，使用默认值
+                }
+            }
+        } catch (error) {
+            console.warn('⚠️ 加载调试配置文件时出错:', error.message);
+        }
+
+        // 5. 默认配置
+        return {
+            enabled: false,
+            source: 'default',
+            features: {
+                showSkipButton: false,
+                showEndGameButton: false,
+                showConsoleLogs: false,
+                autoSaveLogs: false
+            }
+        };
+    }
+
     // 获取游戏配置
     async getGameConfig() {
         if (this.gameConfig) {
@@ -352,14 +432,16 @@ class EnvConfigManager {
             return this.config;
         }
 
-        const [apiConfig, gameConfig] = await Promise.all([
+        const [apiConfig, gameConfig, debugConfig] = await Promise.all([
             this.getApiConfig(),
-            this.getGameConfig()
+            this.getGameConfig(),
+            this.getDebugConfig()
         ]);
 
         this.config = {
             API_CONFIG: apiConfig,
             GAME_CONFIG: gameConfig,
+            DEBUG_CONFIG: debugConfig,
             ENVIRONMENT: {
                 isCloudflarePages: this.isCloudflarePages,
                 isNodeJS: this.isNodeJS,
@@ -375,6 +457,7 @@ class EnvConfigManager {
         this.config = null;
         this.apiConfig = null;
         this.gameConfig = null;
+        this.debugConfig = null;
     }
 }
 

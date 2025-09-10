@@ -1,15 +1,43 @@
 // 调试模式管理器
 class DebugManager {
     constructor() {
-        this.config = window.DEBUG_CONFIG || { enabled: false };
-        this.isDebugEnabled = this.config.enabled;
+        this.config = null;
+        this.isDebugEnabled = false;
         this.originalConsole = {};
         this.logBuffer = [];
         this.conversationLog = [];
         this.systemLog = [];
         this.autoSaveTimer = null;
+        this.initialized = false;
         
-        this.init();
+        // 异步初始化
+        this.initAsync();
+    }
+    
+    // 异步初始化调试管理器
+    async initAsync() {
+        try {
+            // 获取环境配置
+            if (window.envConfigManager) {
+                const fullConfig = await window.envConfigManager.getConfig();
+                this.config = fullConfig.DEBUG_CONFIG;
+            } else {
+                // 回退到传统方式
+                this.config = window.DEBUG_CONFIG || { enabled: false };
+            }
+            
+            this.isDebugEnabled = this.config.enabled;
+            console.log(`🐛 调试配置加载完成: ${this.isDebugEnabled ? '启用' : '禁用'} (来源: ${this.config.source || 'unknown'})`);
+            
+            this.init();
+            this.initialized = true;
+        } catch (error) {
+            console.warn('⚠️ 调试管理器初始化失败，使用默认配置:', error.message);
+            this.config = { enabled: false };
+            this.isDebugEnabled = false;
+            this.init();
+            this.initialized = true;
+        }
     }
     
     // 初始化调试管理器

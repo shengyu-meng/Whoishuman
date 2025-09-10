@@ -15,8 +15,11 @@ class GameController {
         // 异步初始化配置
         this.initializeConfig();
         
-        // 初始化调试管理器
+        // 初始化调试管理器（异步）
         this.debugManager = new DebugManager();
+        
+        // 等待调试管理器初始化完成
+        this.waitForDebugManager();
         
         this.initializeEventListeners();
         
@@ -74,6 +77,23 @@ class GameController {
         };
     }
 
+    // 等待调试管理器初始化完成
+    async waitForDebugManager() {
+        let attempts = 0;
+        const maxAttempts = 50; // 最多等待5秒
+        
+        while (!this.debugManager.initialized && attempts < maxAttempts) {
+            await new Promise(resolve => setTimeout(resolve, 100));
+            attempts++;
+        }
+        
+        if (this.debugManager.initialized) {
+            console.log('✅ 调试管理器初始化完成');
+        } else {
+            console.warn('⚠️ 调试管理器初始化超时');
+        }
+    }
+
     // 异步初始化配置
     async initializeConfig() {
         try {
@@ -84,12 +104,15 @@ class GameController {
                 const config = await window.envConfigManager.getConfig();
                 this.apiConfig = config.API_CONFIG;
                 this.gameConfig = config.GAME_CONFIG;
+                this.debugConfig = config.DEBUG_CONFIG;
                 this.configLoaded = true;
                 
                 console.log('✅ 配置加载成功:', {
                     environment: config.ENVIRONMENT.info,
                     hasApiKey: !!this.apiConfig.apiKey && this.apiConfig.apiKey !== 'YOUR_API_KEY_HERE',
-                    apiKeySource: this.apiConfig.apiKey !== 'YOUR_API_KEY_HERE' ? '环境变量或配置文件' : '未配置'
+                    apiKeySource: this.apiConfig.apiKey !== 'YOUR_API_KEY_HERE' ? '环境变量或配置文件' : '未配置',
+                    debugEnabled: this.debugConfig.enabled,
+                    debugSource: this.debugConfig.source
                 });
             } else {
                 // 回退到传统配置加载
