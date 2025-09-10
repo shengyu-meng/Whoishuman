@@ -851,18 +851,15 @@ body {
     padding: 12px 16px;
     border-radius: 8px;
     animation: gentle-flash 2s infinite;  /* 更频繁的闪动 */
-    max-width: min(350px, 65vw);  /* 限制最大宽度 */
+    max-width: min(300px, 55vw);  /* 减小最大宽度 */
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
     border-left: 3px solid #07c160;  /* 微信绿色强调边 */
     
-    /* 改为绝对定位的浮动元素，位置上移避免与对话重叠 */
+    /* 调整位置到右上角怀疑值下方 */
     position: fixed;
-    top: 30%;
-    right: 20px;
-    transform: translateY(-50%);
+    top: 70px;  /* 位于头部下方 */
+    right: 15px;
     z-index: 1000;  /* 确保在最上层 */
-    
-    /* 移除之前的margin设置 */
 }
 
 @keyframes gentle-flash {
@@ -1307,6 +1304,34 @@ body {
     }
 }
 
+/* 版权信息样式 */
+.copyright-info {
+    margin-top: 20px;
+    padding: 15px;
+    background: rgba(7, 193, 96, 0.05);
+    border-radius: 8px;
+    border-left: 3px solid #07c160;
+    font-size: 15px;
+    text-align: center;
+}
+
+.copyright-info p {
+    margin: 5px 0;
+    color: #666;
+}
+
+.copyright-info a {
+    color: #07c160;
+    text-decoration: none;
+    font-weight: 500;
+    transition: color 0.3s ease;
+}
+
+.copyright-info a:hover {
+    color: #06ad56;
+    text-decoration: underline;
+}
+
 /* 隐藏类 */
 .hidden {
     display: none !important;
@@ -1391,7 +1416,7 @@ body {
         max-width: min(280px, 75vw);
         font-size: 12px;
         right: 10px;  /* 移动端右侧边距稍小 */
-        top: 45%;     /* 移动端稍微上移一点 */
+        top: 110px;   /* 移动端位于头部下方，考虑头部会变高 */
     }
     
     .suspicion-notice h3 {

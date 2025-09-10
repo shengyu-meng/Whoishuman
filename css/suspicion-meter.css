@@ -165,32 +165,66 @@
     border-radius: 10px;
 }
 
-/* 移动端适配 */
+/* 移动端适配 - 保持左右分列布局 */
 @media (max-width: 768px) {
     .game-header {
-        padding: 12px 15px;
-        flex-direction: column;
-        align-items: stretch;
-        gap: 10px;
+        padding: 10px 12px;
+        /* 保持flex水平布局，不改为column */
+        flex-direction: row;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 8px;
+        min-height: 60px;
     }
     
     .group-info {
-        align-items: center;
-        text-align: center;
+        /* 保持左对齐 */
+        align-items: flex-start;
+        text-align: left;
+        flex: 1;
+        max-width: 60%;
+    }
+    
+    .group-name {
+        font-size: 14px;
+    }
+    
+    .member-info {
+        font-size: 10px;
+        padding: 1px 5px;
     }
     
     .game-status {
-        align-items: center;
+        /* 保持右对齐 */
+        align-items: flex-end;
+        text-align: right;
+        flex: 0 0 auto;
+        max-width: 40%;
+    }
+    
+    .round-info {
+        font-size: 11px;
+        padding: 1px 6px;
     }
     
     .suspicion-meter-compact {
-        justify-content: center;
-        margin-top: 8px;
+        margin-top: 4px;
+        gap: 6px;
+    }
+    
+    .suspicion-label-compact {
+        font-size: 10px;
+        min-width: 32px;
     }
     
     .suspicion-bar-compact {
-        width: 100px;
-        height: 7px;
+        width: 60px;
+        height: 5px;
+    }
+    
+    .suspicion-value-compact {
+        font-size: 10px;
+        min-width: 20px;
     }
     
     .suspicion-change-info {
