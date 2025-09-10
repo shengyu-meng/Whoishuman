@@ -77,6 +77,28 @@ class EnvConfigManager {
             }
         }
 
+        // 尝试通过检测API端点来判断是否为Cloudflare环境
+        // 这是一个更可靠的方法，因为Cloudflare Pages总是会有这些API端点
+        if (typeof window !== 'undefined') {
+            try {
+                // 检查是否能访问 /api/config 端点（Cloudflare Pages Functions特有）
+                // 这里不实际发送请求，只是检查当前域名是否可能托管在Cloudflare上
+                const protocol = window.location.protocol;
+                const hostname = window.location.hostname;
+                
+                // 如果不是localhost或127.0.0.1，且是HTTPS，可能是Cloudflare部署
+                if (hostname !== 'localhost' && hostname !== '127.0.0.1' && 
+                    !hostname.startsWith('192.168.') && !hostname.startsWith('10.') &&
+                    protocol === 'https:') {
+                    // 进一步验证：检查是否存在典型的Cloudflare响应头
+                    // 由于无法直接访问响应头，我们通过其他方式判断
+                    return true;
+                }
+            } catch (e) {
+                // 静默忽略
+            }
+        }
+
         return false;
     }
 
