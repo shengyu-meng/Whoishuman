@@ -97,7 +97,12 @@ class GameController {
     // 异步初始化配置
     async initializeConfig() {
         try {
-            console.log('🔧 开始加载配置...');
+            // 使用静默日志，等调试配置加载后再决定是否输出
+            if (window.envConfigManager) {
+                window.envConfigManager.log('log', '🔧 开始加载配置...');
+            } else {
+                console.log('🔧 开始加载配置...');
+            }
             
             // 使用环境配置管理器获取配置
             if (typeof window !== 'undefined' && window.envConfigManager) {
@@ -107,13 +112,17 @@ class GameController {
                 this.debugConfig = config.DEBUG_CONFIG;
                 this.configLoaded = true;
                 
-                console.log('✅ 配置加载成功:', {
-                    environment: config.ENVIRONMENT.info,
-                    hasApiKey: !!this.apiConfig.apiKey && this.apiConfig.apiKey !== 'YOUR_API_KEY_HERE',
-                    apiKeySource: this.apiConfig.apiKey !== 'YOUR_API_KEY_HERE' ? '环境变量或配置文件' : '未配置',
-                    debugEnabled: this.debugConfig.enabled,
-                    debugSource: this.debugConfig.source
-                });
+                // 配置加载完成后，根据调试设置决定是否输出日志
+                if (this.debugConfig && this.debugConfig.enabled && 
+                    this.debugConfig.features && this.debugConfig.features.showConsoleLogs) {
+                    console.log('✅ 配置加载成功:', {
+                        environment: config.ENVIRONMENT.info,
+                        hasApiKey: !!this.apiConfig.apiKey && this.apiConfig.apiKey !== 'YOUR_API_KEY_HERE',
+                        apiKeySource: this.apiConfig.apiKey !== 'YOUR_API_KEY_HERE' ? '环境变量或配置文件' : '未配置',
+                        debugEnabled: this.debugConfig.enabled,
+                        debugSource: this.debugConfig.source
+                    });
+                }
             } else {
                 // 回退到传统配置加载
                 console.warn('⚠️ 环境配置管理器未找到，使用传统配置方式');
