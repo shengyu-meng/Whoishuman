@@ -13,6 +13,7 @@ body {
     justify-content: center;
     align-items: center;
     color: #333;
+    font-size: 16px;  /* 设置基准字体大小为16px */
 }
 
 /* 游戏卡片基础样式 - 精致微信风格 */
@@ -109,7 +110,7 @@ body {
 }
 
 .card-header h1 {
-    font-size: 28px;
+    font-size: 18px;  /* 从28px减少到18px，比对话字体大2px */
     margin-bottom: 10px;
     position: relative;
     z-index: 2;
@@ -117,7 +118,7 @@ body {
 }
 
 .card-header h2 {
-    font-size: 20px;
+    font-size: 17px;  /* 从20px减少到17px，比对话字体大1px */
     opacity: 0.9;
     position: relative;
     z-index: 2;
@@ -503,7 +504,7 @@ body {
 .game-rules h3 {
     color: #07c160;  /* 微信绿色 */
     margin-bottom: 15px;
-    font-size: 18px;
+    font-size: 17px;  /* 从18px减少到17px，比对话字体大1px */
 }
 
 .game-rules ul {
@@ -1358,7 +1359,15 @@ body {
     }
     
     .card-header h1 {
-        font-size: 24px;
+        font-size: 16px;  /* 移动端从24px减少到16px，比移动端对话字体大2px */
+    }
+    
+    .card-header h2 {
+        font-size: 15px;  /* 移动端比对话字体大1px */
+    }
+    
+    .game-rules h3 {
+        font-size: 15px;  /* 移动端比对话字体大1px */
     }
     
     .card-content {
