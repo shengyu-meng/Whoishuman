@@ -35,6 +35,9 @@ class GameState {
         this.suspicionLevel = 50; // 当前怀疑度 (0-100) - 初始设置为50%
         this.suspicionHistory = []; // 怀疑度变化历史
         this.maxSuspicion = 100; // 最大怀疑度阈值
+        
+        // 首次质疑通知状态
+        this.hasShownFirstSuspicionNotice = false; // 是否已显示过第一次质疑通知
     }
 
     reset() {
@@ -68,6 +71,7 @@ class GameState {
         // 重置怀疑度系统
         this.suspicionLevel = 50; // 重置到50%初始怀疑度
         this.suspicionHistory = [];
+        this.hasShownFirstSuspicionNotice = false; // 重置首次质疑通知状态
     }
 
     setPlayerName(name) {

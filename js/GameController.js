@@ -3058,24 +3058,36 @@ ${emojiInstruction}
 
     showSuspicionNotice() {
         console.log('DEBUG: showSuspicionNotice 被调用');
-        const suspicionNotice = document.getElementById('suspicionNotice');
-        const chatContainer = document.getElementById('chatContainer');
-        const changeTextElement = document.getElementById('suspicionChangeText');
-        const reasonElement = document.getElementById('suspicionReason');
         
-        console.log('DEBUG: suspicionNotice 元素:', suspicionNotice);
-        
-        // 重置为通用提示
-        if (changeTextElement && reasonElement) {
-            changeTextElement.textContent = '注意！回答暴露人类特征将增加怀疑度';
-            changeTextElement.style.color = '#FF9800'; // 橙色警告
-            reasonElement.textContent = '';
+        // 只在第一次被AI质疑时显示窗口
+        if (!this.gameState.hasShownFirstSuspicionNotice) {
+            console.log('DEBUG: 第一次显示质疑通知窗口');
+            const suspicionNotice = document.getElementById('suspicionNotice');
+            const chatContainer = document.getElementById('chatContainer');
+            const changeTextElement = document.getElementById('suspicionChangeText');
+            const reasonElement = document.getElementById('suspicionReason');
+            
+            console.log('DEBUG: suspicionNotice 元素:', suspicionNotice);
+            
+            // 重置为通用提示
+            if (changeTextElement && reasonElement) {
+                changeTextElement.textContent = '注意！回答暴露人类特征将增加怀疑度';
+                changeTextElement.style.color = '#FF9800'; // 橙色警告
+                reasonElement.textContent = '';
+            }
+            
+            suspicionNotice.classList.remove('hidden');
+            chatContainer.classList.add('with-notice');  // 为聊天容器添加类，调整右侧间距
+            
+            // 标记已显示过第一次质疑通知
+            this.gameState.hasShownFirstSuspicionNotice = true;
+            
+            console.log('DEBUG: suspicionNotice 显示状态:', suspicionNotice.classList.contains('hidden'));
+        } else {
+            console.log('DEBUG: 已显示过第一次质疑通知，跳过窗口显示');
+            // 第二轮及以后，直接用系统消息显示AI质疑
+            this.addSystemMessage('⚠️ AI们开始质疑你了！请仔细思考你的回复。');
         }
-        
-        suspicionNotice.classList.remove('hidden');
-        chatContainer.classList.add('with-notice');  // 为聊天容器添加类，调整右侧间距
-        
-        console.log('DEBUG: suspicionNotice 显示状态:', suspicionNotice.classList.contains('hidden'));
     }
 
     async generatePlayerQuestion() {
@@ -4935,28 +4947,38 @@ ${analysis.feedback}
     
     // 显示怀疑度变化通知
     showSuspicionChangeNotification(suspicionUpdate) {
-        const noticeElement = document.getElementById('suspicionNotice');
-        const changeTextElement = document.getElementById('suspicionChangeText');
-        const reasonElement = document.getElementById('suspicionReason');
+        const changeText = suspicionUpdate.change >= 0 ? 
+            `+${suspicionUpdate.change}` : `${suspicionUpdate.change}`;
         
-        if (changeTextElement && reasonElement) {
-            const changeText = suspicionUpdate.change >= 0 ? 
-                `+${suspicionUpdate.change}` : `${suspicionUpdate.change}`;
+        // 如果已经显示过第一次质疑通知，使用系统消息显示判定结果
+        if (this.gameState.hasShownFirstSuspicionNotice) {
+            console.log('DEBUG: 使用系统消息显示AI判定结果');
+            const suspicionIcon = suspicionUpdate.change >= 0 ? '📈' : '📉';
+            const suspicionMessage = `${suspicionIcon} AI判定结果：怀疑度 ${changeText} - ${suspicionUpdate.reason}`;
+            this.addSystemMessage(suspicionMessage);
+        } else {
+            // 第一次质疑，使用原来的窗口显示方式
+            console.log('DEBUG: 第一次质疑，使用窗口显示怀疑度变化');
+            const noticeElement = document.getElementById('suspicionNotice');
+            const changeTextElement = document.getElementById('suspicionChangeText');
+            const reasonElement = document.getElementById('suspicionReason');
             
-            changeTextElement.textContent = `怀疑度 ${changeText}`;
-            changeTextElement.style.color = suspicionUpdate.change >= 0 ? '#FF5722' : '#4CAF50';
-            reasonElement.textContent = suspicionUpdate.reason;
-            
-            // 显示通知
-            if (noticeElement) {
-                noticeElement.classList.remove('hidden');
-                document.getElementById('chatContainer').classList.add('with-notice');
+            if (changeTextElement && reasonElement) {
+                changeTextElement.textContent = `怀疑度 ${changeText}`;
+                changeTextElement.style.color = suspicionUpdate.change >= 0 ? '#FF5722' : '#4CAF50';
+                reasonElement.textContent = suspicionUpdate.reason;
                 
-                // 3秒后自动隐藏
-                this.safeTimeout(() => {
-                    noticeElement.classList.add('hidden');
-                    document.getElementById('chatContainer').classList.remove('with-notice');
-                }, 3000);
+                // 显示通知
+                if (noticeElement) {
+                    noticeElement.classList.remove('hidden');
+                    document.getElementById('chatContainer').classList.add('with-notice');
+                    
+                    // 3秒后自动隐藏
+                    this.safeTimeout(() => {
+                        noticeElement.classList.add('hidden');
+                        document.getElementById('chatContainer').classList.remove('with-notice');
+                    }, 3000);
+                }
             }
         }
     }

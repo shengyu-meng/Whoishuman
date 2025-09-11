@@ -1,4 +1,4 @@
-// Cloudflare Pages 函数，用于安全地提供环境变量
+yi// Cloudflare Pages 函数，用于安全地提供环境变量
 // 路径：functions/api/config.js
 
 export async function onRequestGet(context) {
