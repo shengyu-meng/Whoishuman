@@ -3871,12 +3871,7 @@ ${analysis.feedback}
         // 生成并显示AI伪装分析
         this.showPerformanceAnalysis();
         
-        // 设置结果信息
-        document.getElementById('finalRound').textContent = this.gameState.currentRound;
-        document.getElementById('playerAnswer').textContent = finalResponse;
-        document.getElementById('analysisText').textContent = analysis.analysis;
-        document.getElementById('judgmentReason').textContent = analysis.reason;
-        document.getElementById('aiFeedbackText').textContent = analysis.feedback;
+        // 这些元素已从HTML中删除，不再需要设置
         
         // 设置最终统计
         document.getElementById('survivalRounds').textContent = this.gameState.survivedRounds;
@@ -4037,10 +4032,11 @@ ${analysis.feedback}
             canvas.width = 800;
             canvas.height = 1000;
             
-            // 绘制背景渐变
+            // 绘制背景渐变 - 蓝紫色到绿色渐变
             const gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
             gradient.addColorStop(0, '#667eea');
-            gradient.addColorStop(1, '#764ba2');
+            gradient.addColorStop(0.5, '#764ba2');
+            gradient.addColorStop(1, '#07c160');
             ctx.fillStyle = gradient;
             ctx.fillRect(0, 0, canvas.width, canvas.height);
             
@@ -4077,75 +4073,79 @@ ${analysis.feedback}
             // 绘制游戏结果标题
             ctx.fillStyle = '#333';
             ctx.font = 'bold 36px Arial, sans-serif';
-            ctx.fillText('🎯 最终成绩', canvas.width / 2, cardY + 220);
+            ctx.fillText('🎯 最终成绩', canvas.width / 2, cardY + 230);
             
-            // 绘制生存轮数
+            // 绘制生存轮数（增加间距）
             ctx.fillStyle = '#667eea';
-            ctx.font = 'bold 64px Arial, sans-serif';
-            ctx.fillText(`${rounds}`, canvas.width / 2, cardY + 310);
+            ctx.font = 'bold 36px Arial, sans-serif';
+            ctx.fillText(`${rounds}`, canvas.width / 2, cardY + 290);
             
             ctx.fillStyle = '#333';
-            ctx.font = 'bold 32px Arial, sans-serif';
-            ctx.fillText('生存轮数', canvas.width / 2, cardY + 350);
+            ctx.font = 'bold 22px Arial, sans-serif';
+            ctx.fillText('生存轮数', canvas.width / 2, cardY + 320);
             
-            // 绘制怀疑度
-            const suspicionLevel = this.gameState.getSuspicionPercentage();
-            ctx.fillStyle = '#FF9800';
-            ctx.font = 'bold 48px Arial, sans-serif';
-            ctx.fillText(`${suspicionLevel}%`, canvas.width / 2, cardY + 430);
+            // 绘制AI伪装综合评分（增加与生存轮数间距）
+            const aiDisguiseScore = this.calculateAIDisguiseScore();
+            ctx.fillStyle = '#667eea';
+            ctx.font = 'bold 22px Arial, sans-serif';
+            ctx.fillText('🤖 AI伪装综合评分', canvas.width / 2, cardY + 380);
             
-            ctx.fillStyle = '#333';
-            ctx.font = 'bold 24px Arial, sans-serif';
-            ctx.fillText('最终怀疑度', canvas.width / 2, cardY + 460);
-            
-            // 绘制称号
             ctx.fillStyle = '#764ba2';
             ctx.font = 'bold 36px Arial, sans-serif';
-            ctx.fillText(`【${title}】`, canvas.width / 2, cardY + 540);
+            ctx.fillText(`${aiDisguiseScore}/100`, canvas.width / 2, cardY + 420);
+            
+            // 绘制称号（增加与评分和实录的间距）
+            ctx.fillStyle = '#07c160';
+            ctx.font = 'bold 24px Arial, sans-serif';
+            ctx.fillText(`【${title}】`, canvas.width / 2, cardY + 480);
+            
+            // 绘制人类本性暴露实录（增加与称号间距）
+            const humanExposureRecord = this.generateHumanExposureRecord();
+            ctx.fillStyle = '#333';
+            ctx.font = 'bold 20px Arial, sans-serif';
+            ctx.fillText('💭 人类本性暴露实录', canvas.width / 2, cardY + 540);
+            
+            // 绘制实录内容，支持自动换行（增加两侧留白）
+            ctx.fillStyle = '#666';
+            ctx.font = '18px Arial, sans-serif';
+            const recordTextWidth = cardWidth - 140; // 从80增加到140，增加60px留白
+            const recordLines = this.wrapTextJustified(ctx, humanExposureRecord, recordTextWidth);
+            let recordY = cardY + 560; // 稍微增加间距
+            recordLines.forEach(lineObj => {
+                this.drawJustifiedText(ctx, lineObj, canvas.width / 2, recordY, recordTextWidth);
+                recordY += 24; // 从22增加到24，行距稍微增大
+            });
             
             // 绘制评价
             const evaluation = this.getFinalEvaluation();
             ctx.fillStyle = '#666';
-            ctx.font = '24px Arial, sans-serif';
+            ctx.font = '18px Arial, sans-serif';
             
             // 将评价文本分行显示
-            const evalWords = evaluation.split('');
-            let evalLine = '';
-            let evalY = cardY + 600;
-            const maxWidth = cardWidth - 120;
-            
-            for (let i = 0; i < evalWords.length; i++) {
-                const testLine = evalLine + evalWords[i];
-                const metrics = ctx.measureText(testLine);
-                const testWidth = metrics.width;
-                
-                if (testWidth > maxWidth && i > 0) {
-                    ctx.fillText(evalLine, canvas.width / 2, evalY);
-                    evalLine = evalWords[i];
-                    evalY += 35;
-                } else {
-                    evalLine = testLine;
-                }
-            }
-            ctx.fillText(evalLine, canvas.width / 2, evalY);
+            const evalLines = this.wrapText(ctx, evaluation, cardWidth - 80);
+            let evalY = recordY + 40; // 增加与实录的间距
+            evalLines.forEach(line => {
+                ctx.fillText(line, canvas.width / 2, evalY);
+                evalY += 26; // 稍微增加行距
+            });
             
             // 绘制二维码区域
-            const qrSize = 120;
+            const qrSize = 100;
             const qrX = canvas.width / 2 - qrSize / 2;
-            const qrY = cardY + cardHeight - 200;
+            const qrY = evalY + 40; // 增加与评价的间距
             
             // 使用简单的方法生成二维码图案
             await this.drawQRCode(ctx, qrX, qrY, qrSize, 'http://whoishuman.hyperint.net/');
             
             ctx.fillStyle = '#666';
-            ctx.font = '18px Arial, sans-serif';
+            ctx.font = '16px Arial, sans-serif';
             ctx.textAlign = 'center';
-            ctx.fillText('扫码体验游戏', canvas.width / 2, qrY + qrSize + 30);
+            ctx.fillText('扫码体验游戏', canvas.width / 2, qrY + qrSize + 25);
             
             // 绘制底部信息
             ctx.fillStyle = '#999';
-            ctx.font = '16px Arial, sans-serif';
-            ctx.fillText('whoishuman.hyperint.net', canvas.width / 2, cardY + cardHeight - 30);
+            ctx.font = '14px Arial, sans-serif';
+            ctx.fillText('whoishuman.hyperint.net', canvas.width / 2, qrY + qrSize + 50);
             
             // 将canvas转换为图片并直接下载，不触发分享窗口
             const dataURL = canvas.toDataURL('image/png');
@@ -4160,6 +4160,206 @@ ${analysis.feedback}
             console.error('生成分享图片失败:', error);
             alert('生成分享图片失败，请稍后重试');
         }
+    }
+    
+    // 生成人类本性暴露实录
+    generateHumanExposureRecord() {
+        const responses = this.gameState.playerResponses;
+        const suspicionHistory = this.gameState.getSuspicionHistory();
+        const rounds = this.gameState.survivedRounds;
+        const title = this.gameState.getPlayerTitle();
+        
+        if (responses.length === 0) {
+            return '暂无回复记录，无法生成详细分析。';
+        }
+        
+        // 分析主要暴露特征
+        const exposureTypes = [];
+        suspicionHistory.forEach(change => {
+            if (change.change > 0) {
+                if (change.reason.includes('情感')) {
+                    exposureTypes.push('感性思维');
+                } else if (change.reason.includes('直觉')) {
+                    exposureTypes.push('直觉判断');
+                } else if (change.reason.includes('主观')) {
+                    exposureTypes.push('主观表达');
+                } else if (change.reason.includes('简单')) {
+                    exposureTypes.push('简化表达');
+                } else {
+                    exposureTypes.push('人类特征');
+                }
+            }
+        });
+        
+        // 去重并分析
+        const uniqueTypes = [...new Set(exposureTypes)];
+        const mainExposures = uniqueTypes.slice(0, 2);
+        
+        // 生成评价等级描述
+        let levelDesc = '';
+        if (rounds >= 6) {
+            levelDesc = '高级的伪装能力';
+        } else if (rounds >= 4) {
+            levelDesc = '中级的伪装能力';
+        } else if (rounds >= 2) {
+            levelDesc = '入门级的伪装能力';
+        } else {
+            levelDesc = '新手级的伪装能力';
+        }
+        
+        // 生成怀疑度模式描述
+        const finalSuspicion = this.gameState.suspicionLevel;
+        let suspicionPattern = '';
+        if (finalSuspicion >= 90) {
+            suspicionPattern = '急剧上升的模式，这表明在伪装过程中频繁暴露人类特征';
+        } else if (finalSuspicion >= 70) {
+            suspicionPattern = '波动上升的模式，这表明在伪装过程中存在一些难以克服的行为特征';
+        } else if (finalSuspicion >= 50) {
+            suspicionPattern = '缓慢上升的模式，这表明你具备一定的AI伪装技巧';
+        } else {
+            suspicionPattern = '相对稳定的模式，这表明你展现了良好的AI思维特征';
+        }
+        
+        // 生成完整描述
+        const exposureDesc = mainExposures.length > 0 ? 
+            `你的回答直接暴露了人类的${mainExposures.join('和')}，这恰恰证明了人类认知的独特性。` : 
+            '你在回复中展现出了一些人类特有的思维模式。';
+        
+        return `在这场人类与AI身份界限的游戏中，你展现了${levelDesc}。${exposureDesc} 你的怀疑度呈现出${suspicionPattern}。`;
+    }
+    
+    // 计算AI伪装综合评分
+    calculateAIDisguiseScore() {
+        const rounds = this.gameState.survivedRounds;
+        const responses = this.gameState.playerResponses;
+        const suspicionHistory = this.gameState.getSuspicionHistory();
+        
+        let score = 0;
+        
+        // 生存轮数评分 (最高40分)
+        score += Math.min(rounds * 5, 40);
+        
+        // 回复质量评分 (最高30分)
+        if (responses.length > 0) {
+            const avgResponseLength = responses.reduce((acc, r) => acc + r.response.length, 0) / responses.length;
+            score += Math.min(avgResponseLength / 10, 30);
+        }
+        
+        // 怀疑度控制评分 (最高30分)
+        const finalSuspicion = this.gameState.suspicionLevel;
+        if (finalSuspicion < 70) {
+            score += 30;
+        } else if (finalSuspicion < 85) {
+            score += 20;
+        } else if (finalSuspicion < 95) {
+            score += 10;
+        }
+        
+        return Math.round(Math.min(score, 100));
+    }
+    
+    // 文本自动换行方法
+    wrapText(ctx, text, maxWidth) {
+        const words = text.split('');
+        const lines = [];
+        let currentLine = '';
+        
+        for (let i = 0; i < words.length; i++) {
+            const testLine = currentLine + words[i];
+            const metrics = ctx.measureText(testLine);
+            const testWidth = metrics.width;
+            
+            if (testWidth > maxWidth && currentLine !== '') {
+                lines.push(currentLine);
+                currentLine = words[i];
+            } else {
+                currentLine = testLine;
+            }
+        }
+        
+        if (currentLine !== '') {
+            lines.push(currentLine);
+        }
+        
+        return lines;
+    }
+    
+    // 两端对齐文本换行方法
+    wrapTextJustified(ctx, text, maxWidth) {
+        const words = text.split('');
+        const lines = [];
+        let currentLine = '';
+        
+        for (let i = 0; i < words.length; i++) {
+            const testLine = currentLine + words[i];
+            const metrics = ctx.measureText(testLine);
+            const testWidth = metrics.width;
+            
+            if (testWidth > maxWidth && currentLine !== '') {
+                lines.push({
+                    text: currentLine.trim(),
+                    isJustified: true,
+                    width: ctx.measureText(currentLine.trim()).width
+                });
+                currentLine = words[i];
+            } else {
+                currentLine = testLine;
+            }
+        }
+        
+        if (currentLine !== '') {
+            lines.push({
+                text: currentLine.trim(),
+                isJustified: false, // 最后一行不需要两端对齐
+                width: ctx.measureText(currentLine.trim()).width
+            });
+        }
+        
+        return lines;
+    }
+    
+    // 绘制两端对齐文本（左对齐）
+    drawJustifiedText(ctx, lineObj, x, y, maxWidth) {
+        // 计算左边起始位置（左对齐，而不是居中）
+        const startX = x - maxWidth / 2;
+        
+        if (!lineObj.isJustified || lineObj.text.length <= 1) {
+            // 不需要对齐或文字太少，直接左对齐绘制
+            ctx.textAlign = 'left';
+            ctx.fillText(lineObj.text, startX, y);
+            ctx.textAlign = 'center'; // 恢复居中对齐
+            return;
+        }
+        
+        const text = lineObj.text;
+        const chars = text.split('');
+        const totalTextWidth = lineObj.width;
+        const totalSpaceNeeded = maxWidth - totalTextWidth;
+        const spacesBetweenChars = chars.length - 1;
+        
+        if (spacesBetweenChars <= 0) {
+            ctx.textAlign = 'left';
+            ctx.fillText(text, startX, y);
+            ctx.textAlign = 'center'; // 恢复居中对齐
+            return;
+        }
+        
+        const extraSpacePerGap = totalSpaceNeeded / spacesBetweenChars;
+        
+        let currentX = startX; // 从左边开始
+        ctx.textAlign = 'left';
+        
+        for (let i = 0; i < chars.length; i++) {
+            ctx.fillText(chars[i], currentX, y);
+            const charWidth = ctx.measureText(chars[i]).width;
+            currentX += charWidth;
+            
+            if (i < chars.length - 1) {
+                currentX += extraSpacePerGap;
+            }
+        }
+        
+        ctx.textAlign = 'center'; // 恢复居中对齐
     }
     
     // 简单的二维码绘制方法
@@ -4981,12 +5181,7 @@ ${analysis.feedback}
             // 生成并显示AI伪装分析
             this.showPerformanceAnalysis();
             
-            // 设置结果信息
-            document.getElementById('finalRound').textContent = this.gameState.currentRound;
-            document.getElementById('playerAnswer').textContent = '调试模式手动结束';
-            document.getElementById('analysisText').textContent = '通过调试模式手动结束游戏，用于测试和开发目的。';
-            document.getElementById('judgmentReason').textContent = '调试功能触发的游戏结束';
-            document.getElementById('aiFeedbackText').textContent = '这是调试模式下的手动结束，不是正常游戏流程的结果。';
+            // 这些元素已从HTML中删除，不再需要设置
             
             // 设置最终统计
             document.getElementById('survivalRounds').textContent = this.gameState.currentRound;
@@ -5084,12 +5279,7 @@ ${analysis.feedback}
         // 生成并显示AI伪装分析
         this.showPerformanceAnalysis();
         
-        // 设置结果信息
-        document.getElementById('finalRound').textContent = this.gameState.currentRound;
-        document.getElementById('playerAnswer').textContent = '怀疑度累积达到100%';
-        document.getElementById('analysisText').textContent = '你在游戏过程中的行为累积引起了AI们的怀疑，最终怀疑度达到了100%的上限。';
-        document.getElementById('judgmentReason').textContent = '多轮互动中的怀疑度累积效应';
-        document.getElementById('aiFeedbackText').textContent = 'AI们通过观察你的回复模式和行为特征，逐渐提高了对你身份的怀疑程度，最终确认了你的人类身份。';
+        // 这些元素已从HTML中删除，不再需要设置
         
         // 设置最终统计
         document.getElementById('survivalRounds').textContent = this.gameState.currentRound - 1; // 实际存活轮数
