@@ -191,23 +191,6 @@
                 <button id="toggleAnalysisBtn" class="toggle-btn">收起分析</button>
             </div>
             
-            <div class="result-info">
-                <p><strong>第 <span id="finalRound">1</span> 轮</strong></p>
-                <p><strong>你的回复：</strong> <span id="playerAnswer">回复内容</span></p>
-            </div>
-            
-            <div class="analysis-section">
-                <h3>🔍 回复分析</h3>
-                <div class="analysis-result">
-                    <p id="analysisText">分析结果...</p>
-                    <p id="judgmentReason">判定原因...</p>
-                </div>
-                
-                <div class="ai-feedback">
-                    <h4>AI反馈：</h4>
-                    <p id="aiFeedbackText">AI反馈内容...</p>
-                </div>
-            </div>
             
             <div class="final-stats">
                 <h3>最终成绩</h3>
@@ -224,6 +207,9 @@
         </div>
     </div>
 
+    <!-- QR码生成库 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    
     <!-- 模块化脚本文件 -->
     <script src="js/envConfig.js"></script>
     <script src="js/config.js" onerror="console.warn('⚠️ config.js 文件未找到，将使用环境变量配置')"></script>

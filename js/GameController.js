@@ -4033,9 +4033,9 @@ ${analysis.feedback}
             const canvas = document.createElement('canvas');
             const ctx = canvas.getContext('2d');
             
-            // 设置canvas尺寸
+            // 设置canvas尺寸为类似结束卡片的长图格式
             canvas.width = 800;
-            canvas.height = 600;
+            canvas.height = 1000;
             
             // 绘制背景渐变
             const gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
@@ -4046,10 +4046,10 @@ ${analysis.feedback}
             
             // 绘制白色卡片背景
             ctx.fillStyle = 'white';
-            const cardX = 50;
-            const cardY = 50;
-            const cardWidth = canvas.width - 100;
-            const cardHeight = canvas.height - 100;
+            const cardX = 40;
+            const cardY = 40;
+            const cardWidth = canvas.width - 80;
+            const cardHeight = canvas.height - 80;
             const cardRadius = 20;
             
             // 绘制圆角矩形
@@ -4058,105 +4058,186 @@ ${analysis.feedback}
             
             // 绘制标题
             ctx.fillStyle = '#333';
-            ctx.font = 'bold 36px Arial, sans-serif';
+            ctx.font = 'bold 42px Arial, sans-serif';
             ctx.textAlign = 'center';
-            ctx.fillText('谁是人类 - 游戏结果', canvas.width / 2, cardY + 60);
+            ctx.fillText('🤖 谁是人类', canvas.width / 2, cardY + 70);
             
-            // 绘制游戏结果
-            ctx.fillStyle = '#667eea';
-            ctx.font = 'bold 48px Arial, sans-serif';
-            ctx.fillText(`${rounds} 轮`, canvas.width / 2, cardY + 130);
-            
-            // 绘制称号
-            ctx.fillStyle = '#333';
-            ctx.font = 'bold 32px Arial, sans-serif';
-            ctx.fillText(title, canvas.width / 2, cardY + 180);
+            ctx.fillStyle = '#666';
+            ctx.font = '24px Arial, sans-serif';
+            ctx.fillText('反乌托邦AI伪装游戏', canvas.width / 2, cardY + 110);
             
             // 绘制分割线
             ctx.strokeStyle = '#eee';
-            ctx.lineWidth = 2;
+            ctx.lineWidth = 3;
             ctx.beginPath();
-            ctx.moveTo(cardX + 50, cardY + 220);
-            ctx.lineTo(cardX + cardWidth - 50, cardY + 220);
+            ctx.moveTo(cardX + 60, cardY + 150);
+            ctx.lineTo(cardX + cardWidth - 60, cardY + 150);
             ctx.stroke();
             
-            // 绘制分享文本
-            ctx.fillStyle = '#666';
-            ctx.font = '20px Arial, sans-serif';
-            const words = shareText.split('');
-            let line = '';
-            let y = cardY + 270;
-            const maxWidth = cardWidth - 100;
+            // 绘制游戏结果标题
+            ctx.fillStyle = '#333';
+            ctx.font = 'bold 36px Arial, sans-serif';
+            ctx.fillText('🎯 最终成绩', canvas.width / 2, cardY + 220);
             
-            for (let i = 0; i < words.length; i++) {
-                const testLine = line + words[i];
+            // 绘制生存轮数
+            ctx.fillStyle = '#667eea';
+            ctx.font = 'bold 64px Arial, sans-serif';
+            ctx.fillText(`${rounds}`, canvas.width / 2, cardY + 310);
+            
+            ctx.fillStyle = '#333';
+            ctx.font = 'bold 32px Arial, sans-serif';
+            ctx.fillText('生存轮数', canvas.width / 2, cardY + 350);
+            
+            // 绘制怀疑度
+            const suspicionLevel = this.gameState.getSuspicionPercentage();
+            ctx.fillStyle = '#FF9800';
+            ctx.font = 'bold 48px Arial, sans-serif';
+            ctx.fillText(`${suspicionLevel}%`, canvas.width / 2, cardY + 430);
+            
+            ctx.fillStyle = '#333';
+            ctx.font = 'bold 24px Arial, sans-serif';
+            ctx.fillText('最终怀疑度', canvas.width / 2, cardY + 460);
+            
+            // 绘制称号
+            ctx.fillStyle = '#764ba2';
+            ctx.font = 'bold 36px Arial, sans-serif';
+            ctx.fillText(`【${title}】`, canvas.width / 2, cardY + 540);
+            
+            // 绘制评价
+            const evaluation = this.getFinalEvaluation();
+            ctx.fillStyle = '#666';
+            ctx.font = '24px Arial, sans-serif';
+            
+            // 将评价文本分行显示
+            const evalWords = evaluation.split('');
+            let evalLine = '';
+            let evalY = cardY + 600;
+            const maxWidth = cardWidth - 120;
+            
+            for (let i = 0; i < evalWords.length; i++) {
+                const testLine = evalLine + evalWords[i];
                 const metrics = ctx.measureText(testLine);
                 const testWidth = metrics.width;
                 
                 if (testWidth > maxWidth && i > 0) {
-                    ctx.fillText(line, canvas.width / 2, y);
-                    line = words[i];
-                    y += 30;
+                    ctx.fillText(evalLine, canvas.width / 2, evalY);
+                    evalLine = evalWords[i];
+                    evalY += 35;
                 } else {
-                    line = testLine;
+                    evalLine = testLine;
                 }
             }
-            ctx.fillText(line, canvas.width / 2, y);
+            ctx.fillText(evalLine, canvas.width / 2, evalY);
             
-            // 绘制二维码占位区域
-            ctx.fillStyle = '#f0f0f0';
-            this.roundRect(ctx, cardX + cardWidth - 150, cardY + cardHeight - 150, 100, 100, 10);
-            ctx.fill();
+            // 绘制二维码区域
+            const qrSize = 120;
+            const qrX = canvas.width / 2 - qrSize / 2;
+            const qrY = cardY + cardHeight - 200;
             
-            ctx.fillStyle = '#999';
-            ctx.font = '14px Arial, sans-serif';
+            // 使用简单的方法生成二维码图案
+            await this.drawQRCode(ctx, qrX, qrY, qrSize, 'http://whoishuman.hyperint.net/');
+            
+            ctx.fillStyle = '#666';
+            ctx.font = '18px Arial, sans-serif';
             ctx.textAlign = 'center';
-            ctx.fillText('扫码体验', cardX + cardWidth - 100, cardY + cardHeight - 20);
+            ctx.fillText('扫码体验游戏', canvas.width / 2, qrY + qrSize + 30);
             
-            // 绘制游戏logo
-            ctx.fillStyle = '#667eea';
-            ctx.font = 'bold 24px Arial, sans-serif';
-            ctx.fillText('🤖 谁是人类', canvas.width / 2, cardY + cardHeight - 30);
+            // 绘制底部信息
+            ctx.fillStyle = '#999';
+            ctx.font = '16px Arial, sans-serif';
+            ctx.fillText('whoishuman.hyperint.net', canvas.width / 2, cardY + cardHeight - 30);
             
-            // 将canvas转换为图片
+            // 将canvas转换为图片并直接下载，不触发分享窗口
             const dataURL = canvas.toDataURL('image/png');
             
             // 创建下载链接
             const link = document.createElement('a');
-            link.download = `谁人类_游戏结果_${rounds}轮.png`;
+            link.download = `谁是人类_游戏结果_${rounds}轮_${title}.png`;
             link.href = dataURL;
             link.click();
             
-            // 如果支持分享API，也提供分享选项
-            if (navigator.share) {
-                // 将canvas转换为blob
-                canvas.toBlob(async (blob) => {
-                    const file = new File([blob], '游戏结果.png', { type: 'image/png' });
-                    try {
-                        await navigator.share({
-                            title: '谁是人类 - 游戏结果',
-                            text: shareText,
-                            files: [file]
-                        });
-                    } catch (err) {
-                        console.log('分享失败:', err);
-                    }
-                });
-            }
-            
         } catch (error) {
             console.error('生成分享图片失败:', error);
-            // 降级到文本分享
-            if (navigator.share) {
-                navigator.share({
-                    title: '谁是人类 - 游戏结果',
-                    text: shareText,
-                    url: window.location.href
+            alert('生成分享图片失败，请稍后重试');
+        }
+    }
+    
+    // 简单的二维码绘制方法
+    async drawQRCode(ctx, x, y, size, url) {
+        try {
+            // 创建一个临时的二维码生成元素
+            const qrDiv = document.createElement('div');
+            qrDiv.style.position = 'absolute';
+            qrDiv.style.left = '-9999px';
+            document.body.appendChild(qrDiv);
+            
+            // 如果QRCode库可用，使用它生成二维码
+            if (typeof QRCode !== 'undefined') {
+                const qr = new QRCode(qrDiv, {
+                    text: url,
+                    width: size,
+                    height: size,
+                    colorDark: '#000000',
+                    colorLight: '#ffffff',
+                    correctLevel: QRCode.CorrectLevel.H
                 });
+                
+                // 等待二维码生成
+                await new Promise(resolve => setTimeout(resolve, 100));
+                
+                const qrCanvas = qrDiv.querySelector('canvas');
+                if (qrCanvas) {
+                    ctx.drawImage(qrCanvas, x, y, size, size);
+                } else {
+                    this.drawQRCodeFallback(ctx, x, y, size);
+                }
             } else {
-                navigator.clipboard.writeText(shareText).then(() => {
-                    alert('结果已复制到剪贴板！');
-                });
+                this.drawQRCodeFallback(ctx, x, y, size);
+            }
+            
+            document.body.removeChild(qrDiv);
+        } catch (error) {
+            console.error('二维码生成失败:', error);
+            this.drawQRCodeFallback(ctx, x, y, size);
+        }
+    }
+    
+    // 二维码生成失败时的备用方案
+    drawQRCodeFallback(ctx, x, y, size) {
+        // 绘制简单的二维码样式背景
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(x, y, size, size);
+        
+        ctx.fillStyle = '#000000';
+        ctx.strokeStyle = '#000000';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(x, y, size, size);
+        
+        // 绘制简单的二维码图案
+        const blockSize = size / 21; // 标准二维码是21x21模块
+        
+        // 绘制定位点（左上、右上、左下）
+        const corners = [
+            { x: x + blockSize, y: y + blockSize },
+            { x: x + size - 8 * blockSize, y: y + blockSize },
+            { x: x + blockSize, y: y + size - 8 * blockSize }
+        ];
+        
+        corners.forEach(corner => {
+            // 外框
+            ctx.fillRect(corner.x, corner.y, 7 * blockSize, 7 * blockSize);
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(corner.x + blockSize, corner.y + blockSize, 5 * blockSize, 5 * blockSize);
+            ctx.fillStyle = '#000000';
+            ctx.fillRect(corner.x + 2 * blockSize, corner.y + 2 * blockSize, 3 * blockSize, 3 * blockSize);
+        });
+        
+        // 添加一些随机模块以模拟真实二维码
+        for (let i = 0; i < 50; i++) {
+            const rx = x + Math.floor(Math.random() * 15 + 3) * blockSize;
+            const ry = y + Math.floor(Math.random() * 15 + 3) * blockSize;
+            if (Math.random() > 0.5) {
+                ctx.fillRect(rx, ry, blockSize, blockSize);
             }
         }
     }
