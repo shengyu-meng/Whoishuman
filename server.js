@@ -36,7 +36,7 @@ app.get('/api/config', (req, res) => {
         baseUrl: 'https://api.deepseek.com/v1/chat/completions',
         model: 'deepseek-chat',
         requestConfig: {
-            temperature: 0.8,
+            temperature: 0.0,
             maxTokens: 1000,
             timeout: 30000
         }

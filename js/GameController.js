@@ -141,7 +141,7 @@ class GameController {
                 baseUrl: 'https://api.deepseek.com/v1/chat/completions',
                 model: 'deepseek-chat',
                 requestConfig: {
-                    temperature: 0.8,
+                    temperature: 0.0,
                     maxTokens: 1000,
                     timeout: 30000
                 },
@@ -181,7 +181,7 @@ class GameController {
         const requestData = {
             model: options.model || this.apiConfig.model || 'deepseek-chat',
             messages: messages,
-            temperature: options.temperature || this.apiConfig.requestConfig?.temperature || 0.8,
+            temperature: options.temperature || this.apiConfig.requestConfig?.temperature || 0.0,
             max_tokens: options.maxTokens || this.apiConfig.requestConfig?.maxTokens || 1000
         };
 
@@ -1182,7 +1182,7 @@ ${conversationContext}
 
             const responseText = await this.callAI(messages, {
                 model: 'deepseek-chat',
-                temperature: this.apiConfig.requestConfig?.temperature || 0.8
+                temperature: this.apiConfig.requestConfig?.temperature || 0.0
             });
 
             if (!responseText || responseText.trim().length < 20) {
@@ -2026,7 +2026,7 @@ ${conversationContext}
             const msgKeywords = this.extractKeywords(content);
             const overlap = newKeywords.filter(kw => msgKeywords.includes(kw));
             
-            if (overlap.length > Math.min(newKeywords.length, msgKeywords.length) * 0.8) {
+            if (overlap.length > Math.min(newKeywords.length, msgKeywords.length) * GAME_CONFIG.analysis.keywordOverlapThreshold) {
                 console.log(`🚫 检测到关键词重复过多: ${overlap.join(', ')}`);
                 return true;
             }
@@ -2265,7 +2265,7 @@ ${conversationContext}
         return { 
             depth: averageDepth, 
             needsEnhancement,
-            enhancementLevel: needsEnhancement ? Math.max(0.8 - averageDepth, 0.5) : 0.3
+            enhancementLevel: needsEnhancement ? Math.max(GAME_CONFIG.analysis.depthEnhancementBaseThreshold - averageDepth, GAME_CONFIG.analysis.minEnhancementThreshold) : 0.3
         };
     }
 
@@ -4183,7 +4183,7 @@ ${emojiInstruction}
             const content = await this.callAI(messages, {
                 model: 'deepseek-reasoner',
                 maxTokens: 100,
-                temperature: 0.8
+                temperature: 0.0
             });
             
             return content.trim();
@@ -4214,7 +4214,7 @@ ${emojiInstruction}
             const content = await this.callAI(messages, {
                 model: 'deepseek-reasoner',
                 maxTokens: 120,
-                temperature: 0.8
+                temperature: 0.0
             });
             
             return content.trim();

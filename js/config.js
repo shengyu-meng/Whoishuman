@@ -14,7 +14,7 @@ const API_CONFIG = {
     
     // API请求配置
     requestConfig: {
-        temperature: 0.8,
+        temperature: 0.0,
         maxTokens: 1000,
         timeout: 30000
     }
@@ -50,6 +50,30 @@ const GAME_CONFIG = {
     retry: {
         maxAttempts: 5,
         similarityThreshold: 0.6
+    },
+    
+    // AI分析阈值配置
+    analysis: {
+        // 行为一致性检测阈值
+        behavioralConsistencyThreshold: 0.8,
+        
+        // 关键词重叠检测阈值
+        keywordOverlapThreshold: 0.8,
+        
+        // 深度增强基础阈值
+        depthEnhancementBaseThreshold: 0.8,
+        
+        // 最小增强阈值
+        minEnhancementThreshold: 0.5
+    },
+    
+    // 主题进展配置
+    themeProgression: {
+        // 社交性默认值
+        defaultSocialness: 0.8,
+        
+        // 活力默认值
+        defaultEnergy: 0.8
     }
 };
 

@@ -56,7 +56,7 @@ class AIDisguiseAnalyzer {
         if (rounds >= 6) {
             summary += `你不仅仅是在模仿AI的语言模式，更深层地理解了AI思维的本质特征。你的回答${qualityTrend.description}，展现出对技术细节的把握和逻辑推理的严谨性。`;
             
-            if (behavioralConsistency.score > 0.8) {
+            if (behavioralConsistency.score > GAME_CONFIG.analysis.behavioralConsistencyThreshold) {
                 summary += `特别值得注意的是，你在整个游戏过程中保持了惊人的角色一致性，这种持续的自我约束展现了深度的元认知能力。`;
             }
         } else if (rounds >= 4) {
@@ -249,7 +249,7 @@ class AIDisguiseAnalyzer {
 
         return {
             score: consistency,
-            consistency: consistency > 0.8 ? 'high' : consistency > 0.5 ? 'medium' : 'low'
+            consistency: consistency > GAME_CONFIG.analysis.behavioralConsistencyThreshold ? 'high' : consistency > 0.5 ? 'medium' : 'low'
         };
     }
 

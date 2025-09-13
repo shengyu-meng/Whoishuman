@@ -38,7 +38,7 @@ export async function onRequestPost(context) {
     const aiRequest = {
       model: requestData.model || 'deepseek-chat',
       messages: requestData.messages,
-      temperature: requestData.temperature || 0.8,
+      temperature: requestData.temperature || 0.0,
       max_tokens: requestData.max_tokens || 1000,
       stream: false
     };

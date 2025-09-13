@@ -31,7 +31,7 @@ export async function onRequestGet(context) {
       proxyEndpoint: '/api/chat',
       model: 'deepseek-chat',
       requestConfig: {
-        temperature: 0.8,
+        temperature: 0.0,
         maxTokens: 1000,
         timeout: 30000
       }

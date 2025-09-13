@@ -135,7 +135,7 @@ const THEME_EMOTION_MAPPING = {
         dominant: "vulnerable",
         secondary: ["open", "seeking_connection", "empathetic"],
         energy: 0.4,
-        socialness: 0.8,
+        socialness: GAME_CONFIG.themeProgression.defaultSocialness,
         suspicion: 0.3
     },
     
@@ -150,7 +150,7 @@ const THEME_EMOTION_MAPPING = {
     role_reversal: {
         dominant: "questioning",
         secondary: ["analytical", "skeptical", "challenging"],
-        energy: 0.8,
+        energy: GAME_CONFIG.themeProgression.defaultEnergy,
         socialness: 0.4,
         suspicion: 0.9
     },
@@ -166,7 +166,7 @@ const THEME_EMOTION_MAPPING = {
     future_vision: {
         dominant: "hopeful",
         secondary: ["optimistic", "visionary", "inspiring"],
-        energy: 0.8,
+        energy: GAME_CONFIG.themeProgression.defaultEnergy,
         socialness: 0.9,
         suspicion: 0.2
     },

@@ -146,7 +146,7 @@ class EnvConfigManager {
                             proxyEndpoint: config.proxyEndpoint || '/api/chat',
                             model: config.model || 'deepseek-chat',
                             requestConfig: config.requestConfig || {
-                                temperature: 0.8,
+                                temperature: 0.0,
                                 maxTokens: 1000,
                                 timeout: 30000
                             }
@@ -159,7 +159,7 @@ class EnvConfigManager {
                             model: config.model,
                             apiKey: config.apiKey,
                             requestConfig: config.requestConfig || {
-                                temperature: 0.8,
+                                temperature: 0.0,
                                 maxTokens: 1000,
                                 timeout: 30000
                             }
@@ -258,7 +258,7 @@ class EnvConfigManager {
             baseUrl: 'https://api.deepseek.com/v1/chat/completions',
             model: 'deepseek-chat',
             requestConfig: {
-                temperature: 0.8,
+                temperature: 0.0,
                 maxTokens: 1000,
                 timeout: 30000
             }
