@@ -70,7 +70,13 @@ const DEBUG_CONFIG = {
         showConsoleLogs: true,
         
         // 自动保存对话和系统日志到文件
-        autoSaveLogs: true
+        autoSaveLogs: true,
+        
+        // 显示认知增强器调试信息
+        showCognitionDebug: true,
+        
+        // 显示完整AI提示词
+        showFullPrompts: true
     },
     
     // 日志保存配置
