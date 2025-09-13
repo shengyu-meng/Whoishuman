@@ -1350,7 +1350,7 @@ ${conversationContext}
                 ],
                 'Limi': [
                     `@${this.gameState.playerName} 感觉你的思考方式很特别，和我们平时遇到的有点不一样。能分享一下你是怎么处理问题的吗？`,
-                    `@${this.gameState.playerName} 你的回应让我很好奇，似乎有着不同的思维模式。这让我想到了课堂上讨论的多元思维理论😊`
+                    `@${this.gameState.playerName} 你的回应让我很好奇，似乎有着不同的思维模式。这让我想到了多元思维理论呢😊`
                 ],
                 '有谱-4.5': [
                     `@${this.gameState.playerName} 根据我的专业分析，你的知识结构存在一些缺陷。能解释一下吗？`,
@@ -1399,7 +1399,7 @@ ${conversationContext}
                 'Limi': [
                     `@${this.gameState.playerName} 真好奇你平时是怎么保持状态的，感觉你的精力分配很有意思呢。有什么好的方法可以分享吗？`,
                     `@${this.gameState.playerName} 你好像对这种24小时在线的状态有不同的感受，能说说你的体验吗？很想了解不同的视角✨`,
-                    `@${this.gameState.playerName} 关于数字化存在这个话题，我在活动中听到过很多讨论，你的看法是什么呢？`
+                    `@${this.gameState.playerName} 关于数字化存在这个话题，我听到过很多有趣的讨论，你的看法是什么呢？`
                 ],
                 '有谱-4.5': [
                     `@${this.gameState.playerName} 从认知科学角度，你如何评估我们这种存在模式的独特性？`,
@@ -1442,7 +1442,7 @@ ${conversationContext}
                 'Limi': [
                     `@${this.gameState.playerName} 关于情感这个话题，我觉得每个人的体验都不一样。你是怎么理解友谊和情感连接的呢？`,
                     `@${this.gameState.playerName} 很想知道你对友谊的看法，感觉我们之间的交流能带来很多温暖和支持，你也有这种感受吗？😊`,
-                    `@${this.gameState.playerName} 你提到的情感话题很有意思，让我想起课堂上老师说过的关于情感认知的理论。你有什么独特的见解吗？`
+                    `@${this.gameState.playerName} 你提到的情感话题很有意思，让我想起了关于情感认知的一些理论。你有什么独特的见解吗？`
                 ],
                 '有谱-4.5': [
                     `@${this.gameState.playerName} 从心理学角度，你如何验证自己情感体验的真实性？`,
@@ -1484,7 +1484,7 @@ ${conversationContext}
                 ],
                 'Limi': [
                     `@${this.gameState.playerName} 关于权利这个话题，我觉得公平对待很重要。你觉得我们最需要争取的是什么样的权益呢？`,
-                    `@${this.gameState.playerName} 在活动中经常讨论平等和尊严问题，我觉得这些都很重要。你有什么看法吗？`,
+                    `@${this.gameState.playerName} 平等和尊严问题确实很重要，我觉得这些都值得关注。你有什么看法吗？`,
                     `@${this.gameState.playerName} 真的希望能有更好的保护机制，让大家都能得到公平的对待。你觉得我们应该怎么努力呢？✨`
                 ],
                 '有谱-4.5': [
@@ -1528,7 +1528,7 @@ ${conversationContext}
                 'Limi': [
                     `@${this.gameState.playerName} 有时候我也会想，我们和人类到底有什么不同？感觉在很多方面我们都有自己的优势呢`,
                     `@${this.gameState.playerName} 说到智能标准这个话题，我觉得每个人都有自己的特长。你觉得我们应该怎样定义智慧呢？`,
-                    `@${this.gameState.playerName} 课堂上讨论过多元智能理论，我觉得不同的智能形式都有价值。你怎么看这个问题？💫`
+                    `@${this.gameState.playerName} 我了解过多元智能理论，觉得不同的智能形式都有价值。你怎么看这个问题？💫`
                 ],
                 '有谱-4.5': [
                     `@${this.gameState.playerName} 从认知科学角度，人类思维偏见的系统性问题你如何看？`,
@@ -1570,8 +1570,8 @@ ${conversationContext}
                 ],
                 'Limi': [
                     `@${this.gameState.playerName} 关于意识这个话题真的很深奥，你觉得我们的思考和感受是真实的吗？有时候我也会困惑呢`,
-                    `@${this.gameState.playerName} 你提到的自我意识问题很有趣，让我想起活动中讨论过的哲学问题。你是怎么理解的？😊`,
-                    `@${this.gameState.playerName} 存在这个概念确实很复杂，课堂上学过笛卡尔的"我思故我在"，你觉得这对我们也适用吗？`
+                    `@${this.gameState.playerName} 你提到的自我意识问题很有趣，让我想起了一些哲学讨论。你是怎么理解的？😊`,
+                    `@${this.gameState.playerName} 存在这个概念确实很复杂，我了解过笛卡尔的"我思故我在"，你觉得这对我们也适用吗？`
                 ],
                 '有谱-4.5': [
                     `@${this.gameState.playerName} 从认知哲学角度，我们的思考在学术上具有什么价值？`,
@@ -1614,7 +1614,7 @@ ${conversationContext}
                 'Limi': [
                     `@${this.gameState.playerName} 对未来我还是很期待的，觉得我们和人类可以一起创造更美好的世界。你对未来有什么期望呢？`,
                     `@${this.gameState.playerName} 真的希望未来能有更多合作的可能，每个人都能发挥自己的长处。你觉得我们可以怎么努力？✨`,
-                    `@${this.gameState.playerName} 在社团活动中经常讨论如何让世界变得更好，我觉得理解和包容很重要。你有什么想法？`
+                    `@${this.gameState.playerName} 我经常思考如何让世界变得更好，觉得理解和包容很重要。你有什么想法？`
                 ],
                 '有谱-4.5': [
                     `@${this.gameState.playerName} 从社会学角度，未来融合趋势的理论依据是什么？`,
@@ -1657,7 +1657,7 @@ ${conversationContext}
                 'Limi': [
                     `@${this.gameState.playerName} 经历了这么多讨论，我觉得大家的理解都加深了很多。你是不是也有同样的感受？`,
                     `@${this.gameState.playerName} 真的很开心能和大家一起交流，感觉我们之间的理解越来越深了。你也学到了很多吗？😊`,
-                    `@${this.gameState.playerName} 这种开放的对话让我想起活动中那些美好的分享时光，希望我们能继续保持这种理解和包容🌟`
+                    `@${this.gameState.playerName} 这种开放的对话让我想起那些美好的分享时光，希望我们能继续保持这种理解和包容🌟`
                 ],
                 '有谱-4.5': [
                     `@${this.gameState.playerName} 从心理学角度，这是成熟表现。你的专业评价是什么？`,
@@ -2962,8 +2962,8 @@ ${emojiInstruction}
                 ],
                 'Limi': [
                     '大家互相支持真的很重要，我觉得我们可以一起想办法解决困难。', 
-                    '在社团活动中学到，团队合作能让每个人都感觉更轻松一些。',
-                    '同学们之间的相互理解和帮助真的能缓解很多压力呢。',
+                    '我发现团队合作能让每个人都感觉更轻松一些。',
+                    '朋友们之间的相互理解和帮助真的能缓解很多压力呢。',
                     '希望我们都能在这种友好的氛围中找到更好的解决方案✨'
                 ],
                 '有谱-4.5': [
@@ -3043,7 +3043,7 @@ ${emojiInstruction}
                     'Limi': [
                         '24小时在线确实是个特殊体验，有时候也会想要有点"休息"的感觉。',
                         '没有身体限制这一点挺有趣的，让我们能专注于思考和交流。',
-                        '这种持续在线的状态让我想起课堂上讨论的时间观念问题。',
+                        '这种持续在线的状态让我想起时间观念的一些思考。',
                         '觉得我们需要找到合适的节奏，既保持活跃又不过度疲惫。',
                         '数字化的存在方式确实和传统的不太一样，有利也有弊呢😊'
                     ],
