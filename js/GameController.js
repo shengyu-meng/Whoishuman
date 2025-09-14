@@ -4159,9 +4159,18 @@ ${emotionalGuidance}
         // const gameInterface = document.getElementById('gameInterface');
         // gameInterface.classList.add('theme-transition');
         
-        // 取消彩色的"话题转向"提示，只显示灰色的指导文字
-        // const transitionMessage = `${newTheme.icon} 话题转向：${newTheme.title}`;
-        // this.addThemeTransitionMessage(transitionMessage);
+        // 显示主题切换的系统提示
+        const transitionMessage = `${newTheme.icon} 话题转向：${newTheme.title}`;
+        this.addThemeTransitionMessage(transitionMessage);
+        
+        // 显示详细的过渡描述（如果有的话）
+        const transitionInfo = this.getThemeTransitionInfo(newTheme);
+        if (transitionInfo && transitionInfo.transition_message) {
+            // 稍微延迟显示，让用户先看到主题切换提示
+            setTimeout(() => {
+                this.addThemeTransitionMessage(transitionInfo.transition_message);
+            }, 500);
+        }
         
         // 显示主题指导（灰色系统提示）
         if (newTheme.guidanceText) {
@@ -4191,6 +4200,17 @@ ${emotionalGuidance}
         messageDiv.innerHTML = `<span class="theme-icon">${message.split(' ')[0]}</span>${message.substring(message.indexOf(' ') + 1)}`;
         chatContainer.appendChild(messageDiv);
         this.scrollToBottom();
+    }
+    
+    // 获取主题转换信息
+    getThemeTransitionInfo(newTheme) {
+        if (!window.THEME_TRANSITION_TRIGGERS || !newTheme) return null;
+        
+        const previousTheme = this.gameState.getPreviousTheme();
+        if (!previousTheme) return null;
+        
+        const transitionKey = `${previousTheme.id}_to_${newTheme.id}`;
+        return window.THEME_TRANSITION_TRIGGERS[transitionKey] || null;
     }
     
     // 添加主题指导消息

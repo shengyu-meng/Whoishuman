@@ -645,6 +645,12 @@ class GameState {
         return this.themeHistory;
     }
     
+    // 获取前一个主题
+    getPreviousTheme() {
+        if (this.themeHistory.length < 2) return null;
+        return this.themeHistory[this.themeHistory.length - 2].theme;
+    }
+    
     // 检查是否为特殊轮次
     isSpecialRound() {
         if (!this.currentTheme) return false;
