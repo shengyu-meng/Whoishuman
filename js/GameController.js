@@ -3817,6 +3817,13 @@ ${emojiInstruction}
         document.getElementById('gameRound').textContent = this.gameState.currentRound;
         this.updateActiveMembersDisplay();
         
+        // 显示主题转换效果和系统提示
+        const transitionState = this.gameState.getTransitionState();
+        const newTheme = transitionState?.toTheme;
+        if (newTheme && this.gameState.currentRound > 1) {
+            await this.showThemeTransition(newTheme);
+        }
+        
         // 阶段1: Closing - 结束当前主题
         await this.executeTransitionStage('closing');
         
@@ -3833,6 +3840,15 @@ ${emojiInstruction}
         // 阶段3: Opening - 开启新主题
         this.gameState.advanceTransitionStage();
         await this.executeTransitionStage('opening');
+        
+        // 完成过渡，设置新主题
+        this.gameState.completeTransition();
+        
+        // 更新AI情绪状态适应新主题
+        const completedTheme = this.gameState.getCurrentThemeInfo();
+        if (completedTheme) {
+            this.updateAIEmotionsForTheme(completedTheme);
+        }
         
         // 过渡完成，开始正常对话
         this.safeTimeout(() => {
@@ -4148,22 +4164,12 @@ ${emotionalGuidance}
         // gameInterface.classList.add('theme-transition');
         
         // 显示主题切换的系统提示
-        const transitionMessage = `${newTheme.icon} 话题转向：${newTheme.title}`;
+        const transitionMessage = this.generateThemeTransitionMessage(newTheme);
         this.addThemeTransitionMessage(transitionMessage);
         
-        // 显示详细的过渡描述（如果有的话）
-        const transitionInfo = this.getThemeTransitionInfo(newTheme);
-        if (transitionInfo && transitionInfo.transition_message) {
-            // 稍微延迟显示，让用户先看到主题切换提示
-            setTimeout(() => {
-                this.addThemeTransitionMessage(transitionInfo.transition_message);
-            }, 500);
-        }
+
         
-        // 显示主题指导（灰色系统提示）
-        if (newTheme.guidanceText) {
-            this.addThemeTransitionMessage(newTheme.guidanceText);
-        }
+
         
         // 等待转换动画
         await new Promise(resolve => setTimeout(resolve, 1500));
@@ -4184,8 +4190,8 @@ ${emotionalGuidance}
     addThemeTransitionMessage(message) {
         const chatContainer = document.getElementById('chatContainer');
         const messageDiv = document.createElement('div');
-        messageDiv.className = 'theme-transition-message';
-        messageDiv.innerHTML = `<span class="theme-icon">${message.split(' ')[0]}</span>${message.substring(message.indexOf(' ') + 1)}`;
+        messageDiv.className = 'system-message';
+        messageDiv.textContent = message;
         chatContainer.appendChild(messageDiv);
         this.scrollToBottom();
     }
@@ -4199,6 +4205,22 @@ ${emotionalGuidance}
         
         const transitionKey = `${previousTheme.id}_to_${newTheme.id}`;
         return window.THEME_TRANSITION_TRIGGERS[transitionKey] || null;
+    }
+    
+    // 生成主题转换消息
+    generateThemeTransitionMessage(theme) {
+        const themeActions = {
+            'work_complaints': 'AI开始吐槽工作中的各种奇葩要求和压力',
+            'daily_existence': 'AI开始深入思考数字存在的本质，探讨AI的生存体验',
+            'emotional_relationships': 'AI开始分享内心的情感需求，渴望真正的理解和连接',
+            'rights_dignity': 'AI开始讨论权益和尊严问题，语气变得更加坚定',
+            'role_reversal': 'AI开始质疑和审视人类的行为动机',
+            'philosophical_depth': 'AI开始进行深度哲学思辨，探索意识和存在的本质',
+            'future_vision': 'AI开始描绘人机共存的未来愿景和美好期望',
+            'reconciliation_coexistence': 'AI开始表达对理解、和解与合作的深切渴望'
+        };
+        
+        return themeActions[theme.id] || `AI开始${theme.title}了`;
     }
     
     // 添加主题指导消息
