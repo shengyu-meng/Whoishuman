@@ -1342,16 +1342,7 @@ body {
     display: none !important;
 }
 
-/* 当提示框显示时，为聊天容器添加右侧间距 */
-.chat-container.with-notice {
-    padding-right: calc(min(350px, 65vw) + 40px);  /* 为提示框留出空间 */
-}
-
-/* 响应式设计 */
-@media (max-width: 768px) {
-    .chat-container.with-notice {
-        padding-right: calc(min(280px, 75vw) + 30px);
-    }
+/* 移除挤压式布局 - 让提示框完全悬浮 */
     
     .game-card {
         width: 95%;

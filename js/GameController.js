@@ -3511,7 +3511,6 @@ ${emojiInstruction}
             }
             
             suspicionNotice.classList.remove('hidden');
-            chatContainer.classList.add('with-notice');  // 为聊天容器添加类，调整右侧间距
             
             // 标记已显示过第一次质疑通知
             this.gameState.hasShownFirstSuspicionNotice = true;
@@ -3660,7 +3659,6 @@ ${emojiInstruction}
         this.gameState.waitingForResponse = false;
         document.getElementById('responseArea').classList.add('hidden');
         document.getElementById('suspicionNotice').classList.add('hidden');
-        document.getElementById('chatContainer').classList.remove('with-notice');  // 移除间距类
         
         // 添加玩家回复到聊天记录（使用isPlayer=true参数）
         this.addAIMessage(
@@ -6055,12 +6053,10 @@ ${analysis.feedback}
                 // 显示通知
                 if (noticeElement) {
                     noticeElement.classList.remove('hidden');
-                    document.getElementById('chatContainer').classList.add('with-notice');
                     
                     // 3秒后自动隐藏
                     this.safeTimeout(() => {
                         noticeElement.classList.add('hidden');
-                        document.getElementById('chatContainer').classList.remove('with-notice');
                     }, 3000);
                 }
             }
