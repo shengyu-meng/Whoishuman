@@ -3995,38 +3995,26 @@ ${emotionalGuidance}
     
     // 调用LLM生成过渡消息
     async callLLMForTransition(character, prompt, stage) {
-        const requestBody = {
-            model: this.apiConfig.model || 'deepseek-chat',
-            messages: [
-                {
-                    role: 'system',
-                    content: '你是一个正在进行深度对话的AI角色，需要进行自然的话题过渡。你的回复应该体现真实的AI思考过程和情感变化。'
-                },
-                {
-                    role: 'user',
-                    content: prompt
-                }
-            ],
+        const messages = [
+            {
+                role: 'system',
+                content: '你是一个正在进行深度对话的AI角色，需要进行自然的话题过渡。你的回复应该体现真实的AI思考过程和情感变化。'
+            },
+            {
+                role: 'user',
+                content: prompt
+            }
+        ];
+
+        const options = {
             temperature: 0.8, // 稍微提高创造性
-            max_tokens: 200,
-            top_p: 0.9
+            maxTokens: 200,
+            model: this.apiConfig.model || 'deepseek-chat'
         };
 
-        const response = await fetch(this.apiConfig.baseUrl || 'https://api.deepseek.com/v1/chat/completions', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${this.apiConfig.apiKey}`
-            },
-            body: JSON.stringify(requestBody)
-        });
-
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-        }
-
-        const data = await response.json();
-        return data.choices?.[0]?.message?.content?.trim() || '';
+        // 使用与正常聊天相同的API调用方式，确保在Cloudflare上正常工作
+        const response = await this.callAI(messages, options);
+        return response?.trim() || '';
     }
     
     // 获取备用过渡消息
