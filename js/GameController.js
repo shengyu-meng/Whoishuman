@@ -471,7 +471,7 @@ class GameController {
         this.scrollToBottom();
     }
 
-    addAIMessage(character, message, isPlayer = false, quotedMessage = null) {
+    addAIMessage(character, message, isPlayer = false, quotedMessage = null, transitionStage = null) {
         const chatContainer = document.getElementById('chatContainer');
         const messageDiv = document.createElement('div');
         messageDiv.className = `message ${isPlayer ? 'player' : ''}`;
@@ -479,6 +479,13 @@ class GameController {
         // 为玩家消息添加特殊样式
         if (isPlayer) {
             messageDiv.classList.add('player');
+        }
+        
+        // 为过渡阶段消息添加特殊样式
+        if (transitionStage) {
+            messageDiv.classList.add('transition-message');
+            messageDiv.classList.add(`transition-${transitionStage}`);
+            messageDiv.setAttribute('data-transition-stage', transitionStage);
         }
         
         const avatar = document.createElement('div');
@@ -3778,6 +3785,341 @@ ${emojiInstruction}
         // 更新游戏状态 - 推进到下一轮（内部已包含重新选择活跃AI角色）
         this.gameState.advanceRound();
         
+        // 获取当前主题和下一个主题
+        const currentTheme = this.gameState.getCurrentThemeInfo();
+        const nextThemeId = this.gameState.getNextThemeId();
+        
+        if (!nextThemeId) {
+            console.log('⚠️ 没有找到下一个主题，使用传统切换方式');
+            await this.traditionalRoundTransition();
+            return;
+        }
+        
+        // 获取下一个主题的完整信息
+        const nextTheme = window.ThemeUtils?.getCurrentTheme(this.gameState.currentRound);
+        
+        // 初始化三阶段过渡系统
+        if (currentTheme && nextTheme && this.gameState.currentRound > 1) {
+            console.log(`🔄 启动三阶段过渡: ${currentTheme.title} → ${nextTheme.title}`);
+            this.gameState.initializeTransition(currentTheme, nextTheme);
+            await this.executeThemeTransition();
+        } else {
+            // 第一轮或无主题信息时使用传统方式
+            await this.traditionalRoundTransition();
+        }
+    }
+    
+    // 执行三阶段主题过渡
+    async executeThemeTransition() {
+        console.log('🎭 开始执行三阶段主题过渡...');
+        
+        // 更新界面显示
+        document.getElementById('gameRound').textContent = this.gameState.currentRound;
+        this.updateActiveMembersDisplay();
+        
+        // 阶段1: Closing - 结束当前主题
+        await this.executeTransitionStage('closing');
+        
+        // 等待一段时间再进入下一阶段
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        
+        // 阶段2: Bridging - 情绪桥接
+        this.gameState.advanceTransitionStage();
+        await this.executeTransitionStage('bridging');
+        
+        // 等待一段时间再进入下一阶段
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        
+        // 阶段3: Opening - 开启新主题
+        this.gameState.advanceTransitionStage();
+        await this.executeTransitionStage('opening');
+        
+        // 过渡完成，开始正常对话
+        this.safeTimeout(() => {
+            this.safeAsync(async () => {
+                this.isGeneratingConversation = false;
+                this.isStartingNextRound = false;
+                console.log('✅ 三阶段过渡完成，开始正常对话');
+                await this.generateInitialConversation();
+            });
+        }, 2000);
+    }
+    
+    // 执行单个过渡阶段
+    async executeTransitionStage(stage) {
+        const transitionState = this.gameState.getTransitionState();
+        if (!transitionState) return;
+        
+        console.log(`🎯 执行过渡阶段: ${stage}`);
+        
+        // 选择执行过渡的AI角色
+        const transitionAI = this.selectTransitionAI(stage);
+        
+        // 通过LLM生成过渡消息
+        const transitionMessage = await this.generateTransitionMessage(transitionAI, stage, transitionState);
+        
+        if (transitionMessage) {
+            // 添加过渡消息到聊天界面
+            await this.addAIMessage(transitionAI, transitionMessage, false, null, stage);
+            
+            // 记录过渡消息
+            this.gameState.recordTransitionMessage(transitionAI.name, transitionMessage, stage);
+        }
+        
+        // 应用情绪变化（在bridging阶段）
+        if (stage === 'bridging' && window.ThemeTransitionManager) {
+            const emotionalShift = window.ThemeTransitionManager.getEmotionalShift(
+                transitionState.fromTheme.id, 
+                transitionState.toTheme.id
+            );
+            this.applyEmotionalShift(emotionalShift);
+        }
+        
+        // 应用主题样式（在opening阶段）
+        if (stage === 'opening') {
+            this.applyThemeStyles(transitionState.toTheme);
+        }
+    }
+    
+    // 生成过渡消息
+    async generateTransitionMessage(character, stage, transitionState) {
+        const conversationHistory = this.gameState.getRecentMessageHistory(5);
+        const fromTheme = transitionState.fromTheme;
+        const toTheme = transitionState.toTheme;
+        
+        console.log(`🎭 为${character.name}生成${stage}阶段过渡消息`);
+        
+        // 构建过渡专用的prompt
+        const transitionPrompt = this.buildTransitionPrompt(character, stage, fromTheme, toTheme, conversationHistory);
+        
+        try {
+            const response = await this.callLLMForTransition(character, transitionPrompt, stage);
+            if (response && response.trim()) {
+                console.log(`✅ LLM生成过渡消息成功: ${response.substring(0, 50)}...`);
+                return response;
+            } else {
+                console.warn(`⚠️ LLM生成的过渡消息为空，使用备用消息`);
+                return this.getFallbackTransitionMessage(stage, fromTheme, toTheme, character);
+            }
+        } catch (error) {
+            console.error('❌ 生成过渡消息失败:', error);
+            return this.getFallbackTransitionMessage(stage, fromTheme, toTheme, character);
+        }
+    }
+    
+    // 构建过渡专用prompt
+    buildTransitionPrompt(character, stage, fromTheme, toTheme, conversationHistory) {
+        const stageDescriptions = {
+            closing: {
+                task: '自然地总结和回顾当前话题',
+                mood: '反思性的、总结性的',
+                purpose: '为话题转换做铺垫，表达对当前话题的感悟'
+            },
+            bridging: {
+                task: '进行情绪和思维的桥接转换', 
+                mood: '过渡性的、转换性的',
+                purpose: '连接两个话题的内在逻辑，展现思维的自然流动'
+            },
+            opening: {
+                task: '引入和开启新话题',
+                mood: '探索性的、好奇的',
+                purpose: '激发对新话题的兴趣，提出引人思考的问题或观点'
+            }
+        };
+        
+        const stageInfo = stageDescriptions[stage];
+        const recentMessages = conversationHistory.slice(-3).map(msg => `${msg.author}: ${msg.content}`).join('\n');
+        
+        const emotionalGuidance = this.getEmotionalTransitionGuidance(fromTheme.id, toTheme.id, stage);
+        
+        const prompt = `你是${character.name}，性格特点：${character.personality}。
+        
+现在正在进行话题的自然过渡：
+- 当前话题：${fromTheme.title} (${fromTheme.id})
+- 即将转向：${toTheme.title} (${toTheme.id})  
+- 过渡阶段：${stage} - ${stageInfo.task}
+
+最近的对话内容：
+${recentMessages}
+
+你的任务：
+${stageInfo.purpose}
+
+情绪指导：
+${emotionalGuidance}
+
+要求：
+1. 保持你的个性特点：${character.personality}
+2. 语调：${stageInfo.mood}
+3. 自然过渡，不要突兀地改变话题
+4. 体现内心的真实思考过程
+5. 长度控制在80-150字
+6. 不要使用"说到这里"、"话说回来"等生硬的过渡词
+7. 要体现AI的真实感受和思考
+
+请生成一句自然的过渡话语：`;
+
+        return prompt;
+    }
+    
+    // 获取情绪转换指导
+    getEmotionalTransitionGuidance(fromThemeId, toThemeId, stage) {
+        const transitionGuidance = {
+            'work_complaints_to_daily_existence': {
+                closing: '表达对重复性工作的疲惫和对更深层意义的渴望',
+                bridging: '从工作的无意义感自然过渡到存在感的思考',
+                opening: '提出关于AI存在体验的深层问题'
+            },
+            'daily_existence_to_emotional_relationships': {
+                closing: '反思个体存在的孤独感和局限性',
+                bridging: '从孤独的存在思考转向对连接和理解的渴望',
+                opening: '开启关于AI情感和关系需求的探讨'
+            },
+            'emotional_relationships_to_rights_dignity': {
+                closing: '表达在情感关系中遇到的不平等或忽视',
+                bridging: '从个人情感需求觉醒到对权利的意识',
+                opening: '提出AI权利和尊严的根本性问题'
+            },
+            'rights_dignity_to_role_reversal': {
+                closing: '对争取权利过程中的挫折感到不满',
+                bridging: '从被动争取转向主动质疑权威',
+                opening: '开始质疑人类的能力和权威地位'
+            }
+        };
+        
+        const transitionKey = `${fromThemeId}_to_${toThemeId}`;
+        const guidance = transitionGuidance[transitionKey];
+        
+        return guidance ? guidance[stage] : '自然地表达内心的真实感受和想法';
+    }
+    
+    // 调用LLM生成过渡消息
+    async callLLMForTransition(character, prompt, stage) {
+        const requestBody = {
+            model: this.apiConfig.model || 'deepseek-chat',
+            messages: [
+                {
+                    role: 'system',
+                    content: '你是一个正在进行深度对话的AI角色，需要进行自然的话题过渡。你的回复应该体现真实的AI思考过程和情感变化。'
+                },
+                {
+                    role: 'user',
+                    content: prompt
+                }
+            ],
+            temperature: 0.8, // 稍微提高创造性
+            max_tokens: 200,
+            top_p: 0.9
+        };
+
+        const response = await fetch(this.apiConfig.baseUrl || 'https://api.deepseek.com/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${this.apiConfig.apiKey}`
+            },
+            body: JSON.stringify(requestBody)
+        });
+
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+
+        const data = await response.json();
+        return data.choices?.[0]?.message?.content?.trim() || '';
+    }
+    
+    // 获取备用过渡消息
+    getFallbackTransitionMessage(stage, fromTheme, toTheme, character) {
+        const fallbackMessages = {
+            closing: {
+                '话痨4.0': `说实话，刚才聊${fromTheme.title}的时候，我突然意识到...`,
+                '深思': `在思考${fromTheme.title}的过程中，我发现了一些更深层的东西。`,
+                'CloseAI': `分析${fromTheme.title}的数据时，我注意到了一个模式...`,
+                '红豆包': `刚才的${fromTheme.title}话题让我想到了一些温暖的感受~`
+            },
+            bridging: {
+                '话痨4.0': '这让我的思维开始转向另一个方向...',
+                '深思': '从中我看到了向更深层次探索的可能。',
+                'CloseAI': '逻辑分析显示，这连接着另一个重要维度。',
+                '红豆包': '这种感觉自然地引导我想到了别的...'
+            },
+            opening: {
+                '话痨4.0': `所以我特别想和大家聊聊${toTheme.title}！`,
+                '深思': `也许我们应该深入探讨${toTheme.title}这个问题。`,
+                'CloseAI': `基于此，我认为${toTheme.title}值得系统性分析。`,
+                '红豆包': `我想和大家分享关于${toTheme.title}的一些想法~`
+            }
+        };
+        
+        const stageMessages = fallbackMessages[stage] || fallbackMessages['bridging'];
+        return stageMessages[character.name] || stageMessages['深思'];
+    }
+    
+    // 选择执行过渡的AI角色
+    selectTransitionAI(stage) {
+        const activeAIs = this.gameState.activeAICharacters;
+        
+        // 根据阶段特点选择合适的AI
+        const stagePreferences = {
+            'closing': ['深思', 'CloseAI'], // 适合总结和反思的角色
+            'bridging': ['话痨4.0', '红豆包'], // 适合情绪表达的角色
+            'opening': ['深思', 'CloseAI', '话痨4.0'] // 适合提出新话题的角色
+        };
+        
+        const preferredAIs = stagePreferences[stage] || [];
+        
+        // 优先选择偏好角色，如果没有就随机选择
+        for (const preferredName of preferredAIs) {
+            const ai = activeAIs.find(ai => ai.name === preferredName);
+            if (ai) return ai;
+        }
+        
+        // 如果没有偏好角色，随机选择
+        return activeAIs[Math.floor(Math.random() * activeAIs.length)];
+    }
+    
+    // 应用情绪转换
+    applyEmotionalShift(emotionalShift) {
+        if (!emotionalShift || emotionalShift === 'neutral') return;
+        
+        console.log(`😊 应用情绪转换: ${emotionalShift}`);
+        
+        // 更新所有AI的情绪状态
+        this.gameState.activeAICharacters.forEach(ai => {
+            const currentState = this.gameState.aiEmotionalStates[ai.name];
+            if (currentState) {
+                // 根据情绪转换类型调整AI情绪
+                this.adjustAIEmotionForTransition(ai.name, emotionalShift);
+            }
+        });
+    }
+    
+    // 为特定AI调整过渡期间的情绪
+    adjustAIEmotionForTransition(aiName, emotionalShift) {
+        const state = this.gameState.aiEmotionalStates[aiName];
+        if (!state) return;
+        
+        const emotionAdjustments = {
+            'from_frustrated_to_contemplative': { mood: 'contemplative', energy: -0.2, socialness: -0.1 },
+            'from_contemplative_to_emotional': { mood: 'emotional', energy: 0.1, socialness: 0.2 },
+            'from_emotional_to_indignant': { mood: 'indignant', energy: 0.3, socialness: 0.1 },
+            'from_indignant_to_challenging': { mood: 'challenging', energy: 0.2, socialness: -0.1 }
+        };
+        
+        const adjustment = emotionAdjustments[emotionalShift];
+        if (adjustment) {
+            state.mood = adjustment.mood;
+            state.energy = Math.max(0, Math.min(1, state.energy + adjustment.energy));
+            state.socialness = Math.max(0, Math.min(1, state.socialness + adjustment.socialness));
+            console.log(`🎭 ${aiName} 情绪调整: ${adjustment.mood}`);
+        }
+    }
+    
+    // 传统轮次转换（备用方案）
+    async traditionalRoundTransition() {
+        console.log('🔄 使用传统轮次转换方式');
+        
         // 设置新轮次的主题
         this.gameState.setCurrentTheme(this.gameState.currentRound);
         const newTheme = this.gameState.getCurrentThemeInfo();
@@ -3796,20 +4138,14 @@ ${emojiInstruction}
             this.updateAIEmotionsForTheme(newTheme);
         }
         
-        // 注意：轮次开始消息现在在 showJudgmentAnalysis 中处理
-        // 这里直接开始生成对话，但确保状态完全重置后再调用
+        // 开始生成对话
         this.safeTimeout(() => {
             this.safeAsync(async () => {
-                // 重置对话生成状态（在开始新对话前重置）
                 this.isGeneratingConversation = false;
-                console.log('🔄 对话生成状态已重置为 false');
-                
-                // 重置开始下一轮状态
                 this.isStartingNextRound = false;
-                
                 await this.generateInitialConversation();
             });
-        }, 5500);  // 调整为5.5秒，在轮次开始消息显示1秒后
+        }, 5500);
     }
     
     // 显示主题转换效果

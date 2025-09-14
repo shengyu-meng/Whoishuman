@@ -835,15 +835,17 @@ body {
 .system-message {
     text-align: center;
     margin: 10px auto;
-    color: #999;
+    color: #999 !important;
     font-style: normal;
     font-size: 12px;
-    background: rgba(0, 0, 0, 0.05);
+    background: rgba(255, 255, 255, 0.9) !important;
     padding: 4px 12px;
     border-radius: 12px;
     display: block;
     width: fit-content;
     max-width: 80%;
+    border: 1px solid rgba(224, 224, 224, 0.3);
+    backdrop-filter: blur(5px);
 }
 
 .suspicion-notice {
@@ -1161,10 +1163,10 @@ body {
 }
 */
 
-/* 主题系统消息样式 - 改为灰色系统提示 */
+/* 主题系统消息样式 - 强制白色背景 */
 .theme-transition-message {
-    background: #f0f0f0;
-    color: #888;
+    background: rgba(255, 255, 255, 0.95) !important;
+    color: #888 !important;
     padding: 8px 15px;
     border-radius: 15px;
     margin: 10px auto;
@@ -1172,7 +1174,9 @@ body {
     text-align: center;
     font-weight: normal;
     font-size: 13px;
-    box-shadow: none;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+    border: 1px solid rgba(224, 224, 224, 0.3);
+    backdrop-filter: blur(5px);
     animation: fadeIn 0.3s ease-out;
 }
 
@@ -2000,16 +2004,19 @@ body {
     }
 }
 
-/* 主题转换提示样式 */
+/* 主题转换提示样式 - 统一白色背景 */
 .theme-transition-notice {
-    background: linear-gradient(135deg, var(--theme-primary), var(--theme-secondary));
-    color: white;
+    background: white;
+    color: #333;
     padding: 15px 20px;
-    border-radius: 8px;
+    border-radius: 15px;
     text-align: center;
     margin: 10px auto;
     max-width: 80%;
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+    border: 1px solid rgba(224, 224, 224, 0.3);
+    border-left: 4px solid #07c160;  /* 微信绿色左边框作为强调 */
+    backdrop-filter: blur(5px);
     animation: slideInFromTop 0.8s ease-out;
 }
 
@@ -2113,3 +2120,306 @@ body {
         margin-right: 8px;
     }
 }
+
+/* ================================== */
+/* 主题过渡效果样式 */
+/* ================================== */
+
+/* 过渡消息样式 - 与普通AI消息完全一致 */
+.transition-message .message-text {
+    /* 使用与标准AI消息完全相同的样式 */
+    background: white !important;
+    padding: 12px 16px;
+    border-radius: 8px;
+    color: #1a1a1a !important;
+    line-height: 1.4;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+    position: relative;
+    max-width: min(600px, 70vw);
+    word-wrap: break-word;
+    word-break: break-word;
+    min-height: 20px;
+}
+
+/* 过渡消息也需要左侧小三角 */
+.transition-message .message-text::before {
+    content: '';
+    position: absolute;
+    left: -8px;
+    top: 15px;
+    width: 0;
+    height: 0;
+    border-top: 8px solid transparent;
+    border-bottom: 8px solid transparent;
+    border-right: 8px solid white;
+}
+
+/* 移除过渡消息的::before伪元素特效 */
+
+/* 不同阶段的过渡消息样式已移除 - 使用统一的普通消息样式 */
+
+/* 过渡消息动画 */
+@keyframes transitionMessageFadeIn {
+    0% {
+        opacity: 0;
+        transform: translateY(20px) scale(0.95);
+    }
+    50% {
+        opacity: 0.7;
+        transform: translateY(-5px) scale(1.02);
+    }
+    100% {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+@keyframes transitionGlow {
+    0% {
+        opacity: 0.6;
+        box-shadow: 0 0 5px rgba(102, 126, 234, 0.3);
+    }
+    100% {
+        opacity: 1;
+        box-shadow: 0 0 15px rgba(102, 126, 234, 0.6);
+    }
+}
+
+/* 情绪桥接效果 */
+.emotional-transition {
+    position: relative;
+    overflow: hidden;
+}
+
+.emotional-transition::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, 
+        transparent 0%, 
+        rgba(102, 126, 234, 0.1) 50%, 
+        transparent 100%);
+    animation: emotionalWave 3s ease-in-out;
+}
+
+@keyframes emotionalWave {
+    0% {
+        left: -100%;
+    }
+    50% {
+        left: 0%;
+    }
+    100% {
+        left: 100%;
+    }
+}
+
+/* 分层对话深度指示器 */
+.dialogue-depth-indicator {
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 4px;
+    height: 60%;
+    background: linear-gradient(to bottom, 
+        rgba(102, 126, 234, 0.2) 0%,
+        rgba(102, 126, 234, 0.8) 100%);
+    border-radius: 2px;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.message:hover .dialogue-depth-indicator {
+    opacity: 1;
+}
+
+/* 深度层次样式 */
+.depth-surface .dialogue-depth-indicator {
+    height: 20%;
+    background: linear-gradient(to bottom, 
+        rgba(255, 149, 0, 0.3) 0%,
+        rgba(255, 149, 0, 0.7) 100%);
+}
+
+.depth-experiential .dialogue-depth-indicator {
+    height: 35%;
+    background: linear-gradient(to bottom, 
+        rgba(0, 122, 255, 0.3) 0%,
+        rgba(0, 122, 255, 0.7) 100%);
+}
+
+.depth-emotional .dialogue-depth-indicator {
+    height: 50%;
+    background: linear-gradient(to bottom, 
+        rgba(255, 45, 85, 0.3) 0%,
+        rgba(255, 45, 85, 0.8) 100%);
+}
+
+.depth-cognitive .dialogue-depth-indicator {
+    height: 70%;
+    background: linear-gradient(to bottom, 
+        rgba(88, 86, 214, 0.3) 0%,
+        rgba(88, 86, 214, 0.8) 100%);
+}
+
+.depth-philosophical .dialogue-depth-indicator {
+    height: 85%;
+    background: linear-gradient(to bottom, 
+        rgba(147, 51, 234, 0.3) 0%,
+        rgba(147, 51, 234, 0.9) 100%);
+}
+
+.depth-transcendent .dialogue-depth-indicator {
+    height: 100%;
+    background: linear-gradient(to bottom, 
+        rgba(236, 72, 153, 0.3) 0%,
+        rgba(236, 72, 153, 1) 100%);
+    box-shadow: 0 0 10px rgba(236, 72, 153, 0.5);
+}
+
+/* 主题转换全局动画 */
+.theme-transition {
+    animation: themeShift 1.5s ease-in-out;
+}
+
+@keyframes themeShift {
+    0% {
+        filter: blur(0px) brightness(1);
+        transform: scale(1);
+    }
+    25% {
+        filter: blur(2px) brightness(1.1);
+        transform: scale(1.02);
+    }
+    50% {
+        filter: blur(1px) brightness(0.95);
+        transform: scale(0.98);
+    }
+    75% {
+        filter: blur(0.5px) brightness(1.05);
+        transform: scale(1.01);
+    }
+    100% {
+        filter: blur(0px) brightness(1);
+        transform: scale(1);
+    }
+}
+
+/* 情绪强度可视化 */
+.emotional-intensity-bar {
+    position: absolute;
+    left: 0;
+    bottom: 0;
+    height: 3px;
+    background: linear-gradient(90deg, 
+        rgba(52, 199, 89, 0.7) 0%,
+        rgba(255, 149, 0, 0.8) 50%,
+        rgba(255, 59, 48, 0.9) 100%);
+    transition: width 0.5s ease-out;
+    border-radius: 0 0 4px 4px;
+}
+
+.emotional-intensity-low .emotional-intensity-bar {
+    width: 30%;
+}
+
+.emotional-intensity-medium .emotional-intensity-bar {
+    width: 60%;
+}
+
+.emotional-intensity-high .emotional-intensity-bar {
+    width: 90%;
+}
+
+/* 过渡阶段进度指示 - 强制白色背景 */
+.transition-progress {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    width: 60px;
+    height: 60px;
+    background: rgba(255, 255, 255, 0.95) !important;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+    z-index: 1000;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.transition-progress.active {
+    opacity: 1;
+}
+
+.transition-progress-ring {
+    width: 40px;
+    height: 40px;
+    border: 3px solid #f0f0f0;
+    border-top: 3px solid #007aff;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* 对话层次切换动画 */
+.layer-transition {
+    animation: layerShift 0.8s ease-out;
+}
+
+@keyframes layerShift {
+    0% {
+        opacity: 0.7;
+        transform: translateX(-20px);
+    }
+    50% {
+        opacity: 0.9;
+        transform: translateX(5px);
+    }
+    100% {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+/* 响应式适配 */
+@media (max-width: 768px) {
+    .transition-progress {
+        top: 15px;
+        right: 15px;
+        width: 50px;
+        height: 50px;
+    }
+    
+    .transition-progress-ring {
+        width: 35px;
+        height: 35px;
+    }
+    
+    .dialogue-depth-indicator {
+        width: 3px;
+        right: 8px;
+    }
+    
+    .emotional-intensity-bar {
+        height: 2px;
+    }
+}
+
+/* 强制所有过渡相关的消息文本使用浅色主题 */
+[class*="transition"] .message-text,
+[class*="theme-transition"] {
+    background: white !important;
+    color: #333 !important;
+}
+
+/* 暗色主题适配已移除 - 强制使用浅色主题以保持UI一致性 */

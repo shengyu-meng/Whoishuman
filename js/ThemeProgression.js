@@ -284,47 +284,7 @@ const THEME_AI_BEHAVIORS = {
     }
 };
 
-// 工具函数
-const ThemeUtils = {
-    // 获取当前轮次主题
-    getCurrentTheme(roundNumber) {
-        return THEME_PROGRESSION[roundNumber] || THEME_PROGRESSION[1];
-    },
-    
-    // 获取主题情绪配置
-    getThemeEmotion(themeId) {
-        return THEME_EMOTION_MAPPING[themeId] || THEME_EMOTION_MAPPING.work_complaints;
-    },
-    
-    // 获取主题行为模式
-    getThemeBehavior(themeId) {
-        return THEME_AI_BEHAVIORS[themeId] || THEME_AI_BEHAVIORS.work_complaints;
-    },
-    
-    // 获取转换配置
-    getTransitionConfig(fromTheme, toTheme) {
-        const transitionKey = `${fromTheme}_to_${toTheme}`;
-        return THEME_TRANSITION_TRIGGERS[transitionKey];
-    },
-    
-    // 检查是否为特殊轮次
-    isSpecialRound(roundNumber) {
-        const theme = this.getCurrentTheme(roundNumber);
-        return theme.passRate === "special" || theme.passRate === "awakening";
-    },
-    
-    // 获取主题关键词
-    getThemeKeywords(themeId) {
-        const theme = Object.values(THEME_PROGRESSION).find(t => t.id === themeId);
-        return theme ? theme.keywords : [];
-    },
-    
-    // 根据轮次判断难度递进
-    getDifficultyProgression(roundNumber) {
-        const baseRates = [70, 50, 35, 20, 15, 15, 25, "awakening"];
-        return baseRates[roundNumber - 1] || 10;
-    }
-};
+// Note: ThemeUtils is now in dedicated ThemeUtils.js file
 
 // 导出配置
 if (typeof module !== 'undefined' && module.exports) {
@@ -332,8 +292,7 @@ if (typeof module !== 'undefined' && module.exports) {
         THEME_PROGRESSION,
         THEME_EMOTION_MAPPING,
         THEME_TRANSITION_TRIGGERS,
-        THEME_AI_BEHAVIORS,
-        ThemeUtils
+        THEME_AI_BEHAVIORS
     };
 } else {
     // 浏览器环境
@@ -341,5 +300,4 @@ if (typeof module !== 'undefined' && module.exports) {
     window.THEME_EMOTION_MAPPING = THEME_EMOTION_MAPPING;
     window.THEME_TRANSITION_TRIGGERS = THEME_TRANSITION_TRIGGERS;
     window.THEME_AI_BEHAVIORS = THEME_AI_BEHAVIORS;
-    window.ThemeUtils = ThemeUtils;
 }

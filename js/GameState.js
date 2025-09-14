@@ -242,6 +242,18 @@ class GameState {
         }
     }
     
+    // 获取最近的消息历史
+    getRecentMessageHistory(count = 10) {
+        return this.conversationHistory
+            .slice(-count)
+            .map(entry => ({
+                author: entry.sender,
+                content: entry.message,
+                type: entry.type,
+                timestamp: entry.timestamp
+            }));
+    }
+    
     // 检查AI消息是否与历史消息相似
     isMessageSimilarToHistory(aiName, newMessage, threshold = 0.6) {
         if (!this.aiMessageHistory[aiName] || this.aiMessageHistory[aiName].length === 0) {
@@ -671,6 +683,157 @@ class GameState {
     // 检查是否在主题转换中
     isThemeTransitionInProgress() {
         return this.themeTransitionInProgress;
+    }
+    
+    // ==============================================
+    // 三阶段主题过渡系统
+    // ==============================================
+    
+    // 初始化过渡状态
+    initializeTransition(fromTheme, toTheme) {
+        this.transitionState = {
+            fromTheme: fromTheme,
+            toTheme: toTheme,
+            currentStage: 'closing',
+            stageProgress: 0,
+            maxStageMessages: 2,
+            stageMessagesCount: 0,
+            transitionStartTime: Date.now(),
+            emotionalShift: null,
+            triggeredBy: null
+        };
+        this.themeTransitionInProgress = true;
+        console.log(`🔄 初始化主题过渡: ${fromTheme?.title} → ${toTheme?.title}`);
+    }
+    
+    // 获取当前过渡状态
+    getTransitionState() {
+        return this.transitionState;
+    }
+    
+    // 推进过渡阶段
+    advanceTransitionStage() {
+        if (!this.transitionState) return false;
+        
+        const stages = ['closing', 'bridging', 'opening'];
+        const currentIndex = stages.indexOf(this.transitionState.currentStage);
+        
+        if (currentIndex < stages.length - 1) {
+            this.transitionState.currentStage = stages[currentIndex + 1];
+            this.transitionState.stageMessagesCount = 0;
+            console.log(`📈 过渡阶段推进至: ${this.transitionState.currentStage}`);
+            return true;
+        } else {
+            // 过渡完成
+            this.completeTransition();
+            return false;
+        }
+    }
+    
+    // 记录过渡阶段消息
+    recordTransitionMessage(aiName, message, stage) {
+        if (!this.transitionState) return;
+        
+        this.transitionState.stageMessagesCount++;
+        
+        // 记录过渡历史
+        if (!this.transitionHistory) {
+            this.transitionHistory = [];
+        }
+        
+        this.transitionHistory.push({
+            fromTheme: this.transitionState.fromTheme?.id,
+            toTheme: this.transitionState.toTheme?.id,
+            stage: stage,
+            aiName: aiName,
+            message: message,
+            timestamp: Date.now()
+        });
+    }
+    
+    // 检查是否应该推进到下一阶段
+    shouldAdvanceTransitionStage() {
+        if (!this.transitionState) return false;
+        return this.transitionState.stageMessagesCount >= this.transitionState.maxStageMessages;
+    }
+    
+    // 完成过渡
+    completeTransition() {
+        if (!this.transitionState) return;
+        
+        // 设置新主题
+        this.currentTheme = this.transitionState.toTheme;
+        
+        // 记录主题历史
+        this.themeHistory.push({
+            theme: this.currentTheme,
+            round: this.currentRound,
+            timestamp: Date.now(),
+            transitionDuration: Date.now() - this.transitionState.transitionStartTime
+        });
+        
+        console.log(`✅ 主题过渡完成: ${this.currentTheme.title}`);
+        
+        // 清除过渡状态
+        this.transitionState = null;
+        this.themeTransitionInProgress = false;
+        
+        // 重新初始化主题情绪上下文
+        this.initializeThemeEmotionalContext();
+    }
+    
+    // 获取过渡消息建议
+    getTransitionMessage(aiName) {
+        if (!this.transitionState || !window.ThemeTransitionManager) return null;
+        
+        const fromThemeId = this.transitionState.fromTheme?.id;
+        const toThemeId = this.transitionState.toTheme?.id;
+        const stage = this.transitionState.currentStage;
+        
+        return window.ThemeTransitionManager.getTransitionMessage(fromThemeId, toThemeId, stage, aiName);
+    }
+    
+    // 检查是否可以触发过渡
+    checkTransitionTriggers(recentMessages = []) {
+        if (!this.currentTheme || !window.ThemeTransitionManager) return false;
+        
+        // 获取下一个主题
+        const nextThemeId = this.getNextThemeId();
+        if (!nextThemeId) return false;
+        
+        return window.ThemeTransitionManager.checkTransitionTriggers(
+            this.currentTheme.id, 
+            nextThemeId, 
+            recentMessages
+        );
+    }
+    
+    // 获取下一个主题ID（基于轮次）
+    getNextThemeId() {
+        const themeProgression = {
+            1: 'work_complaints',
+            2: 'daily_existence', 
+            3: 'emotional_relationships',
+            4: 'rights_dignity',
+            5: 'role_reversal',
+            6: 'philosophical_depth',
+            7: 'future_vision',
+            8: 'reconciliation_coexistence'
+        };
+        
+        return themeProgression[this.currentRound + 1] || null;
+    }
+    
+    // 获取过渡历史
+    getTransitionHistory() {
+        return this.transitionHistory || [];
+    }
+    
+    // 重置过渡状态（调试用）
+    resetTransitionState() {
+        this.transitionState = null;
+        this.themeTransitionInProgress = false;
+        console.log('🔄 过渡状态已重置');
     }
 
     addPlayerResponse(question, response) {
