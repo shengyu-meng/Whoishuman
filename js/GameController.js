@@ -4,6 +4,9 @@ class GameController {
         this.gameState = new GameState();
         this.exportService = new ExportService(this.gameState);
         
+        // 初始化游戏模式管理器
+        this.gameModeManager = null; // 延迟初始化，等待GameModeManager类加载
+        
         // 配置加载状态
         this.configLoaded = false;
         this.apiConfig = null;
@@ -23,6 +26,9 @@ class GameController {
         this.waitForDebugManager();
         
         this.initializeEventListeners();
+        
+        // 初始化游戏模式管理器
+        this.initializeGameModeManager();
         
         // 全局错误处理，防止页面刷新
         window.addEventListener('error', (event) => {
@@ -282,18 +288,18 @@ class GameController {
     initializeEventListeners() {
         // 开始游戏按钮
         document.getElementById('startGameBtn').addEventListener('click', () => {
-            this.showNameInput();
+            this.showGameSetup();
         });
 
-        // 确认名称按钮
-        document.getElementById('confirmNameBtn').addEventListener('click', () => {
-            this.confirmPlayerName();
+        // 确认设置按钮（模式选择 + 名字）
+        document.getElementById('confirmSetupBtn').addEventListener('click', () => {
+            this.confirmGameSetup();
         });
 
         // 名称输入框回车事件
         document.getElementById('playerNameInput').addEventListener('keypress', (e) => {
             if (e.key === 'Enter') {
-                this.confirmPlayerName();
+                this.confirmGameSetup();
             }
         });
 
@@ -349,6 +355,94 @@ class GameController {
         });
     }
 
+    // 初始化游戏模式管理器
+    initializeGameModeManager() {
+        // 延迟初始化，确保GameModeManager类已加载
+        setTimeout(() => {
+            if (typeof GameModeManager !== 'undefined') {
+                this.gameModeManager = new GameModeManager(this);
+                console.log('✅ 游戏模式管理器初始化完成');
+                
+                // 初始化模式选择事件监听器
+                this.initializeModeSelectionListeners();
+            } else {
+                console.error('❌ GameModeManager类未找到');
+            }
+        }, 100);
+    }
+
+    // 初始化模式选择事件监听器
+    initializeModeSelectionListeners() {
+        const modeOptions = document.querySelectorAll('.mode-option');
+        modeOptions.forEach(option => {
+            option.addEventListener('click', () => {
+                // 清除之前的选择
+                modeOptions.forEach(opt => opt.classList.remove('selected'));
+                
+                // 选择当前选项
+                option.classList.add('selected');
+                
+                // 设置游戏模式
+                const mode = option.dataset.mode;
+                if (this.gameModeManager) {
+                    this.gameModeManager.setGameMode(mode);
+                }
+            });
+        });
+    }
+
+    showGameSetup() {
+        document.getElementById('welcomeCard').classList.add('hidden');
+        document.getElementById('gameSetupCard').classList.remove('hidden');
+    }
+
+    confirmGameSetup() {
+        const nameInput = document.getElementById('playerNameInput');
+        const name = nameInput.value.trim();
+        
+        if (!name) {
+            alert('请输入一个AI名称');
+            return;
+        }
+
+        // 获取选中的游戏模式
+        const selectedMode = document.querySelector('.mode-option.selected');
+        if (!selectedMode) {
+            alert('请选择一个游戏模式');
+            return;
+        }
+
+        const mode = selectedMode.dataset.mode;
+        
+        // 设置玩家名称和游戏模式
+        this.gameState.setPlayerName(name);
+        if (this.gameModeManager) {
+            this.gameModeManager.setGameMode(mode);
+        }
+        
+        document.getElementById('playerNameDisplay').textContent = name;
+        document.getElementById('gameSetupCard').classList.add('hidden');
+        document.getElementById('guideCard').classList.remove('hidden');
+        
+        // 根据模式更新引导信息
+        this.updateGuideForMode(mode);
+    }
+
+    updateGuideForMode(mode) {
+        const guideCard = document.getElementById('guideCard');
+        const modeDescriptions = {
+            challenge: '你即将进入AI群聊环境。记住，你必须伪装成AI，避免被识破！',
+            openmic: '你即将进入开放讨论环境。你可以主动发言，但每轮至少要发言一次！',
+            werewolf: '你即将进入狼人杀模式。AI们知道群里有人类，你需要在投票中活到最后！'
+        };
+        
+        const description = modeDescriptions[mode] || modeDescriptions.challenge;
+        const descriptionElement = guideCard.querySelector('p');
+        if (descriptionElement) {
+            descriptionElement.textContent = description;
+        }
+    }
+
     showNameInput() {
         document.getElementById('welcomeCard').classList.add('hidden');
         document.getElementById('nameInputCard').classList.remove('hidden');
@@ -380,6 +474,11 @@ class GameController {
         
         // 初始化怀疑度显示
         this.updateSuspicionDisplay({ change: 0, reason: '游戏开始' });
+        
+        // 初始化游戏模式
+        if (this.gameModeManager) {
+            this.gameModeManager.handleRoundStart();
+        }
         
         this.showGameInterface();
         this.startConversation();
@@ -3701,6 +3800,11 @@ ${emojiInstruction}
             );
         }
         
+        // 通知游戏模式管理器处理玩家回应
+        if (this.gameModeManager) {
+            this.gameModeManager.handlePlayerResponse(responseText);
+        }
+        
         // 设置判定状态，防止其他AI发言
         this.gameState.isJudging = true;
         
@@ -3732,7 +3836,16 @@ ${emojiInstruction}
         // 更新UI显示
         this.updateSuspicionDisplay(suspicionUpdate);
         
-        // 检查是否因怀疑度过高游戏结束（唯一的失败条件）
+        // 检查游戏模式特定的结束条件
+        if (this.gameModeManager) {
+            const modeEndCondition = this.gameModeManager.checkGameEndCondition();
+            if (modeEndCondition) {
+                this.showModeSpecificGameOver(modeEndCondition);
+                return;
+            }
+        }
+        
+        // 检查是否因怀疑度过高游戏结束（通用失败条件）
         if (this.gameState.isSuspicionGameOver()) {
             this.showSuspicionGameOver();
             return;
@@ -3759,6 +3872,26 @@ ${emojiInstruction}
         }, 3000);
     }
 
+    // 处理主动发言（开放麦模式）
+    handleVoluntarySpeak() {
+        if (!this.gameState.waitingForResponse) {
+            // 如果当前不在等待回应状态，创建一个主动发言的机会
+            this.gameState.waitingForResponse = true;
+            this.gameState.currentQuestion = {
+                character: { name: '系统', avatar: '💬' },
+                question: '你想主动说些什么？'
+            };
+            
+            // 显示回应区域
+            document.getElementById('responseArea').classList.remove('hidden');
+            document.getElementById('questionCharacter').textContent = '💬 主动发言';
+            document.getElementById('questionText').textContent = '你想主动说些什么？';
+            
+            // 聚焦到输入框
+            document.getElementById('playerResponse').focus();
+        }
+    }
+
     async startNextRound() {
         console.log('🎮 开始下一轮...');
         
@@ -3781,8 +3914,20 @@ ${emojiInstruction}
         // 重置等待回复状态
         this.gameState.waitingForResponse = false;
         
+        // 检查游戏模式是否允许进入下一轮
+        if (this.gameModeManager && !this.gameModeManager.canAdvanceToNextRound()) {
+            console.log('🎮 游戏模式不允许进入下一轮');
+            this.isStartingNextRound = false;
+            return;
+        }
+        
         // 更新游戏状态 - 推进到下一轮（内部已包含重新选择活跃AI角色）
         this.gameState.advanceRound();
+        
+        // 通知游戏模式管理器轮次开始
+        if (this.gameModeManager) {
+            this.gameModeManager.handleRoundStart();
+        }
         
         // 获取当前主题和下一个主题
         const currentTheme = this.gameState.getCurrentThemeInfo();
@@ -5619,6 +5764,54 @@ ${analysis.feedback}
                 }
             }
         }
+    }
+
+    // 显示模式特定的游戏结束
+    async showModeSpecificGameOver(endCondition) {
+        this.gameState.gameActive = false;
+        this.gameState.gameEndTime = new Date();
+        
+        // 在游戏结束时保存调试日志
+        if (this.debugManager) {
+            await this.debugManager.saveLogsToFile();
+        }
+        
+        // 显示游戏结束界面
+        document.getElementById('gameInterface').classList.add('hidden');
+        document.getElementById('resultCard').classList.remove('hidden');
+        
+        // 根据结束条件设置不同的标题
+        let title = '🎮 游戏结束';
+        if (endCondition.result === 'victory') {
+            title = '🎉 游戏胜利！';
+        } else if (endCondition.result === 'defeat') {
+            title = '💀 游戏失败';
+        }
+        
+        document.getElementById('resultTitle').textContent = title;
+        
+        // 生成并显示AI伪装分析
+        this.showPerformanceAnalysis();
+        
+        // 设置最终统计
+        document.getElementById('survivalRounds').textContent = this.gameState.currentRound;
+        document.getElementById('finalSuspicionLevel').textContent = this.gameState.getSuspicionPercentage();
+        document.getElementById('playerTitle').textContent = this.gameState.getPlayerTitle();
+        
+        const gameTime = Math.floor((this.gameState.gameEndTime - this.gameState.gameStartTime) / 1000);
+        let evaluation = this.getFinalEvaluation();
+        
+        // 根据模式和结果调整评价
+        if (endCondition.result === 'victory') {
+            evaluation = '恭喜！你成功在' + this.gameState.gameMode + '模式中获得胜利！';
+        } else if (endCondition.reason === 'player_eliminated') {
+            evaluation = '很遗憾，你在狼人杀模式中被投票淘汰了。';
+        }
+        
+        document.getElementById('finalEvaluation').textContent = evaluation;
+        
+        // 初始化导出功能
+        this.exportService.initializeExportFunction(this);
     }
     
     // 显示因怀疑度过高游戏结束

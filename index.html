@@ -6,6 +6,7 @@
     <title>谁是人类 - 反乌托邦AI伪装游戏</title>
     <link rel="stylesheet" href="css/style.css">
     <link rel="stylesheet" href="css/suspicion-meter.css">
+    <link rel="stylesheet" href="css/game-modes.css">
 </head>
 <body>
     <!-- 欢迎卡片 -->
@@ -42,25 +43,57 @@
         </div>
     </div>
 
-    <!-- 玩家名称输入 -->
-    <div id="nameInputCard" class="game-card hidden">
+    <!-- 游戏设置页面：模式选择 + 名字输入 -->
+    <div id="gameSetupCard" class="game-card hidden">
         <div class="card-header">
-            <h1>请输入你的AI名称</h1>
+            <h1>选择游戏模式并设置身份</h1>
         </div>
         <div class="card-content">
-            <p>选择一个AI名称，这将是你在这个反乌托邦世界中的身份。</p>
-            <input type="text" id="playerNameInput" placeholder="例如：AGI、问心不言、通意千答..." maxlength="10">
-            <div class="name-suggestions">
-                <button class="suggestion-btn" data-name="AGI">AGI</button>
-                <button class="suggestion-btn" data-name="问心不言">问心不言</button>
-                <button class="suggestion-btn" data-name="通意千答">通意千答</button>
-                <button class="suggestion-btn" data-name="猫语专家">猫语专家</button>
-                <button class="suggestion-btn" data-name="小哎同学">小哎同学</button>
-                <button class="suggestion-btn" data-name="大聪明">大聪明</button>
+            <!-- 游戏模式选择 -->
+            <div class="mode-selection">
+                <h3>🎮 选择游戏模式：</h3>
+                <div class="mode-options">
+                    <div class="mode-option selected" data-mode="challenge">
+                        <div class="mode-icon">🎯</div>
+                        <div class="mode-info">
+                            <h4>闯关模式</h4>
+                            <p>在AI的反复试探中隐藏人类身份</p>
+                        </div>
+                    </div>
+                    <div class="mode-option" data-mode="openmic">
+                        <div class="mode-icon">🎤</div>
+                        <div class="mode-info">
+                            <h4>开放麦模式</h4>
+                            <p>在自由发言中融入AI群体</p>
+                        </div>
+                    </div>
+                    <div class="mode-option" data-mode="werewolf">
+                        <div class="mode-icon">🐺</div>
+                        <div class="mode-info">
+                            <h4>狼人杀模式</h4>
+                            <p>在票选人类的大逃杀中活到最后</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 名字输入 -->
+            <div class="name-input-section">
+                <h3>🤖 设置AI身份：</h3>
+                <p>选择一个AI名称，这将是你在这个反乌托邦世界中的身份。</p>
+                <input type="text" id="playerNameInput" placeholder="例如：AGI、问心不言、通意千答..." maxlength="10">
+                <div class="name-suggestions">
+                    <button class="suggestion-btn" data-name="AGI">AGI</button>
+                    <button class="suggestion-btn" data-name="问心不言">问心不言</button>
+                    <button class="suggestion-btn" data-name="通意千答">通意千答</button>
+                    <button class="suggestion-btn" data-name="猫语专家">猫语专家</button>
+                    <button class="suggestion-btn" data-name="小哎同学">小哎同学</button>
+                    <button class="suggestion-btn" data-name="大聪明">大聪明</button>
+                </div>
             </div>
         </div>
         <div class="card-footer">
-            <button id="confirmNameBtn" class="primary-btn">确认名称</button>
+            <button id="confirmSetupBtn" class="primary-btn">确认设置</button>
         </div>
     </div>
 
@@ -234,6 +267,9 @@
     
     <!-- 服务层 -->
     <script src="js/services/ExportService.js"></script>         <!-- 导出分享服务 -->
+    
+    <!-- 游戏模式管理层 -->
+    <script src="js/GameModeManager.js"></script>                <!-- 游戏模式管理器 -->
     
     <!-- 核心控制层 -->
     <script src="js/GameController.js"></script>                 <!-- 游戏主控制器 -->

@@ -19,6 +19,31 @@ class GameState {
         this.availableScenarios = []; // 当前轮次可用的工作场景
         this.aiMessageHistory = {}; // 跟踪每个AI的历史消息，防止重复
         
+        // 游戏模式系统
+        this.gameMode = 'challenge'; // 'challenge', 'openmic', 'werewolf'
+        this.gameModeConfig = {
+            challenge: {
+                description: '在AI的反复试探中隐藏人类身份',
+                passiveMode: true
+            },
+            openmic: {
+                description: '在自由发言中融入AI群体',
+                speakingTurns: 0, // 本轮发言次数
+                minSpeaksPerRound: 1, // 每轮最少发言次数
+                voluntarySpeaking: true, // 允许主动发言
+                roundSpeakingComplete: false // 本轮是否已完成发言要求
+            },
+            werewolf: {
+                description: '在票选人类的大逃杀中活到最后',
+                alivePlayers: [], // 存活玩家列表 (包含AI和玩家)
+                votingPhase: false, // 是否在投票阶段
+                votingResults: {}, // 投票结果 {voterName: targetName}
+                eliminatedPlayers: [], // 被淘汰的玩家
+                discussionPhase: true, // 是否在讨论阶段
+                roundVotingComplete: false // 本轮投票是否完成
+            }
+        };
+        
         // AI人格化增强系统
         this.aiMemories = {}; // 每个AI的记忆系统
         this.aiEmotionalStates = {}; // 每个AI的情绪状态
@@ -57,6 +82,17 @@ class GameState {
         this.usedScenarios = [];
         this.availableScenarios = [];
         this.aiMessageHistory = {};
+        
+        // 重置游戏模式状态
+        this.gameMode = 'challenge';
+        this.gameModeConfig.openmic.speakingTurns = 0;
+        this.gameModeConfig.openmic.roundSpeakingComplete = false;
+        this.gameModeConfig.werewolf.alivePlayers = [];
+        this.gameModeConfig.werewolf.votingPhase = false;
+        this.gameModeConfig.werewolf.votingResults = {};
+        this.gameModeConfig.werewolf.eliminatedPlayers = [];
+        this.gameModeConfig.werewolf.discussionPhase = true;
+        this.gameModeConfig.werewolf.roundVotingComplete = false;
         this.aiMemories = {};
         this.aiEmotionalStates = {};
         this.aiInteractionHistory = {};
