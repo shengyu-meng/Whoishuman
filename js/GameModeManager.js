@@ -20,12 +20,30 @@ class GameModeManager {
             return false;
         }
         
+        // 清理之前模式的UI元素
+        this.cleanupModeUI();
+        
         this.currentMode = mode;
         this.gameState.gameMode = mode;
         this.initializeModeSpecificLogic();
         
         console.log(`🎯 游戏模式设置为: ${mode}`);
         return true;
+    }
+    
+    // 清理模式特定的UI元素
+    cleanupModeUI() {
+        // 清理主动发言按钮
+        const voluntaryBtn = document.getElementById('voluntarySpeakBtn');
+        if (voluntaryBtn) {
+            voluntaryBtn.remove();
+        }
+        
+        // 清理投票界面
+        const votingInterface = document.getElementById('votingInterface');
+        if (votingInterface) {
+            votingInterface.remove();
+        }
     }
     
     // 获取当前模式
@@ -269,18 +287,26 @@ class OpenMicMode extends BaseGameMode {
     }
     
     showVoluntarySpeakButton() {
-        // 在响应区域添加主动发言按钮
-        const responseArea = document.getElementById('responseArea');
-        if (responseArea && !document.getElementById('voluntarySpeakBtn')) {
-            const buttonGroup = responseArea.querySelector('.button-group');
-            if (buttonGroup) {
-                const voluntaryBtn = document.createElement('button');
-                voluntaryBtn.id = 'voluntarySpeakBtn';
-                voluntaryBtn.className = 'secondary-btn';
-                voluntaryBtn.textContent = '🎤 主动发言';
-                voluntaryBtn.onclick = () => this.triggerVoluntarySpeak();
-                buttonGroup.insertBefore(voluntaryBtn, buttonGroup.firstChild);
-            }
+        // 在游戏界面头部添加主动发言按钮，让它始终可见
+        const gameHeader = document.querySelector('.game-header');
+        if (gameHeader && !document.getElementById('voluntarySpeakBtn')) {
+            const voluntaryBtn = document.createElement('button');
+            voluntaryBtn.id = 'voluntarySpeakBtn';
+            voluntaryBtn.className = 'voluntary-speak-btn';
+            voluntaryBtn.innerHTML = '🎤 主动发言';
+            voluntaryBtn.onclick = () => this.triggerVoluntarySpeak();
+            
+            // 添加到游戏头部
+            gameHeader.appendChild(voluntaryBtn);
+            
+            console.log('🎤 主动发言按钮已添加到游戏界面');
+        }
+    }
+    
+    hideVoluntarySpeakButton() {
+        const voluntaryBtn = document.getElementById('voluntarySpeakBtn');
+        if (voluntaryBtn) {
+            voluntaryBtn.remove();
         }
     }
     

@@ -83,10 +83,66 @@
 }
 
 .name-input-section h3 {
-    margin-bottom: 10px;
+    margin-bottom: 15px;
     color: #333;
     font-size: 18px;
     font-weight: 600;
+}
+
+.name-input-section p {
+    margin-bottom: 15px;
+    color: #666;
+    font-size: 14px;
+    line-height: 1.5;
+}
+
+/* 名字输入框样式增强 */
+.name-input-section #playerNameInput {
+    width: 100%;
+    padding: 12px 16px;
+    border: 2px solid #e0e0e0;
+    border-radius: 8px;
+    font-size: 16px;
+    transition: all 0.3s ease;
+    margin-bottom: 15px;
+    background: #fafafa;
+}
+
+.name-input-section #playerNameInput:focus {
+    outline: none;
+    border-color: #07c160;
+    background: white;
+    box-shadow: 0 0 0 3px rgba(7, 193, 96, 0.1);
+}
+
+.name-input-section #playerNameInput::placeholder {
+    color: #999;
+    font-size: 14px;
+}
+
+/* 名字建议按钮样式增强 */
+.name-input-section .name-suggestions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 10px;
+}
+
+.name-input-section .suggestion-btn {
+    padding: 8px 12px;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    background: white;
+    color: #666;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.name-input-section .suggestion-btn:hover {
+    border-color: #07c160;
+    color: #07c160;
+    background: rgba(7, 193, 96, 0.05);
 }
 
 /* 投票界面样式（狼人杀模式） */
@@ -164,27 +220,46 @@
 }
 
 /* 主动发言按钮样式（开放麦模式） */
-#voluntarySpeakBtn {
+.voluntary-speak-btn {
     background: linear-gradient(135deg, #07c160, #06ad56);
     border: none;
     color: white;
-    padding: 10px 16px;
+    padding: 8px 12px;
     border-radius: 6px;
-    font-size: 14px;
+    font-size: 13px;
     font-weight: 500;
     cursor: pointer;
     transition: all 0.3s ease;
-    margin-right: 10px;
+    margin-left: 10px;
+    white-space: nowrap;
+    display: flex;
+    align-items: center;
+    gap: 4px;
 }
 
-#voluntarySpeakBtn:hover {
+.voluntary-speak-btn:hover {
     background: linear-gradient(135deg, #06ad56, #059c4f);
     transform: translateY(-1px);
     box-shadow: 0 4px 12px rgba(7, 193, 96, 0.3);
 }
 
-#voluntarySpeakBtn:active {
+.voluntary-speak-btn:active {
     transform: translateY(0);
+}
+
+/* 确保游戏头部有足够空间容纳按钮 */
+.game-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.game-status {
+    display: flex;
+    align-items: center;
+    gap: 15px;
 }
 
 /* 模式状态指示器 */

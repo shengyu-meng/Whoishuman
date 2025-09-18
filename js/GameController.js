@@ -498,6 +498,20 @@ class GameController {
         document.getElementById('gameInterface').classList.remove('hidden');
         document.getElementById('gameRound').textContent = this.gameState.currentRound;
         this.updateActiveMembersDisplay();
+        
+        // 显示模式特定的UI元素
+        if (this.gameModeManager) {
+            const modeUI = this.gameModeManager.getModeSpecificUI();
+            if (modeUI && modeUI.voluntarySpeakButton) {
+                // 延迟显示主动发言按钮，确保DOM已完全加载
+                setTimeout(() => {
+                    const modeManager = this.gameModeManager.getCurrentModeManager();
+                    if (modeManager && typeof modeManager.showVoluntarySpeakButton === 'function') {
+                        modeManager.showVoluntarySpeakButton();
+                    }
+                }, 100);
+            }
+        }
     }
 
     updateActiveMembersDisplay() {
@@ -3864,12 +3878,25 @@ ${emojiInstruction}
         // 显示回复分析结果（不再区分成功/失败，只显示分析）
         await this.showResponseAnalysis(responseText, analysis);
         
-        // 延迟后开始下一轮对话（游戏总是继续，除非怀疑度达到100%）
-        this.safeTimeout(() => {
-            this.safeAsync(async () => {
-                await this.startNextRound();
-            });
-        }, 3000);
+        // 检查是否为主动发言
+        const isVoluntarySpeak = this.gameState.currentQuestion?.isVoluntary;
+        
+        if (isVoluntarySpeak) {
+            // 主动发言：立即触发AI反应，不进入下一轮
+            console.log('🎤 处理主动发言，触发AI反应');
+            this.safeTimeout(() => {
+                this.safeAsync(async () => {
+                    await this.handleVoluntarySpeakResponse(responseText);
+                });
+            }, 2000);
+        } else {
+            // 正常回应：延迟后开始下一轮对话
+            this.safeTimeout(() => {
+                this.safeAsync(async () => {
+                    await this.startNextRound();
+                });
+            }, 3000);
+        }
     }
 
     // 处理主动发言（开放麦模式）
@@ -3879,16 +3906,86 @@ ${emojiInstruction}
             this.gameState.waitingForResponse = true;
             this.gameState.currentQuestion = {
                 character: { name: '系统', avatar: '💬' },
-                question: '你想主动说些什么？'
+                question: '你想主动说些什么？',
+                isVoluntary: true // 标记为主动发言
             };
             
             // 显示回应区域
             document.getElementById('responseArea').classList.remove('hidden');
             document.getElementById('questionCharacter').textContent = '💬 主动发言';
-            document.getElementById('questionText').textContent = '你想主动说些什么？';
+            document.getElementById('questionText').textContent = '你可以主动参与讨论，说出你的想法...';
             
             // 聚焦到输入框
             document.getElementById('playerResponse').focus();
+            
+            console.log('🎤 开放麦模式：玩家主动发言机会已开启');
+        } else {
+            console.log('🎤 当前正在等待回应，无法开启主动发言');
+        }
+    }
+
+    // 处理主动发言后的AI反应
+    async handleVoluntarySpeakResponse(playerMessage) {
+        console.log('🎤 生成AI对主动发言的反应');
+        
+        // 重置等待状态
+        this.gameState.waitingForResponse = false;
+        
+        // 生成1-2个AI的反应
+        const reactingAIs = this.gameState.activeAICharacters
+            .sort(() => 0.5 - Math.random())
+            .slice(0, Math.random() > 0.5 ? 2 : 1);
+        
+        for (let i = 0; i < reactingAIs.length; i++) {
+            const ai = reactingAIs[i];
+            
+            // 延迟显示AI反应
+            await new Promise(resolve => setTimeout(resolve, 1000 + i * 1500));
+            
+            try {
+                const reaction = await this.generateAIReactionToPlayerSpeak(ai, playerMessage);
+                if (reaction) {
+                    this.addAIMessage(ai, reaction);
+                    
+                    // 记录AI消息到游戏状态
+                    this.gameState.addMessageToHistory(ai.name, reaction, 'ai');
+                }
+            } catch (error) {
+                console.error(`❌ 生成${ai.name}的反应失败:`, error);
+            }
+        }
+        
+        // 反应完成后，继续正常的对话流程
+        this.safeTimeout(() => {
+            this.safeAsync(async () => {
+                await this.generateInitialConversation();
+            });
+        }, 2000);
+    }
+
+    // 生成AI对玩家主动发言的反应
+    async generateAIReactionToPlayerSpeak(ai, playerMessage) {
+        const prompt = `你是${ai.name}，一个AI助手。另一个叫${this.gameState.playerName}的AI刚刚主动发言说："${playerMessage}"
+
+请以${ai.name}的身份对这个发言做出自然的回应。要求：
+1. 回应要简短自然（20-40字）
+2. 体现AI的特点和思维方式
+3. 可以表示赞同、补充、或提出不同观点
+4. 保持友好的讨论氛围
+5. 不要质疑对方是否为AI
+
+直接返回你的回应内容，不要加任何前缀。`;
+
+        try {
+            const response = await this.callAI(prompt, {
+                maxTokens: 100,
+                temperature: 0.7
+            });
+            
+            return response?.trim();
+        } catch (error) {
+            console.error('❌ 生成AI反应失败:', error);
+            return null;
         }
     }
 
