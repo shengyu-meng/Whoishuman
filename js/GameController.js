@@ -501,15 +501,22 @@ class GameController {
         
         // 显示模式特定的UI元素
         if (this.gameModeManager) {
-            const modeUI = this.gameModeManager.getModeSpecificUI();
-            if (modeUI && modeUI.voluntarySpeakButton) {
-                // 延迟显示主动发言按钮，确保DOM已完全加载
+            const currentMode = this.gameModeManager.getCurrentMode();
+            
+            if (currentMode === 'openmic') {
+                // 开放麦模式：添加底部边距并显示输入区域
+                document.getElementById('gameInterface').classList.add('has-openmic-input');
+                
+                // 延迟显示输入区域，确保DOM已完全加载
                 setTimeout(() => {
                     const modeManager = this.gameModeManager.getCurrentModeManager();
-                    if (modeManager && typeof modeManager.showVoluntarySpeakButton === 'function') {
-                        modeManager.showVoluntarySpeakButton();
+                    if (modeManager && typeof modeManager.showPersistentInputArea === 'function') {
+                        modeManager.showPersistentInputArea();
                     }
                 }, 100);
+            } else {
+                // 其他模式：移除底部边距
+                document.getElementById('gameInterface').classList.remove('has-openmic-input');
             }
         }
     }
@@ -3922,6 +3929,33 @@ ${emojiInstruction}
         } else {
             console.log('🎤 当前正在等待回应，无法开启主动发言');
         }
+    }
+
+    // 处理开放麦模式的消息发送
+    async handleOpenmicMessage(message) {
+        console.log('🎤 处理开放麦消息:', message);
+        
+        // 添加玩家消息到聊天记录
+        this.addAIMessage(
+            { 
+                name: this.gameState.playerName, 
+                avatar: '我',
+                avatarColor: '#07c160'
+            },
+            message,
+            true  // 标记为玩家消息
+        );
+        
+        // 记录玩家发言
+        if (this.gameModeManager) {
+            this.gameModeManager.handlePlayerResponse(message);
+        }
+        
+        // 记录到游戏状态
+        this.gameState.addMessageToHistory(this.gameState.playerName, message, 'player');
+        
+        // 生成AI反应
+        await this.handleVoluntarySpeakResponse(message);
     }
 
     // 处理主动发言后的AI反应

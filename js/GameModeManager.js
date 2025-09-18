@@ -39,6 +39,12 @@ class GameModeManager {
             voluntaryBtn.remove();
         }
         
+        // 清理开放麦输入区域
+        const openmicInputArea = document.getElementById('openmicInputArea');
+        if (openmicInputArea) {
+            openmicInputArea.remove();
+        }
+        
         // 清理投票界面
         const votingInterface = document.getElementById('votingInterface');
         if (votingInterface) {
@@ -246,8 +252,8 @@ class OpenMicMode extends BaseGameMode {
         this.gameState.gameModeConfig.openmic.speakingTurns = 0;
         this.gameState.gameModeConfig.openmic.roundSpeakingComplete = false;
         
-        // 显示主动发言按钮
-        this.showVoluntarySpeakButton();
+        // 显示持续的输入框
+        this.showPersistentInputArea();
         return true;
     }
     
@@ -280,33 +286,95 @@ class OpenMicMode extends BaseGameMode {
     
     getModeSpecificUI() {
         return {
-            voluntarySpeakButton: true,
+            persistentInputArea: true,
             speakingCounter: this.gameState.gameModeConfig.openmic.speakingTurns,
             requiredSpeaks: this.gameState.gameModeConfig.openmic.minSpeaksPerRound
         };
     }
     
-    showVoluntarySpeakButton() {
-        // 在游戏界面头部添加主动发言按钮，让它始终可见
-        const gameHeader = document.querySelector('.game-header');
-        if (gameHeader && !document.getElementById('voluntarySpeakBtn')) {
-            const voluntaryBtn = document.createElement('button');
-            voluntaryBtn.id = 'voluntarySpeakBtn';
-            voluntaryBtn.className = 'voluntary-speak-btn';
-            voluntaryBtn.innerHTML = '🎤 主动发言';
-            voluntaryBtn.onclick = () => this.triggerVoluntarySpeak();
+    showPersistentInputArea() {
+        // 显示持续的输入区域在页面底部
+        const gameInterface = document.getElementById('gameInterface');
+        if (gameInterface && !document.getElementById('openmicInputArea')) {
+            const inputArea = document.createElement('div');
+            inputArea.id = 'openmicInputArea';
+            inputArea.className = 'openmic-input-area';
+            inputArea.innerHTML = `
+                <div class="openmic-input-container">
+                    <textarea id="openmicInput" placeholder="在开放麦模式中，你可以随时发言参与讨论..." maxlength="500"></textarea>
+                    <div class="openmic-input-footer">
+                        <div class="char-count">
+                            <span id="openmicCharCount">0</span>/500
+                        </div>
+                        <button id="openmicSendBtn" class="openmic-send-btn" disabled>发送</button>
+                    </div>
+                </div>
+            `;
             
-            // 添加到游戏头部
-            gameHeader.appendChild(voluntaryBtn);
+            // 添加到游戏界面底部
+            gameInterface.appendChild(inputArea);
             
-            console.log('🎤 主动发言按钮已添加到游戏界面');
+            // 绑定事件监听器
+            this.setupOpenmicInputListeners();
+            
+            console.log('🎤 开放麦输入区域已显示');
         }
     }
     
-    hideVoluntarySpeakButton() {
-        const voluntaryBtn = document.getElementById('voluntarySpeakBtn');
-        if (voluntaryBtn) {
-            voluntaryBtn.remove();
+    setupOpenmicInputListeners() {
+        const input = document.getElementById('openmicInput');
+        const sendBtn = document.getElementById('openmicSendBtn');
+        const charCount = document.getElementById('openmicCharCount');
+        
+        if (input && sendBtn && charCount) {
+            // 字符计数
+            input.addEventListener('input', () => {
+                const length = input.value.length;
+                charCount.textContent = length;
+                sendBtn.disabled = length < 5; // 至少5个字符才能发送
+            });
+            
+            // 发送按钮点击
+            sendBtn.addEventListener('click', () => {
+                this.handleOpenmicSend();
+            });
+            
+            // 回车发送（Ctrl+Enter或Shift+Enter换行）
+            input.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey) {
+                    e.preventDefault();
+                    if (!sendBtn.disabled) {
+                        this.handleOpenmicSend();
+                    }
+                }
+            });
+        }
+    }
+    
+    handleOpenmicSend() {
+        const input = document.getElementById('openmicInput');
+        const sendBtn = document.getElementById('openmicSendBtn');
+        
+        if (input && sendBtn) {
+            const message = input.value.trim();
+            if (message.length >= 5) {
+                // 清空输入框
+                input.value = '';
+                document.getElementById('openmicCharCount').textContent = '0';
+                sendBtn.disabled = true;
+                
+                // 触发发言处理
+                if (this.gameController && typeof this.gameController.handleOpenmicMessage === 'function') {
+                    this.gameController.handleOpenmicMessage(message);
+                }
+            }
+        }
+    }
+    
+    hideOpenmicInputArea() {
+        const inputArea = document.getElementById('openmicInputArea');
+        if (inputArea) {
+            inputArea.remove();
         }
     }
     

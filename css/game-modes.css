@@ -219,47 +219,111 @@
     font-weight: 500;
 }
 
-/* 主动发言按钮样式（开放麦模式） */
-.voluntary-speak-btn {
+/* 开放麦输入区域样式 */
+.openmic-input-area {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: white;
+    border-top: 1px solid #e0e0e0;
+    box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
+    z-index: 1000;
+    padding: 15px;
+}
+
+.openmic-input-container {
+    max-width: 600px;
+    margin: 0 auto;
+    width: 100%;
+}
+
+.openmic-input-container textarea {
+    width: 100%;
+    min-height: 60px;
+    max-height: 120px;
+    padding: 12px 16px;
+    border: 2px solid #e0e0e0;
+    border-radius: 8px;
+    font-size: 14px;
+    font-family: inherit;
+    resize: vertical;
+    transition: border-color 0.3s ease;
+    background: #fafafa;
+}
+
+.openmic-input-container textarea:focus {
+    outline: none;
+    border-color: #07c160;
+    background: white;
+    box-shadow: 0 0 0 3px rgba(7, 193, 96, 0.1);
+}
+
+.openmic-input-container textarea::placeholder {
+    color: #999;
+}
+
+.openmic-input-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 8px;
+}
+
+.openmic-input-footer .char-count {
+    font-size: 12px;
+    color: #666;
+}
+
+.openmic-send-btn {
     background: linear-gradient(135deg, #07c160, #06ad56);
     border: none;
     color: white;
-    padding: 8px 12px;
+    padding: 8px 16px;
     border-radius: 6px;
-    font-size: 13px;
+    font-size: 14px;
     font-weight: 500;
     cursor: pointer;
     transition: all 0.3s ease;
-    margin-left: 10px;
-    white-space: nowrap;
-    display: flex;
-    align-items: center;
-    gap: 4px;
+    min-width: 60px;
 }
 
-.voluntary-speak-btn:hover {
+.openmic-send-btn:hover:not(:disabled) {
     background: linear-gradient(135deg, #06ad56, #059c4f);
     transform: translateY(-1px);
     box-shadow: 0 4px 12px rgba(7, 193, 96, 0.3);
 }
 
-.voluntary-speak-btn:active {
+.openmic-send-btn:active:not(:disabled) {
     transform: translateY(0);
 }
 
-/* 确保游戏头部有足够空间容纳按钮 */
-.game-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 10px;
+.openmic-send-btn:disabled {
+    background: #ccc;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
 }
 
-.game-status {
-    display: flex;
-    align-items: center;
-    gap: 15px;
+/* 为游戏界面添加底部边距，避免被输入框遮挡 */
+#gameInterface.has-openmic-input {
+    padding-bottom: 140px;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+    .openmic-input-area {
+        padding: 12px;
+    }
+    
+    .openmic-input-container textarea {
+        min-height: 50px;
+        font-size: 16px; /* 防止iOS缩放 */
+    }
+    
+    #gameInterface.has-openmic-input {
+        padding-bottom: 120px;
+    }
 }
 
 /* 模式状态指示器 */
