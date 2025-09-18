@@ -307,18 +307,17 @@ class DebugManager {
         setTimeout(() => URL.revokeObjectURL(url), 100);
     }
     
-    // 获取对话日志
-    getConversationLogs() {
+    // 调试接口方法 - 供外部调用或控制台调试使用
+    
+    getConversationLogs() {                          // 获取对话日志
         return this.conversationLog;
     }
     
-    // 获取系统日志
-    getSystemLogs() {
+    getSystemLogs() {                               // 获取系统日志
         return this.systemLog;
     }
     
-    // 清理日志
-    clearLogs() {
+    clearLogs() {                                   // 清理所有日志
         this.conversationLog = [];
         this.systemLog = [];
         

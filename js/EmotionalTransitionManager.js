@@ -1,4 +1,11 @@
-// 情绪桥接转换机制 - 管理AI角色在主题转换过程中的情绪变化
+/**
+ * 情绪桥接转换机制 - 管理AI角色在主题转换过程中的情绪变化
+ * 
+ * 主要外部接口：
+ * - getPersonalityModifier(character) - 获取角色个性修饰符 (被GameController使用)
+ * 
+ * 注意：大部分复杂功能为完整实现，但当前项目中使用有限
+ */
 
 // 情绪转换映射表
 const EMOTIONAL_TRANSITIONS = {

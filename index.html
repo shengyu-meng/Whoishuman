@@ -208,24 +208,33 @@
     </div>
 
     <!-- QR码生成库 -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <!-- 第三方库：QR码生成库 (用于游戏记录导出) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js" defer></script>
     
-    <!-- 模块化脚本文件 -->
-    <script src="js/envConfig.js"></script>
+    <!-- 模块化脚本文件 - 按依赖顺序加载 -->
+    
+    <!-- 配置管理层 -->
+    <script src="js/envConfig.js"></script>                      <!-- 环境配置管理器 -->
     <script src="js/config.js" onerror="console.warn('⚠️ config.js 文件未找到，将使用环境变量配置')"></script>
-    <script src="js/DebugManager.js"></script>
-    <script src="js/ThemeProgression.js"></script>
-    <script src="js/ThemeUtils.js"></script>
-    <script src="js/ThemeScenarios.js"></script>
-    <script src="js/EmotionalTransitionManager.js"></script>
-    <script src="js/LayeredDialogueSystem.js"></script>
-    <script src="js/GameState.js"></script>
-    <script src="js/AIDisguiseAnalyzer.js"></script>
-    <script src="js/GameRecordExporter.js"></script>
-    <script src="js/AICharacterPool.js"></script>
-    <script src="js/TopicProgression.js"></script>
-    <script src="js/GameController.js"></script>
-    <script src="js/GameInitializer.js"></script>
+    <script src="js/DebugManager.js"></script>                   <!-- 调试管理器 -->
+    
+    <!-- 主题系统层 -->
+    <script src="js/ThemeProgression.js"></script>               <!-- 主题过渡管理 -->
+    <script src="js/ThemeUtils.js"></script>                     <!-- 主题工具和配置 -->
+    <script src="js/ThemeScenarios.js"></script>                 <!-- 主题场景数据 -->
+    
+    <!-- AI系统层 -->
+    <script src="js/EmotionalTransitionManager.js"></script>     <!-- 情绪转换管理 -->
+    <!-- <script src="js/LayeredDialogueSystem.js"></script> --> <!-- 暂时禁用：功能未使用 -->
+    <script src="js/GameState.js"></script>                      <!-- 游戏状态管理 -->
+    <script src="js/AIDisguiseAnalyzer.js"></script>             <!-- AI行为分析器 -->
+    <script src="js/GameRecordExporter.js"></script>             <!-- 游戏记录导出 -->
+    <script src="js/AICharacterPool.js"></script>                <!-- AI角色数据池 -->
+    <script src="js/TopicProgression.js"></script>               <!-- 话题进展管理 -->
+    
+    <!-- 核心控制层 -->
+    <script src="js/GameController.js"></script>                 <!-- 游戏主控制器 -->
+    <script src="js/GameInitializer.js"></script>                <!-- 游戏初始化器 -->
     
     <!-- 全局错误处理 - 防止页面刷新 -->
     <script>

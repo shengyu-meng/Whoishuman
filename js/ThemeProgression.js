@@ -1,8 +1,8 @@
-// 引用 ThemeUtils 中的统一主题配置
-// THEME_PROGRESSION 现在基于 ThemeUtils.THEME_CONFIG 构建，避免重复
-
-// 注意：THEME_EMOTION_MAPPING 与 ThemeUtils.THEME_EMOTIONS 重复
-// 这里保留 THEME_EMOTION_MAPPING 以向后兼容，但新代码应使用 ThemeUtils.THEME_EMOTIONS
+/**
+ * 主题过渡系统 - 管理主题切换的行为和触发条件
+ * 注意：避免重复配置，主题数据统一使用 ThemeUtils.js
+ * 为保持向后兼容性，部分配置通过别名引用 ThemeUtils
+ */
 
 // 主题转换条件和触发器
 const THEME_TRANSITION_TRIGGERS = {
@@ -108,11 +108,10 @@ const THEME_AI_BEHAVIORS = {
     }
 };
 
-// 为保持向后兼容性，创建一个基于 ThemeUtils 的 THEME_PROGRESSION 别名
+// 向后兼容性别名 - 引用 ThemeUtils.js 中的统一配置
 const THEME_PROGRESSION = typeof window !== 'undefined' && window.THEME_CONFIG ? 
     window.THEME_CONFIG : {};
 
-// 为保持向后兼容性，创建一个基于 ThemeUtils 的 THEME_EMOTION_MAPPING 别名  
 const THEME_EMOTION_MAPPING = typeof window !== 'undefined' && window.THEME_EMOTIONS ?
     window.THEME_EMOTIONS : {};
 

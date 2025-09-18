@@ -1,22 +1,19 @@
-// API配置文件 - 存储敏感信息和配置项
-// 请勿将此文件提交到版本控制系统
+/**
+ * API配置文件 - 存储敏感信息和配置项
+ * 注意：请勿将此文件提交到版本控制系统
+ */
 
 // DeepSeek API配置
 const API_CONFIG = {
-    // DeepSeek API密钥
-    apiKey: '',
-    
-    // API基础URL
-    baseUrl: 'https://api.deepseek.com/v1/chat/completions',
-    
-    // API模型配置
-    model: 'deepseek-chat',
+    apiKey: '',                                        // DeepSeek API密钥
+    baseUrl: 'https://api.deepseek.com/v1/chat/completions',  // API基础URL
+    model: 'deepseek-chat',                           // API模型配置
     
     // API请求配置
     requestConfig: {
-        temperature: 0.0,
-        maxTokens: 1000,
-        timeout: 30000
+        temperature: 0.0,                             // 响应随机性控制
+        maxTokens: 1000,                             // 最大响应长度
+        timeout: 30000                               // 请求超时时间(ms)
     }
 };
 
@@ -67,58 +64,31 @@ const GAME_CONFIG = {
         minEnhancementThreshold: 0.5
     },
     
-    // 主题进展配置
-    themeProgression: {
-        // 社交性默认值
-        defaultSocialness: 0.8,
-        
-        // 活力默认值
-        defaultEnergy: 0.8
-    }
+    // 注意：themeProgression 配置已移除（未使用）
+    // 主题相关配置现在在 ThemeUtils.js 中管理
 };
 
 // 调试模式配置
 const DEBUG_CONFIG = {
-    // 调试模式开关 - 设置为true启用调试功能
-    enabled: true,
+    enabled: true,                                    // 调试模式总开关
     
     // 调试功能开关
     features: {
-        // 显示"跳过本轮"按钮
-        showSkipButton: true,
-        
-        // 显示"结束游戏"按钮
-        showEndGameButton: true,
-        
-        // 显示浏览器控制台日志
-        showConsoleLogs: true,
-        
-        // 自动保存对话和系统日志到文件
-        autoSaveLogs: true,
-        
-        // 显示认知增强器调试信息
-        showCognitionDebug: true,
-        
-        // 显示完整AI提示词
-        showFullPrompts: true
+        showSkipButton: true,                        // 显示"跳过本轮"按钮
+        showEndGameButton: true,                     // 显示"结束游戏"按钮
+        showConsoleLogs: true,                       // 显示浏览器控制台日志
+        autoSaveLogs: true,                         // 自动保存对话和系统日志到文件
+        showCognitionDebug: true,                   // 显示认知增强器调试信息
+        showFullPrompts: true                       // 显示完整AI提示词
     },
     
     // 日志保存配置
     logging: {
-        // 日志文件保存路径
-        logDirectory: '.logs',
-        
-        // 对话日志文件名前缀
-        conversationLogPrefix: 'conversation_',
-        
-        // 系统日志文件名前缀
-        systemLogPrefix: 'system_',
-        
-        // 日志文件格式
-        logFormat: 'json', // 'json' 或 'text'
-        
-        // 自动保存间隔（毫秒）
-        autoSaveInterval: 30000 // 30秒
+        logDirectory: '.logs',                       // 日志文件保存路径
+        conversationLogPrefix: 'conversation_',     // 对话日志文件名前缀
+        systemLogPrefix: 'system_',                 // 系统日志文件名前缀
+        logFormat: 'json',                          // 日志文件格式 ('json' 或 'text')
+        autoSaveInterval: 30000                     // 自动保存间隔(ms) - 30秒
     }
 };
 
