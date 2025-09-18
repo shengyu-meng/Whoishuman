@@ -353,6 +353,57 @@
     }
 }
 
+/* 开放麦轮次分析样式 */
+.openmic-round-analysis {
+    background: linear-gradient(135deg, rgba(7, 193, 96, 0.1), rgba(7, 193, 96, 0.05));
+    border: 2px solid #07c160;
+    border-radius: 12px;
+    padding: 16px;
+    margin: 15px 0;
+    animation: slideDown 0.3s ease-out;
+}
+
+.openmic-round-analysis .analysis-header h3 {
+    color: #07c160;
+    margin: 0 0 12px 0;
+    font-size: 16px;
+    font-weight: 600;
+}
+
+.openmic-round-analysis .analysis-stats {
+    display: flex;
+    gap: 15px;
+    margin-bottom: 10px;
+    flex-wrap: wrap;
+}
+
+.openmic-round-analysis .stat {
+    background: rgba(255, 255, 255, 0.8);
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 500;
+}
+
+.openmic-round-analysis .stat.passed {
+    background: rgba(76, 175, 80, 0.2);
+    color: #4CAF50;
+}
+
+.openmic-round-analysis .stat.failed {
+    background: rgba(244, 67, 54, 0.2);
+    color: #F44336;
+}
+
+.openmic-round-analysis .analysis-text {
+    font-size: 14px;
+    color: #333;
+    line-height: 1.4;
+    background: rgba(255, 255, 255, 0.6);
+    padding: 8px 12px;
+    border-radius: 6px;
+}
+
 /* 响应式设计 */
 @media (max-width: 768px) {
     .mode-options {
@@ -379,5 +430,13 @@
     
     .vote-options {
         grid-template-columns: 1fr;
+    }
+    
+    .openmic-round-analysis .analysis-stats {
+        gap: 8px;
+    }
+    
+    .openmic-round-analysis .stat {
+        font-size: 11px;
     }
 }

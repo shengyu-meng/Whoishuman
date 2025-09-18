@@ -238,57 +238,164 @@ class ChallengeMode extends BaseGameMode {
 class OpenMicMode extends BaseGameMode {
     initialize() {
         console.log('🎤 开放麦模式初始化');
-        this.gameState.gameModeConfig.openmic.speakingTurns = 0;
-        this.gameState.gameModeConfig.openmic.roundSpeakingComplete = false;
+        this.resetRoundState();
     }
     
     reset() {
-        this.gameState.gameModeConfig.openmic.speakingTurns = 0;
-        this.gameState.gameModeConfig.openmic.roundSpeakingComplete = false;
+        this.resetRoundState();
+    }
+    
+    resetRoundState() {
+        const config = this.gameState.gameModeConfig.openmic;
+        config.playerSpeakingTurns = 0;
+        config.totalSpeakingTurns = 0;
+        config.roundStartTime = Date.now();
+        config.roundSpeakingComplete = false;
+        config.playerMessages = [];
+        config.hasPlayerSpoken = false;
+        config.aiReactionsPending = false;
     }
     
     handleRoundStart() {
-        // 重置本轮发言状态
-        this.gameState.gameModeConfig.openmic.speakingTurns = 0;
-        this.gameState.gameModeConfig.openmic.roundSpeakingComplete = false;
+        // 重置本轮状态
+        this.resetRoundState();
         
         // 显示持续的输入框
         this.showPersistentInputArea();
+        
+        // 开始轮次计时器
+        this.startRoundTimer();
+        
+        console.log('🎤 开放麦轮次开始，等待玩家或AI发言');
         return true;
+    }
+    
+    startRoundTimer() {
+        // 清除之前的计时器
+        if (this.roundTimer) {
+            clearTimeout(this.roundTimer);
+        }
+        
+        // 设置2分钟计时器
+        this.roundTimer = setTimeout(() => {
+            this.checkRoundEndConditions('timeout');
+        }, this.gameState.gameModeConfig.openmic.roundDuration);
     }
     
     handlePlayerResponse(response) {
-        // 记录玩家发言
-        this.gameState.gameModeConfig.openmic.speakingTurns++;
+        const config = this.gameState.gameModeConfig.openmic;
         
-        // 检查是否满足最少发言要求
-        if (this.gameState.gameModeConfig.openmic.speakingTurns >= 
-            this.gameState.gameModeConfig.openmic.minSpeaksPerRound) {
-            this.gameState.gameModeConfig.openmic.roundSpeakingComplete = true;
-        }
+        // 记录玩家发言
+        config.playerSpeakingTurns++;
+        config.totalSpeakingTurns++;
+        config.hasPlayerSpoken = true;
+        
+        // 保存玩家本轮的发言
+        config.playerMessages.push({
+            message: response,
+            timestamp: Date.now(),
+            context: this.getRecentContext()
+        });
+        
+        console.log(`🎤 玩家发言记录: ${config.playerSpeakingTurns}次, 总发言: ${config.totalSpeakingTurns}次`);
+        
+        // 检查轮次结束条件
+        this.checkRoundEndConditions('player_speak');
         
         return true;
     }
     
+    handleAIResponse(aiName, response) {
+        const config = this.gameState.gameModeConfig.openmic;
+        config.totalSpeakingTurns++;
+        
+        console.log(`🎤 AI发言记录 (${aiName}): 总发言 ${config.totalSpeakingTurns}次`);
+        
+        // 检查轮次结束条件
+        this.checkRoundEndConditions('ai_speak');
+    }
+    
+    getRecentContext() {
+        // 获取最近的对话上下文
+        return this.gameState.getRecentMessageHistory(5);
+    }
+    
     handleRoundEnd() {
-        // 检查是否完成发言要求
-        if (!this.gameState.gameModeConfig.openmic.roundSpeakingComplete) {
-            // 强制cue玩家发言
-            this.forcePlayerSpeak();
-            return false; // 不允许进入下一轮
-        }
-        return true;
+        // 开放麦模式的轮次结束由条件触发，不需要额外检查
+        return this.gameState.gameModeConfig.openmic.roundSpeakingComplete;
     }
     
     canAdvanceToNextRound() {
         return this.gameState.gameModeConfig.openmic.roundSpeakingComplete;
     }
     
+    checkRoundEndConditions(trigger) {
+        const config = this.gameState.gameModeConfig.openmic;
+        
+        // 如果玩家没有发言，不结束轮次
+        if (!config.hasPlayerSpoken) {
+            console.log('🎤 玩家尚未发言，轮次继续');
+            return false;
+        }
+        
+        const currentTime = Date.now();
+        const roundDuration = currentTime - config.roundStartTime;
+        
+        // 检查结束条件
+        const maxSpeaksReached = config.totalSpeakingTurns >= config.maxSpeaksPerRound;
+        const timeoutReached = roundDuration >= config.roundDuration;
+        
+        if (maxSpeaksReached || timeoutReached || trigger === 'timeout') {
+            console.log(`🎤 轮次结束条件满足: 发言${config.totalSpeakingTurns}次, 时长${Math.round(roundDuration/1000)}秒`);
+            this.endRound();
+            return true;
+        }
+        
+        return false;
+    }
+    
+    async endRound() {
+        const config = this.gameState.gameModeConfig.openmic;
+        config.roundSpeakingComplete = true;
+        
+        // 清除计时器
+        if (this.roundTimer) {
+            clearTimeout(this.roundTimer);
+            this.roundTimer = null;
+        }
+        
+        console.log('🎤 开放麦轮次结束，开始分析玩家表现');
+        
+        // 分析玩家本轮的所有发言
+        await this.analyzePlayerRoundPerformance();
+    }
+    
+    async analyzePlayerRoundPerformance() {
+        const config = this.gameState.gameModeConfig.openmic;
+        
+        if (config.playerMessages.length === 0) {
+            console.log('🎤 玩家本轮无发言，跳过分析');
+            return;
+        }
+        
+        // 通知GameController进行分析
+        if (this.gameController && typeof this.gameController.analyzeOpenmicRoundPerformance === 'function') {
+            await this.gameController.analyzeOpenmicRoundPerformance(config.playerMessages);
+        }
+    }
+    
     getModeSpecificUI() {
+        const config = this.gameState.gameModeConfig.openmic;
+        const remainingTime = config.roundStartTime ? 
+            Math.max(0, config.roundDuration - (Date.now() - config.roundStartTime)) : 0;
+            
         return {
             persistentInputArea: true,
-            speakingCounter: this.gameState.gameModeConfig.openmic.speakingTurns,
-            requiredSpeaks: this.gameState.gameModeConfig.openmic.minSpeaksPerRound
+            playerSpeaks: config.playerSpeakingTurns,
+            totalSpeaks: config.totalSpeakingTurns,
+            maxSpeaks: config.maxSpeaksPerRound,
+            remainingTime: Math.ceil(remainingTime / 1000),
+            hasPlayerSpoken: config.hasPlayerSpoken
         };
     }
     

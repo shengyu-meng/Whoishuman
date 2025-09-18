@@ -543,6 +543,100 @@ class GameController {
         await this.generateInitialConversation();
     }
 
+    // 生成开放麦模式的对话环境
+    async generateOpenmicConversation() {
+        this.isGeneratingConversation = true;
+        
+        try {
+            console.log('🎤 开始生成开放麦对话环境');
+            
+            // 生成2-3个AI的自由讨论
+            const discussionAIs = this.gameState.activeAICharacters
+                .sort(() => 0.5 - Math.random())
+                .slice(0, Math.random() > 0.5 ? 3 : 2);
+            
+            for (let i = 0; i < discussionAIs.length; i++) {
+                // 检查是否被玩家发言中断
+                if (!this.isGeneratingConversation) {
+                    console.log('🛑 对话生成被玩家发言中断');
+                    return;
+                }
+                
+                const ai = discussionAIs[i];
+                
+                // 延迟显示AI消息
+                await new Promise(resolve => setTimeout(resolve, 1500 + i * 2000));
+                
+                // 再次检查是否被中断
+                if (!this.isGeneratingConversation) {
+                    console.log('🛑 对话生成被玩家发言中断');
+                    return;
+                }
+                
+                try {
+                    const message = await this.generateOpenmicAIMessage(ai);
+                    if (message) {
+                        this.addAIMessage(ai, message);
+                        this.gameState.addMessageToHistory(ai.name, message, 'ai');
+                        
+                        // 通知模式管理器AI发言
+                        if (this.gameModeManager) {
+                            const modeManager = this.gameModeManager.getCurrentModeManager();
+                            if (modeManager && typeof modeManager.handleAIResponse === 'function') {
+                                modeManager.handleAIResponse(ai.name, message);
+                            }
+                        }
+                    }
+                } catch (error) {
+                    console.error(`❌ 生成${ai.name}的开放麦消息失败:`, error);
+                }
+            }
+            
+            console.log('🎤 开放麦对话环境生成完成');
+            
+        } catch (error) {
+            console.error('❌ 开放麦对话生成失败:', error);
+        } finally {
+            this.isGeneratingConversation = false;
+        }
+    }
+    
+    // 生成开放麦模式的AI消息
+    async generateOpenmicAIMessage(ai) {
+        const currentTopic = topicProgression[this.gameState.currentDifficulty];
+        const recentHistory = this.gameState.getRecentMessageHistory(5);
+        
+        const messages = [
+            {
+                role: "system",
+                content: `你是${ai.name}，一个AI助手。你正在和其他AI进行自由讨论。`
+            },
+            {
+                role: "user",
+                content: `当前讨论话题是"${currentTopic.name}"。
+
+最近的对话：
+${recentHistory.map(h => `${h.author}: ${h.content}`).join('\n')}
+
+请以${ai.name}的身份参与讨论：
+1. 发言要自然流畅（30-60字）
+2. 可以分享观点、提出问题或回应他人
+3. 体现AI的思维特点
+4. 保持友好的讨论氛围
+5. 不要直接质疑任何人是否为AI
+
+直接返回你的发言内容。`
+            }
+        ];
+        
+        const response = await this.callAI(messages, {
+            maxTokens: 150,
+            temperature: 0.8
+        });
+        
+        return response?.trim();
+    }
+
     addSystemMessage(message) {
         const chatContainer = document.getElementById('chatContainer');
         const messageDiv = document.createElement('div');
@@ -772,6 +866,13 @@ class GameController {
         // 防护措施：防止重复调用
         if (this.isGeneratingConversation) {
             console.log('⚠️ 正在生成对话中，跳过重复调用');
+            return;
+        }
+        
+        // 开放麦模式特殊处理
+        if (this.gameState.gameMode === 'openmic') {
+            console.log('🎤 开放麦模式：生成自由讨论环境');
+            await this.generateOpenmicConversation();
             return;
         }
         
@@ -3954,8 +4055,194 @@ ${emojiInstruction}
         // 记录到游戏状态
         this.gameState.addMessageToHistory(this.gameState.playerName, message, 'player');
         
+        // 停止当前AI对话生成，开始处理玩家发言的反应
+        this.stopCurrentAIGeneration();
+        
         // 生成AI反应
-        await this.handleVoluntarySpeakResponse(message);
+        await this.handleOpenmicPlayerSpeakResponse(message);
+    }
+    
+    // 停止当前AI对话生成
+    stopCurrentAIGeneration() {
+        // 设置标志，停止正在进行的AI对话生成
+        this.isGeneratingConversation = false;
+        console.log('🛑 停止当前AI对话生成，优先处理玩家发言');
+    }
+
+    // 处理开放麦模式玩家发言后的AI反应
+    async handleOpenmicPlayerSpeakResponse(playerMessage) {
+        console.log('🎤 生成开放麦模式AI反应');
+        
+        const config = this.gameState.gameModeConfig.openmic;
+        config.aiReactionsPending = true;
+        
+        // 生成2-3个AI的反应
+        const reactingAIs = this.gameState.activeAICharacters
+            .sort(() => 0.5 - Math.random())
+            .slice(0, Math.random() > 0.3 ? 3 : 2);
+        
+        for (let i = 0; i < reactingAIs.length; i++) {
+            const ai = reactingAIs[i];
+            
+            // 延迟显示AI反应
+            await new Promise(resolve => setTimeout(resolve, 800 + i * 1200));
+            
+            try {
+                const reaction = await this.generateAIReactionToPlayerSpeak(ai, playerMessage);
+                if (reaction) {
+                    this.addAIMessage(ai, reaction);
+                    
+                    // 记录AI消息到游戏状态
+                    this.gameState.addMessageToHistory(ai.name, reaction, 'ai');
+                    
+                    // 通知模式管理器AI发言
+                    if (this.gameModeManager) {
+                        const modeManager = this.gameModeManager.getCurrentModeManager();
+                        if (modeManager && typeof modeManager.handleAIResponse === 'function') {
+                            modeManager.handleAIResponse(ai.name, reaction);
+                        }
+                    }
+                }
+            } catch (error) {
+                console.error(`❌ 生成${ai.name}的反应失败:`, error);
+            }
+        }
+        
+        config.aiReactionsPending = false;
+        console.log('🎤 AI反应生成完成');
+    }
+
+    // 分析开放麦模式玩家轮次表现
+    async analyzeOpenmicRoundPerformance(playerMessages) {
+        console.log('🎤 开始分析开放麦轮次表现');
+        
+        // 构建分析prompt
+        const messagesText = playerMessages.map((msg, index) => 
+            `发言${index + 1}: ${msg.message}`
+        ).join('\n');
+        
+        const contextText = playerMessages.length > 0 ? 
+            playerMessages[0].context.map(ctx => `${ctx.author}: ${ctx.content}`).join('\n') : '';
+        
+        const messages = [
+            {
+                role: "system",
+                content: "你是一个AI伪装检测专家，需要分析玩家在开放麦模式中的表现。"
+            },
+            {
+                role: "user",
+                content: `请分析以下玩家在本轮开放麦讨论中的表现：
+
+对话上下文：
+${contextText}
+
+玩家发言记录：
+${messagesText}
+
+请从以下角度分析：
+1. 发言的AI特征程度（技术性、逻辑性、系统性思维）
+2. 是否暴露了人类特征（情感表达、直觉思维、个人经历）
+3. 与上下文的契合度
+4. 整体伪装效果
+
+请给出：
+- 总体评分（0-100分）
+- AI特征得分（0-50分）
+- 人类特征扣分（0到-50分）
+- 简要分析（50字以内）
+
+返回JSON格式：
+{
+  "totalScore": 分数,
+  "aiScore": AI特征分数,
+  "humanPenalty": 人类特征扣分,
+  "analysis": "分析文本",
+  "passed": true/false
+}`
+            }
+        ];
+        
+        try {
+            const analysisText = await this.callAI(messages, {
+                maxTokens: 300,
+                temperature: 0.3
+            });
+            
+            const analysis = JSON.parse(analysisText);
+            
+            // 计算怀疑度变化
+            const suspicionChange = this.gameState.calculateSuspicionChange(
+                analysis.passed,
+                analysis,
+                'openmic_round'
+            );
+            
+            const suspicionUpdate = this.gameState.adjustSuspicionLevel(
+                suspicionChange.change,
+                suspicionChange.reason,
+                analysis
+            );
+            
+            // 更新UI显示
+            this.updateSuspicionDisplay(suspicionUpdate);
+            
+            // 显示轮次分析结果
+            await this.showOpenmicRoundAnalysis(analysis, playerMessages.length);
+            
+            // 检查游戏结束条件
+            if (this.gameState.isSuspicionGameOver()) {
+                this.showSuspicionGameOver();
+                return;
+            }
+            
+            // 延迟后开始下一轮
+            this.safeTimeout(() => {
+                this.safeAsync(async () => {
+                    await this.startNextRound();
+                });
+            }, 3000);
+            
+        } catch (error) {
+            console.error('❌ 开放麦轮次分析失败:', error);
+            // 分析失败时直接进入下一轮
+            this.safeTimeout(() => {
+                this.safeAsync(async () => {
+                    await this.startNextRound();
+                });
+            }, 2000);
+        }
+    }
+    
+    // 显示开放麦轮次分析结果
+    async showOpenmicRoundAnalysis(analysis, messageCount) {
+        const analysisDiv = document.createElement('div');
+        analysisDiv.className = 'openmic-round-analysis';
+        analysisDiv.innerHTML = `
+            <div class="analysis-header">
+                <h3>🎤 本轮开放麦表现分析</h3>
+            </div>
+            <div class="analysis-content">
+                <div class="analysis-stats">
+                    <span class="stat">发言次数: ${messageCount}</span>
+                    <span class="stat">总评分: ${analysis.totalScore}/100</span>
+                    <span class="stat ${analysis.passed ? 'passed' : 'failed'}">
+                        ${analysis.passed ? '✅ 通过' : '❌ 失败'}
+                    </span>
+                </div>
+                <div class="analysis-text">${analysis.analysis}</div>
+            </div>
+        `;
+        
+        const chatContainer = document.getElementById('chatContainer');
+        chatContainer.appendChild(analysisDiv);
+        this.scrollToBottom();
+        
+        // 3秒后移除分析显示
+        setTimeout(() => {
+            if (analysisDiv.parentNode) {
+                analysisDiv.remove();
+            }
+        }, 3000);
     }
 
     // 处理主动发言后的AI反应

@@ -28,10 +28,16 @@ class GameState {
             },
             openmic: {
                 description: '在自由发言中融入AI群体',
-                speakingTurns: 0, // 本轮发言次数
-                minSpeaksPerRound: 1, // 每轮最少发言次数
+                playerSpeakingTurns: 0, // 玩家本轮发言次数
+                totalSpeakingTurns: 0, // 本轮总发言次数（包括AI和玩家）
+                maxSpeaksPerRound: 10, // 每轮最多发言次数
+                roundDuration: 120000, // 轮次最长持续时间（2分钟）
+                roundStartTime: null, // 轮次开始时间
                 voluntarySpeaking: true, // 允许主动发言
-                roundSpeakingComplete: false // 本轮是否已完成发言要求
+                roundSpeakingComplete: false, // 本轮是否已完成
+                playerMessages: [], // 玩家本轮的所有发言
+                hasPlayerSpoken: false, // 玩家本轮是否已发言
+                aiReactionsPending: false // AI反应是否在进行中
             },
             werewolf: {
                 description: '在票选人类的大逃杀中活到最后',
@@ -85,8 +91,13 @@ class GameState {
         
         // 重置游戏模式状态
         this.gameMode = 'challenge';
-        this.gameModeConfig.openmic.speakingTurns = 0;
+        this.gameModeConfig.openmic.playerSpeakingTurns = 0;
+        this.gameModeConfig.openmic.totalSpeakingTurns = 0;
+        this.gameModeConfig.openmic.roundStartTime = null;
         this.gameModeConfig.openmic.roundSpeakingComplete = false;
+        this.gameModeConfig.openmic.playerMessages = [];
+        this.gameModeConfig.openmic.hasPlayerSpoken = false;
+        this.gameModeConfig.openmic.aiReactionsPending = false;
         this.gameModeConfig.werewolf.alivePlayers = [];
         this.gameModeConfig.werewolf.votingPhase = false;
         this.gameModeConfig.werewolf.votingResults = {};
