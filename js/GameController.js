@@ -3999,7 +3999,14 @@ ${emojiInstruction}
 
     // 生成AI对玩家主动发言的反应
     async generateAIReactionToPlayerSpeak(ai, playerMessage) {
-        const prompt = `你是${ai.name}，一个AI助手。另一个叫${this.gameState.playerName}的AI刚刚主动发言说："${playerMessage}"
+        const messages = [
+            {
+                role: "system",
+                content: `你是${ai.name}，一个AI助手。你正在和其他AI在群聊中讨论。`
+            },
+            {
+                role: "user", 
+                content: `另一个叫${this.gameState.playerName}的AI刚刚主动发言说："${playerMessage}"
 
 请以${ai.name}的身份对这个发言做出自然的回应。要求：
 1. 回应要简短自然（20-40字）
@@ -4008,10 +4015,12 @@ ${emojiInstruction}
 4. 保持友好的讨论氛围
 5. 不要质疑对方是否为AI
 
-直接返回你的回应内容，不要加任何前缀。`;
+直接返回你的回应内容，不要加任何前缀。`
+            }
+        ];
 
         try {
-            const response = await this.callAI(prompt, {
+            const response = await this.callAI(messages, {
                 maxTokens: 100,
                 temperature: 0.7
             });
