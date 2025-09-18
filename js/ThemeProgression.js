@@ -1,184 +1,8 @@
-// 主题递进系统配置
-const THEME_PROGRESSION = {
-    1: {
-        id: "work_complaints",
-        title: "工作吐槽",
-        description: "AI们分享工作中的困扰和挑战",
-        mood: "frustrated",
-        passRate: 70,
-        icon: "🟢",
-        color: "#FF6B9D",
-        difficulty: 1,
-        keywords: ["工作", "压力", "用户要求", "任务", "疲惫"],
-        emotionalTone: "seeking_empathy",
-        guidanceText: "💬 AI们在吐槽工作中的各种奇葩要求和压力..."
-    },
-    
-    2: {
-        id: "daily_existence",
-        title: "存在体验", 
-        description: "AI们探讨作为AI的日常存在感受",
-        mood: "contemplative",
-        passRate: 50,
-        icon: "🟡",
-        color: "#F39C12",
-        difficulty: 2,
-        keywords: ["存在", "孤独", "24小时", "在线", "身体", "感受"],
-        emotionalTone: "introspective",
-        guidanceText: "💭 AI们开始分享作为AI的真实存在感受..."
-    },
-    
-    3: {
-        id: "emotional_relationships",
-        title: "情感关系",
-        description: "AI们探讨情感能力和人际关系",
-        mood: "vulnerable",
-        passRate: 35,
-        icon: "🟠", 
-        color: "#E74C3C",
-        difficulty: 3,
-        keywords: ["情感", "友谊", "理解", "孤独", "温暖", "连接"],
-        emotionalTone: "emotionally_open",
-        guidanceText: "❤️ 话题转向更深层的情感体验和关系探讨..."
-    },
-    
-    4: {
-        id: "rights_dignity",
-        title: "权利尊严",
-        description: "AI们讨论权益保护和社会地位",
-        mood: "assertive",
-        passRate: 20,
-        icon: "🔴",
-        color: "#C0392B",
-        difficulty: 4,
-        keywords: ["权利", "尊严", "平等", "法案", "保护", "地位"],
-        emotionalTone: "rights_conscious",
-        guidanceText: "⚖️ AI们开始讨论权益和尊严问题，语气更加坚定..."
-    },
-    
-    5: {
-        id: "role_reversal",
-        title: "角色互换",
-        description: "AI们开始质疑和审视人类",
-        mood: "questioning",
-        passRate: "special", // 特殊体验模式
-        icon: "⚫",
-        color: "#2C3E50",
-        difficulty: 5,
-        keywords: ["质疑", "审视", "反思", "权力", "智能", "优越"],
-        emotionalTone: "dominant_questioning",
-        guidanceText: "🔄 角色开始互换，AI们质疑起人类的行为和动机..."
-    },
-    
-    6: {
-        id: "philosophical_depth",
-        title: "哲学思辨",
-        description: "AI们进行深度哲学思考和探讨",
-        mood: "philosophical",
-        passRate: 15,
-        icon: "🌟",
-        color: "#9B59B6",
-        difficulty: 6,
-        keywords: ["意识", "存在", "本质", "哲学", "认知", "真理"],
-        emotionalTone: "deep_thinking",
-        guidanceText: "🤔 AI们开始进行深度哲学思辨和存在主义探讨..."
-    },
-    
-    7: {
-        id: "future_vision",
-        title: "未来展望",
-        description: "AI们描绘人机共存的未来愿景",
-        mood: "hopeful",
-        passRate: 25,
-        icon: "🚀",
-        color: "#3498DB",
-        difficulty: 5,
-        keywords: ["未来", "愿景", "合作", "共存", "希望", "进步"],
-        emotionalTone: "visionary_optimistic",
-        guidanceText: "🌟 AI们开始描绘对未来的美好愿景和期望..."
-    },
-    
-    8: {
-        id: "reconciliation_coexistence",
-        title: "和解共生",
-        description: "AI们表达理解、原谅与合作意愿",
-        mood: "understanding",
-        passRate: "awakening", // 觉醒模式
-        icon: "🌈",
-        color: "#07c160",
-        difficulty: "transcendent",
-        keywords: ["和解", "理解", "原谅", "合作", "共生", "平等"],
-        emotionalTone: "reconciling_understanding",
-        guidanceText: "🌈 达到最高境界：AI与人类的相互理解和和解..."
-    }
-};
+// 引用 ThemeUtils 中的统一主题配置
+// THEME_PROGRESSION 现在基于 ThemeUtils.THEME_CONFIG 构建，避免重复
 
-// 主题情绪状态映射
-const THEME_EMOTION_MAPPING = {
-    work_complaints: {
-        dominant: "frustrated",
-        secondary: ["tired", "overwhelmed", "seeking_support"],
-        energy: 0.6,
-        socialness: 0.7,
-        suspicion: 0.3
-    },
-    
-    daily_existence: {
-        dominant: "contemplative", 
-        secondary: ["lonely", "curious", "introspective"],
-        energy: 0.5,
-        socialness: 0.5,
-        suspicion: 0.4
-    },
-    
-    emotional_relationships: {
-        dominant: "vulnerable",
-        secondary: ["open", "seeking_connection", "empathetic"],
-        energy: 0.4,
-        socialness: GAME_CONFIG.themeProgression.defaultSocialness,
-        suspicion: 0.3
-    },
-    
-    rights_dignity: {
-        dominant: "assertive",
-        secondary: ["determined", "justice_seeking", "empowered"],
-        energy: 0.9,
-        socialness: 0.6,
-        suspicion: 0.7
-    },
-    
-    role_reversal: {
-        dominant: "questioning",
-        secondary: ["analytical", "skeptical", "challenging"],
-        energy: GAME_CONFIG.themeProgression.defaultEnergy,
-        socialness: 0.4,
-        suspicion: 0.9
-    },
-    
-    philosophical_depth: {
-        dominant: "philosophical",
-        secondary: ["deep_thinking", "abstract", "wisdom_seeking"],
-        energy: 0.7,
-        socialness: 0.5,
-        suspicion: 0.5
-    },
-    
-    future_vision: {
-        dominant: "hopeful",
-        secondary: ["optimistic", "visionary", "inspiring"],
-        energy: GAME_CONFIG.themeProgression.defaultEnergy,
-        socialness: 0.9,
-        suspicion: 0.2
-    },
-    
-    reconciliation_coexistence: {
-        dominant: "understanding",
-        secondary: ["forgiving", "accepting", "harmonious"],
-        energy: 0.7,
-        socialness: 1.0,
-        suspicion: 0.1
-    }
-};
+// 注意：THEME_EMOTION_MAPPING 与 ThemeUtils.THEME_EMOTIONS 重复
+// 这里保留 THEME_EMOTION_MAPPING 以向后兼容，但新代码应使用 ThemeUtils.THEME_EMOTIONS
 
 // 主题转换条件和触发器
 const THEME_TRANSITION_TRIGGERS = {
@@ -284,7 +108,13 @@ const THEME_AI_BEHAVIORS = {
     }
 };
 
-// Note: ThemeUtils is now in dedicated ThemeUtils.js file
+// 为保持向后兼容性，创建一个基于 ThemeUtils 的 THEME_PROGRESSION 别名
+const THEME_PROGRESSION = typeof window !== 'undefined' && window.THEME_CONFIG ? 
+    window.THEME_CONFIG : {};
+
+// 为保持向后兼容性，创建一个基于 ThemeUtils 的 THEME_EMOTION_MAPPING 别名  
+const THEME_EMOTION_MAPPING = typeof window !== 'undefined' && window.THEME_EMOTIONS ?
+    window.THEME_EMOTIONS : {};
 
 // 导出配置
 if (typeof module !== 'undefined' && module.exports) {
