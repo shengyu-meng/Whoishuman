@@ -202,14 +202,12 @@ class DebugManager {
             const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
             
             if (isLocalhost) {
-                // 尝试服务器端保存
-                const serverSaved = await this.saveLogsToServer();
-                if (serverSaved) {
-                    if (this.config.features?.showConsoleLogs) {
-                        console.log('📁 日志已自动保存到.logs文件夹');
-                    }
-                    return;
+                // 在本地开发环境中，直接使用浏览器下载，避免404错误
+                if (this.config.features?.showConsoleLogs) {
+                    console.log('📁 本地环境：使用浏览器下载模式保存日志');
                 }
+                await this.fallbackToDownload();
+                return;
             }
             
             // 如果服务器端保存失败或非本地环境，回退到浏览器下载

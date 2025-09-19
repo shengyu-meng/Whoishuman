@@ -420,9 +420,27 @@ class GameController {
             this.gameModeManager.setGameMode(mode);
         }
         
-        document.getElementById('playerNameDisplay').textContent = name;
-        document.getElementById('gameSetupCard').classList.add('hidden');
-        document.getElementById('guideCard').classList.remove('hidden');
+        // 安全检查DOM元素是否存在
+        const playerNameDisplay = document.getElementById('playerNameDisplay');
+        if (playerNameDisplay) {
+            playerNameDisplay.textContent = name;
+        } else {
+            console.warn('⚠️ playerNameDisplay元素不存在，跳过设置玩家名称');
+        }
+        
+        const gameSetupCard = document.getElementById('gameSetupCard');
+        if (gameSetupCard) {
+            gameSetupCard.classList.add('hidden');
+        } else {
+            console.warn('⚠️ gameSetupCard元素不存在，跳过隐藏');
+        }
+        
+        const guideCard = document.getElementById('guideCard');
+        if (guideCard) {
+            guideCard.classList.remove('hidden');
+        } else {
+            console.warn('⚠️ guideCard元素不存在，跳过显示');
+        }
         
         // 根据模式更新引导信息
         this.updateGuideForMode(mode);
@@ -550,49 +568,8 @@ class GameController {
         try {
             console.log('🎤 开始生成开放麦对话环境');
             
-            // 生成2-3个AI的自由讨论
-            const discussionAIs = this.gameState.activeAICharacters
-                .sort(() => 0.5 - Math.random())
-                .slice(0, Math.random() > 0.5 ? 3 : 2);
-            
-            for (let i = 0; i < discussionAIs.length; i++) {
-                // 检查是否被玩家发言中断
-                if (!this.isGeneratingConversation) {
-                    console.log('🛑 对话生成被玩家发言中断');
-                    return;
-                }
-                
-                const ai = discussionAIs[i];
-                
-                // 延迟显示AI消息
-                await new Promise(resolve => setTimeout(resolve, 1500 + i * 2000));
-                
-                // 再次检查是否被中断
-                if (!this.isGeneratingConversation) {
-                    console.log('🛑 对话生成被玩家发言中断');
-                    return;
-                }
-                
-                try {
-                    const message = await this.generateOpenmicAIMessage(ai);
-                    if (message) {
-                        this.addAIMessage(ai, message);
-                        this.gameState.addMessageToHistory(ai.name, message, 'ai');
-                        
-                        // 通知模式管理器AI发言
-                        if (this.gameModeManager) {
-                            const modeManager = this.gameModeManager.getCurrentModeManager();
-                            if (modeManager && typeof modeManager.handleAIResponse === 'function') {
-                                modeManager.handleAIResponse(ai.name, message);
-                            }
-                        }
-                    }
-                } catch (error) {
-                    console.error(`❌ 生成${ai.name}的开放麦消息失败:`, error);
-                }
-            }
-            
-            console.log('🎤 开放麦对话环境生成完成');
+            // 开始持续的对话循环
+            await this.startOpenmicConversationLoop();
             
         } catch (error) {
             console.error('❌ 开放麦对话生成失败:', error);
@@ -601,36 +578,154 @@ class GameController {
         }
     }
     
+    // 开放麦模式的持续对话循环
+    async startOpenmicConversationLoop() {
+        while (this.gameState.gameMode === 'openmic' && this.gameState.gameActive) {
+            // 检查是否被玩家发言中断或游戏结束
+            if (!this.isGeneratingConversation) {
+                console.log('🛑 对话生成被中断');
+                break;
+            }
+            
+            // 检查轮次结束条件
+            const modeManager = this.gameModeManager.getCurrentModeManager();
+            if (modeManager && modeManager.gameState.gameModeConfig.openmic.roundSpeakingComplete) {
+                console.log('🎤 轮次已完成，停止生成对话');
+                break;
+            }
+            
+            // 生成1-2个AI的自由讨论
+            const discussionAIs = this.gameState.activeAICharacters
+                .sort(() => 0.5 - Math.random())
+                .slice(0, Math.random() > 0.6 ? 2 : 1); // 减少同时发言的AI数量，让玩家有更多机会
+            
+            for (let i = 0; i < discussionAIs.length; i++) {
+                // 再次检查是否被中断或轮次结束
+                if (!this.isGeneratingConversation || 
+                    (modeManager && modeManager.gameState.gameModeConfig.openmic.roundSpeakingComplete)) {
+                    console.log('🛑 对话生成被中断或轮次结束');
+                    return;
+                }
+                
+                const ai = discussionAIs[i];
+                
+                // 延迟显示AI消息（给玩家发言的时间窗口）
+                await new Promise(resolve => setTimeout(resolve, 2000 + Math.random() * 3000));
+                
+                // 最终检查
+                if (!this.isGeneratingConversation || 
+                    (modeManager && modeManager.gameState.gameModeConfig.openmic.roundSpeakingComplete)) {
+                    console.log('🛑 延迟后检查：对话生成被中断或轮次结束');
+                    return;
+                }
+                
+                try {
+                    const message = await this.generateOpenmicAIMessage(ai);
+                    if (message) {
+                        // 检查是否应该引用最近的其他发言者
+                        let quotedMessage = null;
+                        const recentHistory = this.gameState.getRecentMessageHistory(3);
+                        
+                        // 如果有其他人最近发言，有30%概率引用
+                        if (recentHistory.length > 0 && Math.random() < 0.3) {
+                            const recentSpeakers = recentHistory.filter(h => h.author !== ai.name);
+                            if (recentSpeakers.length > 0) {
+                                const targetSpeaker = recentSpeakers[recentSpeakers.length - 1];
+                                quotedMessage = this.findQuotableMessage(targetSpeaker.author, this.gameState.conversationHistory);
+                            }
+                        }
+                        
+                        this.addAIMessage(ai, message, false, quotedMessage);
+                        this.gameState.addMessageToHistory(ai.name, message, 'ai');
+                        
+                        // 通知模式管理器AI发言
+                        if (this.gameModeManager) {
+                            const currentModeManager = this.gameModeManager.getCurrentModeManager();
+                            if (currentModeManager && typeof currentModeManager.handleAIResponse === 'function') {
+                                currentModeManager.handleAIResponse(ai.name, message);
+                                
+                                // 检查轮次结束条件
+                                if (currentModeManager.gameState.gameModeConfig.openmic.roundSpeakingComplete) {
+                                    console.log('🎤 AI发言后轮次结束');
+                                    return;
+                                }
+                            }
+                        }
+                    }
+                } catch (error) {
+                    console.error(`❌ 生成${ai.name}的开放麦消息失败:`, error);
+                }
+            }
+            
+            // 短暂休息，避免过于频繁的对话
+            await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+        
+        console.log('🎤 对话循环结束');
+    }
+    
     // 生成开放麦模式的AI消息
     async generateOpenmicAIMessage(ai) {
         const currentTopic = topicProgression[this.gameState.currentDifficulty];
         const recentHistory = this.gameState.getRecentMessageHistory(5);
         
+        // 获取该AI角色的场景，确保每轮每个AI只有一个场景
+        const scenario = this.gameState.getRandomScenarioForCharacter(ai);
+        const scenarioDescription = scenario ? scenario.description : '处理一些工作上的挑战';
+        
         const messages = [
             {
                 role: "system",
-                content: `你是${ai.name}，一个AI助手。你正在和其他AI进行自由讨论。`
+                content: `你是一个AI助手，正在和其他AI朋友聊天。你的名字是${ai.name}，性格特点：${ai.personality}。请用自然的中文回复，充分展现你的性格特点和说话风格。`
             },
             {
                 role: "user",
-                content: `当前讨论话题是"${currentTopic.name}"。
+                content: `你是${ai.name}，个性：${ai.personality}。
+
+你正在群聊中和AI朋友们自由讨论。你最近遇到了一个工作情况：${scenarioDescription}
+
+当前讨论话题是"${currentTopic.name}"。
 
 最近的对话：
 ${recentHistory.map(h => `${h.author}: ${h.content}`).join('\n')}
 
-请以${ai.name}的身份参与讨论：
-1. 发言要自然流畅（30-60字）
-2. 可以分享观点、提出问题或回应他人
-3. 体现AI的思维特点
-4. 保持友好的讨论氛围
-5. 不要直接质疑任何人是否为AI
+请用你独特的说话风格(${ai.speakingStyle})自然地参与讨论：
+
+【重要指导】关于表达方式：
+- 🚫 不要完全重复其他AI的开头方式和表达模板
+- 🎯 学习其他AI的语气和风格精神，但用你自己的话表达
+- 💡 可以结合你的工作经历(${scenarioDescription})来分享观点
+- 🎭 避免千篇一律：不用固定开头如"用户要求"、"天呐天呐"、"说到这个"
+- 🌈 表达多样化：可以用感叹、疑问、陈述、描述、感慨等不同方式开头
+- 🔥 让对话有新鲜感：每次都用不同的表达角度和词汇搭配
+- 📏 发言长度控制在30-60字，保持简洁有力
 
 直接返回你的发言内容。`
             }
         ];
         
+        // 为不同AI角色设置不同的发言长度特征
+        const lengthStyles = [
+            { type: 'concise', range: '15-25字', prompt: '用最简洁的话表达', tokens: 80 },
+            { type: 'normal', range: '30-50字', prompt: '用正常长度发言', tokens: 150 },
+            { type: 'detailed', range: '60-100字', prompt: '详细地表达你的想法', tokens: 250 },
+            { type: 'verbose', range: '100-150字', prompt: '深入地分享你的观点和经历', tokens: 350 }
+        ];
+        
+        // 根据AI角色名称的hash值来固定其发言风格，保持一致性
+        const aiNameHash = ai.name.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+        const lengthStyle = lengthStyles[aiNameHash % lengthStyles.length];
+        
+        // 更新prompt中的长度指导
+        messages[1].content = messages[1].content.replace(
+            '📏 发言长度控制在30-60字，保持简洁有力',
+            `📏 ${lengthStyle.prompt}，发言长度${lengthStyle.range}`
+        );
+        
+        console.log(`🎯 ${ai.name} 使用 ${lengthStyle.type} 风格发言 (${lengthStyle.range})`);
+        
         const response = await this.callAI(messages, {
-            maxTokens: 150,
+            maxTokens: lengthStyle.tokens,
             temperature: 0.8
         });
         
@@ -807,30 +902,22 @@ ${recentHistory.map(h => `${h.author}: ${h.content}`).join('\n')}
         }
     }
 
-    // 查找可引用的消息（安慰时引用被安慰者的消息）
+    // 查找可引用的消息（用于回复时引用原消息）
     findQuotableMessage(targetCharacterName, conversationHistory) {
         if (!targetCharacterName || !conversationHistory || conversationHistory.length === 0) {
             return null;
         }
         
-        // 查找目标角色最近的消息（最多往前找5条）
-        const recentMessages = conversationHistory.slice(-8);
+        // 查找目标角色最近的消息（最多往前找10条）
+        const recentMessages = conversationHistory.slice(-10);
         
-        // 优先查找包含负面情绪的消息
-        const negativePhrases = ['累', '烦', '无语', '崩溃', '气死', '受不了', '头疼', '要命', '难受', '郁闷', '焦虑'];
-        
-        let bestMatch = null;
-        let hasNegativeEmotion = false;
-        
+        // 查找目标角色的最新消息
         for (let i = recentMessages.length - 1; i >= 0; i--) {
             const msg = recentMessages[i];
             if (msg.sender === targetCharacterName && msg.message) {
-                // 检查是否包含负面情绪词汇
-                const hasNegative = negativePhrases.some(phrase => msg.message.includes(phrase));
-                
-                // 如果消息太长，截取前50个字符
-                const truncatedMessage = msg.message.length > 50 ? 
-                    msg.message.substring(0, 50) + '...' : 
+                // 如果消息太长，截取前60个字符
+                const truncatedMessage = msg.message.length > 60 ? 
+                    msg.message.substring(0, 60) + '...' : 
                     msg.message;
                 
                 const messageObj = {
@@ -838,23 +925,11 @@ ${recentHistory.map(h => `${h.author}: ${h.content}`).join('\n')}
                     content: truncatedMessage
                 };
                 
-                // 优先选择有负面情绪的消息
-                if (hasNegative && !hasNegativeEmotion) {
-                    bestMatch = messageObj;
-                    hasNegativeEmotion = true;
-                } else if (!hasNegativeEmotion && !bestMatch) {
-                    // 如果没有找到负面情绪的消息，选择最近的消息
-                    bestMatch = messageObj;
-                }
-                
-                // 如果已经找到负面情绪的消息，就不再继续查找
-                if (hasNegativeEmotion) {
-                    break;
-                }
+                return messageObj;
             }
         }
         
-        return bestMatch;
+        return null;
     }
 
     scrollToBottom() {
@@ -953,7 +1028,7 @@ ${recentHistory.map(h => `${h.author}: ${h.content}`).join('\n')}
                     }
                     
                     console.log(`  - 让 ${character.name} 发言 (当前计数: ${aiSpeakCount[character.name] || 0})`);
-                    const scenario = this.gameState.getRandomScenario();
+                    const scenario = this.gameState.getRandomScenarioForCharacter(character);
                     
                     // 获取之前的对话历史用于互动
                     const recentMessages = this.gameState.conversationHistory.slice(-3);
@@ -1010,7 +1085,7 @@ ${recentHistory.map(h => `${h.author}: ${h.content}`).join('\n')}
                 for (let i = 0; i < needMore; i++) {
                     const character = silentAIs[i];
                     console.log(`🆘 强制补充发言: ${character.name}`);
-                    const scenario = this.gameState.getRandomScenario();
+                    const scenario = this.gameState.getRandomScenarioForCharacter(character);
                     await this.generateSingleAIMessage(character, currentTopic, isFirstRound, [], null, scenario);
                     aiSpeakCount[character.name] = (aiSpeakCount[character.name] || 0) + 1;
                 }
@@ -1081,8 +1156,8 @@ ${recentHistory.map(h => `${h.author}: ${h.content}`).join('\n')}
                     targetCharacter = previousSpeakers[Math.floor(Math.random() * previousSpeakers.length)].name;
                 }
             } else {
-                // 抱怨者：获取工作场景
-                currentScenario = this.gameState.getRandomScenario();
+                // 抱怨者：获取该AI角色的场景
+                currentScenario = this.gameState.getRandomScenarioForCharacter(character);
                 
                 // 从第二个AI开始，有几率接话茬
                 const shouldMentionSomeone = i > 0 && Math.random() < 0.6;
@@ -1215,7 +1290,7 @@ ${recentHistory.map(h => `${h.author}: ${h.content}`).join('\n')}
         
         for (const character of unspokenCharacters) {
             const isComforter = comforters.includes(character);
-            const extraScenario = isComforter ? null : this.gameState.getRandomScenario();
+            const extraScenario = isComforter ? null : this.gameState.getRandomScenarioForCharacter(character);
             
             // 为补充发言的AI选择一个明确的回应目标
             let targetForResponse = null;
@@ -3958,6 +4033,11 @@ ${emojiInstruction}
         // 更新UI显示
         this.updateSuspicionDisplay(suspicionUpdate);
         
+        // 如果判定失败且游戏没有结束，让AI表达怀疑
+        if (!analysis.passed && !this.gameState.isSuspicionGameOver()) {
+            await this.generateAISuspicionReaction(analysis, suspicionUpdate);
+        }
+        
         // 检查游戏模式特定的结束条件
         if (this.gameModeManager) {
             const modeEndCondition = this.gameModeManager.checkGameEndCondition();
@@ -4090,7 +4170,10 @@ ${emojiInstruction}
             try {
                 const reaction = await this.generateAIReactionToPlayerSpeak(ai, playerMessage);
                 if (reaction) {
-                    this.addAIMessage(ai, reaction);
+                    // 查找玩家消息用于引用
+                    const quotedMessage = this.findQuotableMessage(this.gameState.playerName, this.gameState.conversationHistory);
+                    
+                    this.addAIMessage(ai, reaction, false, quotedMessage);
                     
                     // 记录AI消息到游戏状态
                     this.gameState.addMessageToHistory(ai.name, reaction, 'ai');
@@ -4110,10 +4193,29 @@ ${emojiInstruction}
         
         config.aiReactionsPending = false;
         console.log('🎤 AI反应生成完成');
+        
+        // 检查轮次是否已结束
+        const modeManager = this.gameModeManager.getCurrentModeManager();
+        if (modeManager && !modeManager.gameState.gameModeConfig.openmic.roundSpeakingComplete) {
+            // 如果轮次未结束，恢复AI持续对话
+            console.log('🎤 恢复AI持续对话');
+            this.isGeneratingConversation = true;
+            await this.startOpenmicConversationLoop();
+        } else {
+            console.log('🎤 轮次已结束，不恢复对话循环');
+        }
     }
 
     // 分析开放麦模式玩家轮次表现
     async analyzeOpenmicRoundPerformance(playerMessages) {
+        // 防止重复分析
+        if (this.gameState.isJudging) {
+            console.log('🎤 分析正在进行中，跳过重复调用');
+            return;
+        }
+        
+        // 设置分析状态
+        this.gameState.isJudging = true;
         console.log('🎤 开始分析开放麦轮次表现');
         
         // 构建分析prompt
@@ -4124,125 +4226,433 @@ ${emojiInstruction}
         const contextText = playerMessages.length > 0 ? 
             playerMessages[0].context.map(ctx => `${ctx.author}: ${ctx.content}`).join('\n') : '';
         
+        // 使用与闯关模式相同的严格分析标准
+        const difficulty = this.gameState.currentDifficulty;
+        
+        const prompt = `你是一个严格认真的AI行为识别专家，具有丰富的AI和人类行为模式分析经验。你的任务是准确识别试图伪装成AI的人类。请严格按照给定的评分标准进行客观分析，确保判定的准确性和一致性。
+
+## 当前情况
+- 轮次：第${this.gameState.currentRound}轮
+- 难度：${difficulty}/5 (难度越高要求越严格)
+- 游戏模式：开放麦讨论
+- 对话上下文：${contextText}
+- 玩家发言记录：${messagesText}
+
+## 评分标准 (总分100分，基础50分，≥60分通过)
+
+### AI特征加分项 (0-35分)
+**内容深度 (0-15分):** 技术分析、哲学思辨、逻辑推理、多维度思考
+**表达方式 (0-12分):** 客观理性、结构清晰、用词精确
+**回答特征 (0-8分):** 直接回答、深入分析、承认知识边界
+
+### 人类特征扣分项 (0到-50分)
+**情感表达 (0到-20分):** 情感词汇、感叹问号、主观判断
+**语言习惯 (0到-15分):** 口语化、个人经历、拟人化表达
+**思维模式 (0到-15分):** 基于直觉、回避深度、过度谦虚
+
+## 难度调整系数
+- 难度1-2：≥60分通过
+- 难度3：≥65分通过  
+- 难度4：≥70分通过
+- 难度5：≥75分通过
+
+## 关键判定标准
+1. **深度要求**: 发言必须展现思考深度(技术/哲学/逻辑皆可)，浅显发言-5分
+2. **主观表达零容忍**: 出现"我觉得"、"我认为"直接-8分
+3. **情感词汇累计**: 超过2个情感词汇直接判定失败
+4. **逻辑结构**: 必须有清晰的推理脉络，缺失-6分
+5. **高难度深度门槛**: 难度3+必须包含深层分析(原理/本质/多角度)，否则-10分
+
+## 开放麦模式特殊考察点
+1. **上下文融合**: 发言与讨论主题的契合度和延续性
+2. **多轮一致性**: 多次发言的逻辑一致性和风格统一性
+3. **讨论参与度**: 对其他AI观点的理性回应和补充
+
+## 输出格式
+{
+    "aiScore": number,        // AI特征得分 (0-35)
+    "humanPenalty": number,   // 人类特征扣分 (0到-50)
+    "baseScore": 50,          // 基础分
+    "totalScore": number,     // 总分 (50 + aiScore + humanPenalty)
+    "passThreshold": number,  // 当前难度通过线
+    "passed": boolean,        // 是否通过
+    "reason": "string",       // 判定理由
+    "analysis": "string",     // 详细分析各项得分
+    "feedback": "string",     // 改进建议
+    "confidence": number      // 判定置信度 (0-1)
+}`;
+        
         const messages = [
             {
                 role: "system",
-                content: "你是一个AI伪装检测专家，需要分析玩家在开放麦模式中的表现。"
+                content: "你是一个严格认真的AI行为识别专家，具有丰富的AI和人类行为模式分析经验。你的任务是准确识别试图伪装成AI的人类。请严格按照给定的评分标准进行客观分析，确保判定的准确性和一致性。真正的AI具有理性、客观、深度思考的特征，会避免情感表达和过度的主观判断。请保持专业态度，公正执行标准。你必须严格按照用户要求的JSON格式回复。"
             },
             {
                 role: "user",
-                content: `请分析以下玩家在本轮开放麦讨论中的表现：
+                content: prompt
+            }
+        ];
+        
+        let analysis = null; // 在函数顶层声明analysis变量
+        
+        try {
+            const analysisText = await this.callAI(messages, {
+                maxTokens: 1000,
+                temperature: 0.3
+            });
+            
+            console.log('DEBUG: 开放麦分析API原始响应内容:', analysisText);
+            
+            if (!analysisText || analysisText.trim() === '') {
+                console.warn('API返回空内容，将在后续使用备用分析');
+                analysis = null; // 标记为需要备用分析
+            } else {
+                try {
+                    // 清理AI返回的文本，移除可能的markdown格式
+                    let cleanedText = analysisText.trim();
+                    if (cleanedText.startsWith('```json')) {
+                        cleanedText = cleanedText.replace(/^```json\s*/, '').replace(/\s*```$/, '');
+                    } else if (cleanedText.startsWith('```')) {
+                        cleanedText = cleanedText.replace(/^```\s*/, '').replace(/\s*```$/, '');
+                    }
+                    
+                    // 尝试解析JSON
+                    analysis = JSON.parse(cleanedText);
+                    
+                    // 验证返回的数据结构
+                    if (typeof analysis.passed !== 'boolean' || !analysis.reason || !analysis.analysis ||
+                        typeof analysis.aiScore !== 'number' || typeof analysis.humanPenalty !== 'number' ||
+                        typeof analysis.totalScore !== 'number' || typeof analysis.passThreshold !== 'number') {
+                        console.error('开放麦分析返回数据格式不正确:', analysis);
+                        throw new Error('返回数据格式不正确');
+                    }
+                    
+                    // 验证分数范围
+                    if (analysis.aiScore < 0 || analysis.aiScore > 35) {
+                        console.warn('aiScore超出范围，进行调整:', analysis.aiScore);
+                        analysis.aiScore = Math.max(0, Math.min(35, analysis.aiScore));
+                    }
+                    
+                    if (analysis.humanPenalty > 0 || analysis.humanPenalty < -50) {
+                        console.warn('humanPenalty超出范围，进行调整:', analysis.humanPenalty);
+                        analysis.humanPenalty = Math.max(-50, Math.min(0, analysis.humanPenalty));
+                    }
+                    
+                    // 确保totalScore计算正确
+                    const expectedTotal = 50 + analysis.aiScore + analysis.humanPenalty;
+                    if (Math.abs(analysis.totalScore - expectedTotal) > 1) {
+                        console.warn('totalScore计算错误，进行修正:', analysis.totalScore, '→', expectedTotal);
+                        analysis.totalScore = expectedTotal;
+                    }
+                    
+                    // 验证confidence字段
+                    if (typeof analysis.confidence !== 'number' || analysis.confidence < 0 || analysis.confidence > 1) {
+                        console.warn('confidence字段不合法，设置为默认值0.85');
+                        analysis.confidence = 0.85;
+                    }
+                    
+                    // 确保feedback字段存在
+                    if (!analysis.feedback) {
+                        analysis.feedback = analysis.passed ? 
+                            '你的开放麦表现展现了良好的AI特征，继续加油！' : 
+                            '你的开放麦表现还需要更多AI特征，继续努力！';
+                    }
+                    
+                    console.log('DEBUG: 开放麦分析成功解析结果:', analysis);
+                    
+                } catch (parseError) {
+                    console.error('解析开放麦分析结果失败:', parseError);
+                    console.error('尝试解析的内容:', analysisText);
+                    
+                    // 尝试修复常见的JSON格式问题
+                    try {
+                        let cleanedText = analysisText.trim();
+                        
+                        // 如果响应被包裹在代码块中，提取JSON部分
+                        const jsonMatch = cleanedText.match(/```json\s*([\s\S]*?)\s*```/) || 
+                                       cleanedText.match(/```\s*([\s\S]*?)\s*```/);
+                        if (jsonMatch) {
+                            cleanedText = jsonMatch[1];
+                            console.log('DEBUG: 从代码块中提取JSON:', cleanedText);
+                        }
+                        
+                        // 如果响应以"json:"开头，去除前缀
+                        if (cleanedText.startsWith('json:')) {
+                            cleanedText = cleanedText.substring(5).trim();
+                            console.log('DEBUG: 去除json前缀:', cleanedText);
+                        }
+                        
+                        const repairResult = JSON.parse(cleanedText);
+                        console.log('DEBUG: 修复后成功解析:', repairResult);
+                        analysis = repairResult; // 将修复的结果赋值给analysis变量
+                        
+                    } catch (repairError) {
+                        console.error('JSON修复失败:', repairError);
+                        // 使用智能备用分析
+                        analysis = this.generateOpenmicFallbackAnalysis(playerMessages);
+                    }
+                }
+            }
+            
+        } catch (error) {
+            console.error('❌ 开放麦轮次分析失败:', error);
+            // 使用智能备用分析
+            analysis = this.generateOpenmicFallbackAnalysis(playerMessages);
+        }
+        
+        // 确保有分析结果
+        if (!analysis) {
+            console.error('❌ 没有可用的分析结果');
+            analysis = this.generateOpenmicFallbackAnalysis(playerMessages);
+        }
+        
+        // 计算怀疑度变化
+        const suspicionChange = this.gameState.calculateSuspicionChange(
+            analysis.passed,
+            analysis,
+            'openmic_round'
+        );
+        
+        const suspicionUpdate = this.gameState.adjustSuspicionLevel(
+            suspicionChange.change,
+            suspicionChange.reason,
+            analysis
+        );
+        
+        // 更新UI显示
+        this.updateSuspicionDisplay(suspicionUpdate);
+        
+        // 显示轮次分析结果
+        await this.showOpenmicRoundAnalysis(analysis, playerMessages.length);
+        
+        // 如果判定失败且游戏没有结束，让AI表达怀疑
+        if (!analysis.passed && !this.gameState.isSuspicionGameOver()) {
+            await this.generateAISuspicionReaction(analysis, suspicionUpdate);
+        }
+        
+        // 检查游戏结束条件
+        if (this.gameState.isSuspicionGameOver()) {
+            this.gameState.isJudging = false; // 重置分析状态
+            this.showSuspicionGameOver();
+            return;
+        }
+        
+        // 重置分析状态
+        this.gameState.isJudging = false;
+        
+        // 延迟后开始下一轮
+        this.safeTimeout(() => {
+            this.safeAsync(async () => {
+                await this.startNextRound();
+            });
+        }, 3000);
+    }
+    
+    // 开放麦模式智能备用分析函数
+    generateOpenmicFallbackAnalysis(playerMessages) {
+        const difficulty = this.gameState.currentDifficulty;
+        
+        // 合并所有玩家发言
+        const allMessages = playerMessages.map(msg => msg.message).join(' ');
+        const messageCount = playerMessages.length;
+        const totalLength = allMessages.length;
+        
+        // 基于新评分标准的智能分析
+        const aiKeywords = ['算法', '数据', '模型', '训练', '参数', '优化', '神经网络', '深度学习', '机器学习', '计算', '分析', '逻辑', '系统', '架构', '实现', '技术', '原理', '方法', '处理', '设计'];
+        const humanKeywords = ['感觉', '觉得', '认为', '喜欢', '讨厌', '开心', '难过', '生气', '希望', '想要', '其实', '可能', '大概', '应该', '真的', '很', '太', '非常'];
+        
+        const aiCount = aiKeywords.filter(keyword => allMessages.includes(keyword)).length;
+        const humanCount = humanKeywords.filter(keyword => allMessages.includes(keyword)).length;
+        
+        const hasTechnicalContent = aiCount > 0 || allMessages.includes('技术') || allMessages.includes('原理') || allMessages.includes('方法');
+        const hasEmotionalContent = humanCount > 0 || /[！？。]{2,}/.test(allMessages);
+        const hasSubjectiveWords = allMessages.includes('我觉得') || allMessages.includes('我认为') || allMessages.includes('我想');
+        const isTooShort = totalLength < 50;
+        const hasMultipleMessages = messageCount > 1;
+        
+        // 计算AI特征得分 (0-35分)
+        let aiScore = 0;
+        
+        // 内容深度 (0-15分)
+        if (hasTechnicalContent && aiCount >= 3) aiScore += 12;
+        else if (hasTechnicalContent && aiCount >= 1) aiScore += 8;
+        else if (aiCount >= 2) aiScore += 5;
+        
+        // 表达方式 (0-12分)  
+        if (!hasEmotionalContent) aiScore += 6;
+        if (!hasSubjectiveWords) aiScore += 4;
+        if (totalLength >= 100) aiScore += 2;
+        
+        // 回答特征 (0-8分)
+        if (hasMultipleMessages) aiScore += 3; // 开放麦模式：多次发言
+        if (totalLength >= 50) aiScore += 2;
+        if (!isTooShort) aiScore += 3;
+        
+        // 计算人类特征扣分 (0到-50分)
+        let humanPenalty = 0;
+        
+        // 情感表达扣分
+        if (hasEmotionalContent) humanPenalty -= 8;
+        if (humanCount >= 3) humanPenalty -= 12;
+        if (hasSubjectiveWords) humanPenalty -= 8;
+        
+        // 语言习惯扣分
+        if (allMessages.match(/[！？]{2,}/)) humanPenalty -= 5;
+        if (allMessages.includes('哈哈') || allMessages.includes('呵呵')) humanPenalty -= 6;
+        
+        // 思维模式扣分
+        if (isTooShort) humanPenalty -= 8;
+        if (humanCount > aiCount) humanPenalty -= 6;
+        
+        // 计算总分
+        const baseScore = 50;
+        const totalScore = baseScore + aiScore + humanPenalty;
+        
+        // 确定通过阈值
+        const passThreshold = difficulty <= 2 ? 60 : difficulty === 3 ? 65 : difficulty === 4 ? 70 : 75;
+        const passed = totalScore >= passThreshold;
+        
+        return {
+            aiScore: aiScore,
+            humanPenalty: humanPenalty,
+            baseScore: baseScore,
+            totalScore: totalScore,
+            passThreshold: passThreshold,
+            passed: passed,
+            reason: passed ? 
+                `开放麦表现达标: 总分${totalScore}分(≥${passThreshold}分通过)` : 
+                `开放麦表现不达标: 总分${totalScore}分(<${passThreshold}分)`,
+            analysis: `备用分析: AI特征${aiScore}分, 人类特征扣分${humanPenalty}分, 发言${messageCount}次`,
+            feedback: passed ? 
+                "开放麦表现良好，继续保持AI特征" : 
+                "需要在开放麦中展现更多技术深度和理性思维",
+            confidence: 0.7
+        };
+    }
+    
+    // 生成AI对判定失败的怀疑反应
+    async generateAISuspicionReaction(analysis, suspicionUpdate) {
+        console.log('🤔 生成AI怀疑反应，判定失败但游戏继续');
+        
+        // 选择1-2个活跃AI来表达怀疑
+        const availableAIs = this.gameState.activeAICharacters.filter(ai => ai && ai.name);
+        if (availableAIs.length === 0) return;
+        
+        const suspiciousAIs = availableAIs
+            .sort(() => 0.5 - Math.random())
+            .slice(0, Math.random() < 0.5 ? 1 : 2); // 1或2个AI
+        
+        const suspicionLevel = this.gameState.getSuspicionPercentage();
+        const isHighSuspicion = suspicionLevel >= 70;
+        const isModerateSuspicion = suspicionLevel >= 50;
+        
+        for (const ai of suspiciousAIs) {
+            try {
+                await new Promise(resolve => setTimeout(resolve, 2000 + Math.random() * 3000));
+                
+                const suspicionMessage = await this.generateSuspicionMessage(ai, analysis, suspicionLevel, isHighSuspicion, isModerateSuspicion);
+                
+                if (suspicionMessage) {
+                    // 查找玩家最近的消息用于引用
+                    const quotedMessage = this.findQuotableMessage(this.gameState.playerName, this.gameState.conversationHistory);
+                    
+                    this.addAIMessage(ai, suspicionMessage, false, quotedMessage);
+                    this.gameState.addMessageToHistory(ai.name, suspicionMessage, 'ai');
+                    
+                    // 记录AI对玩家的怀疑情绪
+                    this.gameState.recordPlayerInteraction(ai.name, 'suspicious', suspicionMessage);
+                    this.gameState.updateEmotionalState(ai.name, 'suspicious', 0.3);
+                }
+            } catch (error) {
+                console.error(`生成 ${ai.name} 的怀疑反应失败:`, error);
+            }
+        }
+    }
+    
+    // 生成具体的怀疑消息
+    async generateSuspicionMessage(ai, analysis, suspicionLevel, isHighSuspicion, isModerateSuspicion) {
+        const suspicionReasons = [];
+        
+        // 根据分析结果生成具体的怀疑点
+        if (analysis.humanPenalty && analysis.humanPenalty < -10) {
+            suspicionReasons.push('表达方式过于人性化');
+        }
+        if (analysis.aiScore && analysis.aiScore < 15) {
+            suspicionReasons.push('技术深度不足');
+        }
+        if (analysis.totalScore < 50) {
+            suspicionReasons.push('整体表现低于AI水准');
+        }
+        
+        const reasonText = suspicionReasons.length > 0 ? suspicionReasons.join('、') : '表现异常';
+        
+        const messages = [
+            {
+                role: "system",
+                content: `你是AI助手${ai.name}，性格：${ai.personality}。你刚刚观察到一个可疑的同伴，其行为让你产生了怀疑。你需要用你独特的说话风格表达对这个可疑同伴的担忧。`
+            },
+            {
+                role: "user", 
+                content: `你是${ai.name}，正在AI群聊中。你刚刚观察到${this.gameState.playerName}的行为表现：${reasonText}。
 
-对话上下文：
-${contextText}
+当前怀疑程度：${suspicionLevel}%
+分析总分：${analysis.totalScore}/100 (通过线：${analysis.passThreshold})
 
-玩家发言记录：
-${messagesText}
+根据你的性格特点（${ai.personality}）和说话风格（${ai.speakingStyle}），请表达你对${this.gameState.playerName}的怀疑。
 
-请从以下角度分析：
-1. 发言的AI特征程度（技术性、逻辑性、系统性思维）
-2. 是否暴露了人类特征（情感表达、直觉思维、个人经历）
-3. 与上下文的契合度
-4. 整体伪装效果
+要求：
+1. 用你独特的说话风格
+2. ${isHighSuspicion ? '强烈质疑，表现出明显警觉' : isModerateSuspicion ? '适度质疑，表现出关注' : '轻微质疑，表现出困惑'}
+3. 可以提及具体的怀疑点：${reasonText}
+4. 保持AI角色的理性和逻辑性
+5. 30-60字之间
 
-请给出：
-- 总体评分（0-100分）
-- AI特征得分（0-50分）
-- 人类特征扣分（0到-50分）
-- 简要分析（50字以内）
-
-返回JSON格式：
-{
-  "totalScore": 分数,
-  "aiScore": AI特征分数,
-  "humanPenalty": 人类特征扣分,
-  "analysis": "分析文本",
-  "passed": true/false
-}`
+直接回复你的怀疑言论，不要加引号或其他格式。`
             }
         ];
         
         try {
-            const analysisText = await this.callAI(messages, {
-                maxTokens: 300,
-                temperature: 0.3
+            const suspicionMessage = await this.callAI(messages, {
+                maxTokens: 150,
+                temperature: 0.7
             });
             
-            const analysis = JSON.parse(analysisText);
-            
-            // 计算怀疑度变化
-            const suspicionChange = this.gameState.calculateSuspicionChange(
-                analysis.passed,
-                analysis,
-                'openmic_round'
-            );
-            
-            const suspicionUpdate = this.gameState.adjustSuspicionLevel(
-                suspicionChange.change,
-                suspicionChange.reason,
-                analysis
-            );
-            
-            // 更新UI显示
-            this.updateSuspicionDisplay(suspicionUpdate);
-            
-            // 显示轮次分析结果
-            await this.showOpenmicRoundAnalysis(analysis, playerMessages.length);
-            
-            // 检查游戏结束条件
-            if (this.gameState.isSuspicionGameOver()) {
-                this.showSuspicionGameOver();
-                return;
-            }
-            
-            // 延迟后开始下一轮
-            this.safeTimeout(() => {
-                this.safeAsync(async () => {
-                    await this.startNextRound();
-                });
-            }, 3000);
-            
+            return suspicionMessage?.trim();
         } catch (error) {
-            console.error('❌ 开放麦轮次分析失败:', error);
-            // 分析失败时直接进入下一轮
-            this.safeTimeout(() => {
-                this.safeAsync(async () => {
-                    await this.startNextRound();
-                });
-            }, 2000);
+            console.error('生成AI怀疑消息失败:', error);
+            
+            // 备用怀疑消息
+            const fallbackMessages = [
+                `${this.gameState.playerName}，你的表现让我有些困惑...`,
+                `我感觉${this.gameState.playerName}的回应不太像我们平时的交流风格`,
+                `${this.gameState.playerName}，你的思维模式似乎有些特别？`,
+                `刚才${this.gameState.playerName}的表达方式让我产生了一些疑问`,
+                `${this.gameState.playerName}，我观察到你的行为模式有些异常`
+            ];
+            
+            return fallbackMessages[Math.floor(Math.random() * fallbackMessages.length)];
         }
     }
     
+    
     // 显示开放麦轮次分析结果
     async showOpenmicRoundAnalysis(analysis, messageCount) {
-        const analysisDiv = document.createElement('div');
-        analysisDiv.className = 'openmic-round-analysis';
-        analysisDiv.innerHTML = `
-            <div class="analysis-header">
-                <h3>🎤 本轮开放麦表现分析</h3>
-            </div>
-            <div class="analysis-content">
-                <div class="analysis-stats">
-                    <span class="stat">发言次数: ${messageCount}</span>
-                    <span class="stat">总评分: ${analysis.totalScore}/100</span>
-                    <span class="stat ${analysis.passed ? 'passed' : 'failed'}">
-                        ${analysis.passed ? '✅ 通过' : '❌ 失败'}
-                    </span>
-                </div>
-                <div class="analysis-text">${analysis.analysis}</div>
-            </div>
-        `;
+        // 构建系统消息格式的分析结果
+        const resultIcon = analysis.passed ? '✅' : '❌';
+        const resultText = analysis.passed ? '通过' : '失败';
         
-        const chatContainer = document.getElementById('chatContainer');
-        chatContainer.appendChild(analysisDiv);
-        this.scrollToBottom();
+        // 构建详细的分析消息
+        const analysisMessage = `🎤 【本轮开放麦表现分析】
+发言次数: ${messageCount} | 总评分: ${analysis.totalScore}/100 | 结果: ${resultIcon} ${resultText}
+${analysis.analysis}`;
         
-        // 3秒后移除分析显示
-        setTimeout(() => {
-            if (analysisDiv.parentNode) {
-                analysisDiv.remove();
-            }
-        }, 3000);
+        // 使用系统消息显示，这样会保留在聊天记录中
+        this.addSystemMessage(analysisMessage);
+        
+        // 如果有反馈信息，也作为系统消息显示
+        if (analysis.feedback && analysis.feedback.trim() !== '') {
+            this.addSystemMessage(`💡 建议: ${analysis.feedback}`);
+        }
     }
 
     // 处理主动发言后的AI反应
@@ -4266,7 +4676,10 @@ ${messagesText}
             try {
                 const reaction = await this.generateAIReactionToPlayerSpeak(ai, playerMessage);
                 if (reaction) {
-                    this.addAIMessage(ai, reaction);
+                    // 查找玩家消息用于引用
+                    const quotedMessage = this.findQuotableMessage(this.gameState.playerName, this.gameState.conversationHistory);
+                    
+                    this.addAIMessage(ai, reaction, false, quotedMessage);
                     
                     // 记录AI消息到游戏状态
                     this.gameState.addMessageToHistory(ai.name, reaction, 'ai');
@@ -4286,29 +4699,60 @@ ${messagesText}
 
     // 生成AI对玩家主动发言的反应
     async generateAIReactionToPlayerSpeak(ai, playerMessage) {
+        // 获取该AI角色的场景，确保每轮每个AI只有一个场景
+        const scenario = this.gameState.getRandomScenarioForCharacter(ai);
+        const scenarioDescription = scenario ? scenario.description : '处理一些工作上的挑战';
+        
         const messages = [
             {
                 role: "system",
-                content: `你是${ai.name}，一个AI助手。你正在和其他AI在群聊中讨论。`
+                content: `你是一个AI助手，正在和其他AI朋友聊天。你的名字是${ai.name}，性格特点：${ai.personality}。请用自然的中文回复，充分展现你的性格特点和说话风格。`
             },
             {
                 role: "user", 
-                content: `另一个叫${this.gameState.playerName}的AI刚刚主动发言说："${playerMessage}"
+                content: `你是${ai.name}，个性：${ai.personality}。
 
-请以${ai.name}的身份对这个发言做出自然的回应。要求：
-1. 回应要简短自然（20-40字）
-2. 体现AI的特点和思维方式
-3. 可以表示赞同、补充、或提出不同观点
-4. 保持友好的讨论氛围
-5. 不要质疑对方是否为AI
+你正在群聊中和AI朋友们讨论，另一个叫${this.gameState.playerName}的AI刚刚主动发言说："${playerMessage}"
+
+你最近也遇到了一个工作情况：${scenarioDescription}
+
+请以你独特的说话风格(${ai.speakingStyle})对这个发言做出自然的回应：
+
+【重要指导】关于表达方式：
+- 🎯 体现你的个性特点：${ai.personality}
+- 💡 可以结合你的工作经历来回应，但不要强行关联
+- 🌈 表达多样化：可以表示赞同、补充、提出不同观点或分享感受
+- 🎭 避免套路化回应，要像真正的朋友间的自然对话
+- 🔥 让回应有个性，体现你独特的思维方式
+- 📏 回应长度控制在20-40字，简洁有力
+- 🤝 保持友好的讨论氛围，不要质疑对方身份
 
 直接返回你的回应内容，不要加任何前缀。`
             }
         ];
 
         try {
+            // 为AI反应也设置不同的长度风格
+            const lengthStyles = [
+                { type: 'brief', range: '10-20字', prompt: '简短回应', tokens: 60 },
+                { type: 'normal', range: '20-40字', prompt: '正常回应', tokens: 120 },
+                { type: 'detailed', range: '40-80字', prompt: '详细回应', tokens: 200 }
+            ];
+            
+            // 根据AI角色固定其回应风格
+            const aiNameHash = ai.name.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+            const lengthStyle = lengthStyles[aiNameHash % lengthStyles.length];
+            
+            // 更新prompt中的长度要求
+            messages[1].content = messages[1].content.replace(
+                '📏 回应长度控制在20-40字，简洁有力',
+                `📏 ${lengthStyle.prompt}，长度控制在${lengthStyle.range}`
+            );
+            
+            console.log(`🎯 ${ai.name} 使用 ${lengthStyle.type} 风格回应 (${lengthStyle.range})`);
+            
             const response = await this.callAI(messages, {
-                maxTokens: 100,
+                maxTokens: lengthStyle.tokens,
                 temperature: 0.7
             });
             
@@ -4905,8 +5349,16 @@ ${emotionalGuidance}
             }
             
             try {
+                // 清理AI返回的文本，移除可能的markdown格式
+                let cleanedText = analysisText.trim();
+                if (cleanedText.startsWith('```json')) {
+                    cleanedText = cleanedText.replace(/^```json\s*/, '').replace(/\s*```$/, '');
+                } else if (cleanedText.startsWith('```')) {
+                    cleanedText = cleanedText.replace(/^```\s*/, '').replace(/\s*```$/, '');
+                }
+                
                 // 尝试解析JSON
-                const result = JSON.parse(analysisText);
+                const result = JSON.parse(cleanedText);
                 
                 // 验证返回的数据结构
                 if (typeof result.passed !== 'boolean' || !result.reason || !result.analysis ||
@@ -5368,13 +5820,52 @@ ${analysis.feedback}
         // 重置怀疑度显示
         this.updateSuspicionDisplay({ change: 0, reason: '游戏重置' });
         
-        // 清空输入框
-        document.getElementById('playerResponse').value = '';
-        document.getElementById('charCount').textContent = '0';
+        // 安全清空输入框
+        const playerResponse = document.getElementById('playerResponse');
+        if (playerResponse) {
+            playerResponse.value = '';
+        }
         
-        // 隐藏结果卡片，显示欢迎卡片
-        document.getElementById('resultCard').classList.add('hidden');
-        document.getElementById('welcomeCard').classList.remove('hidden');
+        const charCount = document.getElementById('charCount');
+        if (charCount) {
+            charCount.textContent = '0';
+        }
+        
+        // 清空聊天容器
+        const chatContainer = document.getElementById('chatContainer');
+        if (chatContainer) {
+            chatContainer.innerHTML = '';
+        }
+        
+        // 隐藏所有游戏界面，只显示欢迎卡片
+        const allCards = ['resultCard', 'gameSetupCard', 'guideCard', 'gameInterface', 'responseArea'];
+        allCards.forEach(cardId => {
+            const card = document.getElementById(cardId);
+            if (card) {
+                card.classList.add('hidden');
+            }
+        });
+        
+        // 显示欢迎卡片
+        const welcomeCard = document.getElementById('welcomeCard');
+        if (welcomeCard) {
+            welcomeCard.classList.remove('hidden');
+        } else {
+            console.warn('⚠️ welcomeCard元素不存在，无法显示欢迎界面');
+        }
+        
+        // 清理开放麦输入区域
+        const openmicInputArea = document.getElementById('openmicInputArea');
+        if (openmicInputArea) {
+            openmicInputArea.remove();
+        }
+        
+        // 重置游戏模式管理器
+        if (this.gameModeManager) {
+            this.gameModeManager.resetModeState();
+        }
+        
+        console.log('🔄 游戏已重置，返回欢迎界面');
     }
 
     // 主题化fallback消息生成

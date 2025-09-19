@@ -49,6 +49,14 @@ const GAME_CONFIG = {
         similarityThreshold: 0.6
     },
     
+    // 回答超时配置
+    responseTimeout: {
+        enabled: false,                                  // 默认关闭超时限制
+        timeoutDuration: 60000,                         // 超时时间(ms) - 60秒
+        showCountdown: true,                            // 是否显示倒计时
+        warningTime: 10000                              // 警告提示时间(ms) - 10秒
+    },
+    
     // AI分析阈值配置
     analysis: {
         // 行为一致性检测阈值

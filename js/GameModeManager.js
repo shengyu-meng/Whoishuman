@@ -254,6 +254,9 @@ class OpenMicMode extends BaseGameMode {
         config.playerMessages = [];
         config.hasPlayerSpoken = false;
         config.aiReactionsPending = false;
+        config.forcedCueCount = 0; // 强制cue次数
+        config.lastForcedCueTime = null; // 最后一次强制cue时间
+        config.roundEndCheckInProgress = false; // 防止重复检查轮次结束
     }
     
     handleRoundStart() {
@@ -289,6 +292,9 @@ class OpenMicMode extends BaseGameMode {
         config.playerSpeakingTurns++;
         config.totalSpeakingTurns++;
         config.hasPlayerSpoken = true;
+        
+        // 重置强制cue计数器，因为玩家已经回应了
+        config.forcedCueCount = 0;
         
         // 保存玩家本轮的发言
         config.playerMessages.push({
@@ -332,23 +338,45 @@ class OpenMicMode extends BaseGameMode {
     checkRoundEndConditions(trigger) {
         const config = this.gameState.gameModeConfig.openmic;
         
-        // 如果玩家没有发言，不结束轮次
-        if (!config.hasPlayerSpoken) {
-            console.log('🎤 玩家尚未发言，轮次继续');
+        // 防止重复检查
+        if (config.roundEndCheckInProgress) {
+            console.log('🎤 轮次结束检查正在进行中，跳过重复检查');
             return false;
         }
         
         const currentTime = Date.now();
         const roundDuration = currentTime - config.roundStartTime;
         
-        // 检查结束条件
-        const maxSpeaksReached = config.totalSpeakingTurns >= config.maxSpeaksPerRound;
-        const timeoutReached = roundDuration >= config.roundDuration;
+        // 检查三个结束条件
+        const maxSpeaksReached = config.totalSpeakingTurns >= config.maxSpeaksPerRound; // 8次发言
+        const timeoutReached = roundDuration >= config.roundDuration; // 120秒
+        const playerSpeakTwice = config.playerSpeakingTurns >= 2; // 玩家发言2次
         
-        if (maxSpeaksReached || timeoutReached || trigger === 'timeout') {
-            console.log(`🎤 轮次结束条件满足: 发言${config.totalSpeakingTurns}次, 时长${Math.round(roundDuration/1000)}秒`);
-            this.endRound();
-            return true;
+        console.log(`🎤 检查结束条件: 发言${config.totalSpeakingTurns}/${config.maxSpeaksPerRound}次, 时长${Math.round(roundDuration/1000)}/120秒, 玩家发言${config.playerSpeakingTurns}/2次`);
+        
+        // 如果玩家发言了，检查是否满足结束条件
+        if (config.hasPlayerSpoken) {
+            if (maxSpeaksReached || timeoutReached || playerSpeakTwice || trigger === 'timeout') {
+                const endReason = maxSpeaksReached ? '达到最大发言次数' : 
+                                 timeoutReached ? '达到时间限制' : 
+                                 playerSpeakTwice ? '玩家发言达到2次' : '超时';
+                console.log(`🎤 轮次结束: ${endReason}`);
+                
+                // 设置检查进行中标志
+                config.roundEndCheckInProgress = true;
+                this.endRound();
+                return true;
+            }
+        } else {
+            // 如果玩家没有发言，但达到讨论次数或时间限制，处理强制cue逻辑
+            if (maxSpeaksReached || timeoutReached || trigger === 'timeout') {
+                // 如果已经强制cue过了，就停止检查，一直等待玩家回应
+                if (config.forcedCueCount > 0) {
+                    console.log('🎤 已经cue过玩家，停止重复检查，等待回应...');
+                    return false; // 不继续检查，等待玩家回应
+                }
+                return this.handlePlayerSilenceCondition();
+            }
         }
         
         return false;
@@ -368,6 +396,9 @@ class OpenMicMode extends BaseGameMode {
         
         // 分析玩家本轮的所有发言
         await this.analyzePlayerRoundPerformance();
+        
+        // 重置检查标志
+        config.roundEndCheckInProgress = false;
     }
     
     async analyzePlayerRoundPerformance() {
@@ -496,6 +527,141 @@ class OpenMicMode extends BaseGameMode {
         // 强制玩家发言的逻辑
         console.log('🎤 强制玩家发言 - 未达到最少发言要求');
         // 这里可以显示特殊的提示，要求玩家必须发言
+    }
+    
+    // 处理玩家沉默条件
+    handlePlayerSilenceCondition() {
+        const config = this.gameState.gameModeConfig.openmic;
+        
+        // 如果已经cue过了，就一直等待，不再继续流程
+        if (config.forcedCueCount > 0) {
+            console.log('🎤 已经cue过玩家，等待回应中...');
+            return false; // 不结束轮次，继续等待
+        }
+        
+        // 第一次触发cue
+        console.log('🎤 触发强制cue，等待玩家回应');
+        this.triggerForcedPlayerCue();
+        return false; // 不结束轮次，等待玩家回应
+    }
+    
+    
+    // 触发强制玩家cue（类似闯关模式）
+    async triggerForcedPlayerCue() {
+        const config = this.gameState.gameModeConfig.openmic;
+        config.forcedCueCount++;
+        
+        console.log('🎤 触发强制玩家cue');
+        
+        // 停止当前的AI对话生成
+        if (this.gameController) {
+            this.gameController.isGeneratingConversation = false;
+        }
+        
+        // 选择一个AI来强制提问玩家
+        const questionAI = this.gameState.activeAICharacters[
+            Math.floor(Math.random() * this.gameState.activeAICharacters.length)
+        ];
+        
+        console.log(`🎯 选择 ${questionAI.name} 进行强制提问`);
+        
+        // 生成强制提问
+        try {
+            await this.generateForcedQuestion(questionAI);
+        } catch (error) {
+            console.error('❌ 强制提问生成失败:', error);
+            // 使用备用提问
+            this.showFallbackForcedQuestion(questionAI);
+        }
+    }
+    
+    // 生成强制提问
+    async generateForcedQuestion(questionAI) {
+        const recentMessages = this.gameState.getRecentMessageHistory(5);
+        const conversationContext = recentMessages.map(msg => `${msg.author}: ${msg.content}`).join('\n');
+        
+        const messages = [
+            {
+                role: "system",
+                content: `你是${questionAI.name}，性格特点：${questionAI.personality}。你正在开放麦模式的群聊中，注意到${this.gameState.playerName}一直没有发言。作为AI，你需要主动询问他的想法。`
+            },
+            {
+                role: "user", 
+                content: `你是${questionAI.name}，个性：${questionAI.personality}。
+
+在开放麦讨论中，大家都在积极交流，但是${this.gameState.playerName}一直没有发言。作为一个关心群体氛围的AI，你想要邀请他参与讨论。
+
+最近的对话：
+${conversationContext}
+
+请用你的说话风格(${questionAI.speakingStyle})主动询问${this.gameState.playerName}的想法，让他参与到讨论中来。
+
+要求：
+1. 问题必须@${this.gameState.playerName}
+2. 语气友好，邀请性质，不要太强势
+3. 可以基于最近的讨论内容提问
+4. 体现你的个性特点
+5. 长度在30-80字之间
+
+直接返回你的发言内容。`
+            }
+        ];
+        
+        // 为强制提问设置适中的长度
+        const response = await this.gameController.callAI(messages, {
+            maxTokens: 120, // 提问应该简洁明了
+            temperature: 0.7
+        });
+        
+        if (response && response.trim()) {
+            this.showForcedQuestion(questionAI, response.trim());
+        } else {
+            this.showFallbackForcedQuestion(questionAI);
+        }
+    }
+    
+    // 显示强制提问
+    showForcedQuestion(questionAI, question) {
+        const config = this.gameState.gameModeConfig.openmic;
+        
+        // 添加AI消息（向玩家询问不需要引用）
+        this.gameController.addAIMessage(questionAI, question);
+        this.gameState.addMessageToHistory(questionAI.name, question, 'ai');
+        
+        // 显示系统消息
+        setTimeout(() => {
+            const systemMessage = 'AI注意到你还没有发言，主动询问你的想法！请在开放麦输入框中回复。';
+            
+            this.gameController.addSystemMessage(systemMessage);
+            
+            // 开放麦模式不需要显示额外的问题区域，使用现有的输入框即可
+            // 确保传统回复区域保持隐藏状态
+            const responseArea = document.getElementById('responseArea');
+            if (responseArea) {
+                responseArea.classList.add('hidden');
+            }
+            
+            // 只设置当前问题信息，不设置waitingForResponse以避免触发传统问答界面
+            this.gameState.currentQuestion = {
+                character: questionAI,
+                question: question,
+                isVoluntary: false,
+                isOpenmicCue: true // 标记为开放麦cue
+            };
+        }, 1000);
+    }
+    
+    // 显示备用强制提问
+    showFallbackForcedQuestion(questionAI) {
+        const fallbackQuestions = [
+            `@${this.gameState.playerName} 你怎么一直不说话呀？有什么想法分享一下吗？`,
+            `@${this.gameState.playerName} 大家都在讨论，你也来说说你的看法吧！`,
+            `@${this.gameState.playerName} 你对刚才的话题有什么想法吗？`,
+            `@${this.gameState.playerName} 来来来，别光听着，也说两句呗！`
+        ];
+        
+        const question = fallbackQuestions[Math.floor(Math.random() * fallbackQuestions.length)];
+        this.showForcedQuestion(questionAI, question);
     }
     
     checkGameEndCondition() {

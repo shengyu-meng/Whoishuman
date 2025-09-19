@@ -30,14 +30,16 @@ class GameState {
                 description: '在自由发言中融入AI群体',
                 playerSpeakingTurns: 0, // 玩家本轮发言次数
                 totalSpeakingTurns: 0, // 本轮总发言次数（包括AI和玩家）
-                maxSpeaksPerRound: 10, // 每轮最多发言次数
+                maxSpeaksPerRound: 8, // 每轮最多发言次数
                 roundDuration: 120000, // 轮次最长持续时间（2分钟）
                 roundStartTime: null, // 轮次开始时间
                 voluntarySpeaking: true, // 允许主动发言
                 roundSpeakingComplete: false, // 本轮是否已完成
                 playerMessages: [], // 玩家本轮的所有发言
                 hasPlayerSpoken: false, // 玩家本轮是否已发言
-                aiReactionsPending: false // AI反应是否在进行中
+                aiReactionsPending: false, // AI反应是否在进行中
+                forcedCueCount: 0, // 强制cue次数
+                roundEndCheckInProgress: false // 防止重复检查轮次结束
             },
             werewolf: {
                 description: '在票选人类的大逃杀中活到最后',
@@ -69,6 +71,9 @@ class GameState {
         
         // 首次质疑通知状态
         this.hasShownFirstSuspicionNotice = false; // 是否已显示过第一次质疑通知
+        
+        // AI角色轮次场景缓存 - 确保每个AI每轮只有一个场景
+        this.aiRoundScenarios = {}; // { aiName: { round: number, scenario: object } }
     }
 
     reset() {
@@ -98,6 +103,8 @@ class GameState {
         this.gameModeConfig.openmic.playerMessages = [];
         this.gameModeConfig.openmic.hasPlayerSpoken = false;
         this.gameModeConfig.openmic.aiReactionsPending = false;
+        this.gameModeConfig.openmic.forcedCueCount = 0;
+        this.gameModeConfig.openmic.roundEndCheckInProgress = false;
         this.gameModeConfig.werewolf.alivePlayers = [];
         this.gameModeConfig.werewolf.votingPhase = false;
         this.gameModeConfig.werewolf.votingResults = {};
@@ -119,6 +126,9 @@ class GameState {
         this.suspicionLevel = 50; // 重置到50%初始怀疑度
         this.suspicionHistory = [];
         this.hasShownFirstSuspicionNotice = false; // 重置首次质疑通知状态
+        
+        // 重置AI场景缓存
+        this.aiRoundScenarios = {};
     }
 
     setPlayerName(name) {
@@ -234,20 +244,43 @@ class GameState {
         return selectedScenario;
     }
     
-    // 为特定AI角色获取场景
+    // 为特定AI角色获取场景（每轮每个AI只分配一个场景）
     getRandomScenarioForCharacter(character) {
+        const characterName = typeof character === 'string' ? character : character.name;
+        
+        // 检查该AI在当前轮是否已经有场景
+        if (this.aiRoundScenarios[characterName] && 
+            this.aiRoundScenarios[characterName].round === this.currentRound) {
+            console.log(`🎯 ${characterName} 复用本轮场景: ${this.aiRoundScenarios[characterName].scenario.description}`);
+            return this.aiRoundScenarios[characterName].scenario;
+        }
+        
+        // 为该AI分配新场景
+        let scenario;
+        
         // 如果有主题系统，使用主题场景
         if (this.currentTheme && typeof window !== 'undefined' && window.ThemeScenarioIntegration) {
             const themeScenario = window.ThemeScenarioIntegration.getScenarioForAICharacter(this, character);
             if (themeScenario) {
+                scenario = themeScenario;
                 // 将主题场景添加到已使用列表
                 this.usedScenarios.push(themeScenario);
-                return themeScenario;
             }
         }
         
         // 回退到通用获取方法
-        return this.getRandomScenario();
+        if (!scenario) {
+            scenario = this.getRandomScenario();
+        }
+        
+        // 缓存该AI在本轮的场景
+        this.aiRoundScenarios[characterName] = {
+            round: this.currentRound,
+            scenario: scenario
+        };
+        
+        console.log(`🎯 ${characterName} 分配新场景(第${this.currentRound}轮): ${scenario.description}`);
+        return scenario;
     }
 
     getPlayerTitle() {
@@ -985,6 +1018,10 @@ class GameState {
         let change = 0;
         let reason = '';
         
+        // 检查是否为开放麦模式
+        const isOpenmicMode = actionType === 'openmic_round';
+        const isFirstRound = this.currentRound === 1;
+        
         if (actionType === 'timeout') {
             change = 36; // 增加20%难度：30 → 36
             reason = '超时未回答';
@@ -1009,6 +1046,11 @@ class GameState {
                     change = Math.floor(Math.random() * 6) - 3; // -3 到 +2 随机
                 }
                 
+                // 开放麦模式额外奖励：成功表现应该获得更多奖励
+                if (isOpenmicMode && totalScore >= 60) {
+                    change -= 3; // 额外-3怀疑度奖励
+                }
+                
                 // 根据AI特征得分额外调整
                 if (aiScore >= 25) change -= 2;
                 if (aiScore >= 30) change -= 1;
@@ -1017,47 +1059,94 @@ class GameState {
                 if (humanPenalty <= -20) change += 3;
                 if (humanPenalty <= -30) change += 2;
                 
-                reason = `成功回答 (总分${totalScore}/100, AI特征${aiScore}分, 人类扣分${humanPenalty}分)`;
+                reason = isOpenmicMode ? 
+                    `开放麦表现良好 (总分${totalScore}/100, AI特征${aiScore}分, 人类扣分${humanPenalty}分)` :
+                    `成功回答 (总分${totalScore}/100, AI特征${aiScore}分, 人类扣分${humanPenalty}分)`;
             } else {
                 // 兼容旧格式
                 change = Math.floor(Math.random() * 31) - 12; // -12 to +18
-                reason = `成功回答 (使用备用计算)`;
+                reason = isOpenmicMode ? `开放麦表现良好 (使用备用计算)` : `成功回答 (使用备用计算)`;
             }
         } else {
-            // 失败回答：基于新评分系统计算怀疑度增加
+            // 失败回答：开放麦模式采用更宽松的判定
             if (responseQuality && typeof responseQuality.totalScore === 'number') {
                 const totalScore = responseQuality.totalScore;
                 const humanPenalty = responseQuality.humanPenalty || 0;
                 const aiScore = responseQuality.aiScore || 0;
                 
-                // 根据总分和人类特征扣分计算怀疑度增加量
                 let baseIncrease = 0;
-                if (totalScore <= 30) {
-                    baseIncrease = 55; // 极差表现
-                } else if (totalScore <= 40) {
-                    baseIncrease = 48; // 很差表现
-                } else if (totalScore <= 50) {
-                    baseIncrease = 42; // 较差表现
+                
+                if (isOpenmicMode) {
+                    // 开放麦模式：更宽松的怀疑度增加
+                    if (isFirstRound) {
+                        // 第一轮特别宽松，给玩家适应机会
+                        if (totalScore <= 30) {
+                            baseIncrease = 25; // 第一轮极差表现：25 (原55)
+                        } else if (totalScore <= 40) {
+                            baseIncrease = 20; // 第一轮很差表现：20 (原48)
+                        } else if (totalScore <= 50) {
+                            baseIncrease = 15; // 第一轮较差表现：15 (原42)
+                        } else {
+                            baseIncrease = 10; // 第一轮轻微失败：10 (原35)
+                        }
+                    } else {
+                        // 非第一轮稍微严格一些，但仍比挑战模式宽松
+                        if (totalScore <= 30) {
+                            baseIncrease = 35; // 极差表现：35 (原55)
+                        } else if (totalScore <= 40) {
+                            baseIncrease = 30; // 很差表现：30 (原48)
+                        } else if (totalScore <= 50) {
+                            baseIncrease = 25; // 较差表现：25 (原42)
+                        } else {
+                            baseIncrease = 18; // 轻微失败：18 (原35)
+                        }
+                    }
                 } else {
-                    baseIncrease = 35; // 轻微失败
+                    // 挑战模式：保持原有严格标准
+                    if (totalScore <= 30) {
+                        baseIncrease = 55; // 极差表现
+                    } else if (totalScore <= 40) {
+                        baseIncrease = 48; // 很差表现
+                    } else if (totalScore <= 50) {
+                        baseIncrease = 42; // 较差表现
+                    } else {
+                        baseIncrease = 35; // 轻微失败
+                    }
                 }
+                
+                // 调整系数：开放麦模式减半
+                const adjustmentMultiplier = isOpenmicMode ? 0.5 : 1.0;
                 
                 // 根据人类特征扣分程度调整
                 const penaltyFactor = Math.abs(humanPenalty) / 50; // 0-1
-                const penaltyAdjustment = Math.floor(penaltyFactor * 15); // 0-15
+                const penaltyAdjustment = Math.floor(penaltyFactor * 15 * adjustmentMultiplier); // 开放麦模式减半
                 
                 // 根据AI特征缺失调整
                 const aiDeficit = Math.max(0, 20 - aiScore) / 20; // 0-1
-                const aiAdjustment = Math.floor(aiDeficit * 10); // 0-10
+                const aiAdjustment = Math.floor(aiDeficit * 10 * adjustmentMultiplier); // 开放麦模式减半
                 
                 change = baseIncrease + penaltyAdjustment + aiAdjustment;
-                change = Math.min(65, change); // 限制最大增加量
                 
-                reason = `失败回答 (总分${totalScore}/100, 人类特征严重程度${Math.abs(humanPenalty)}分, AI特征不足${20-aiScore}分)`;
+                // 限制最大增加量：开放麦模式更宽松
+                const maxIncrease = isOpenmicMode ? (isFirstRound ? 35 : 45) : 65;
+                change = Math.min(maxIncrease, change);
+                
+                const modeText = isOpenmicMode ? '开放麦' : '挑战';
+                const roundText = isFirstRound && isOpenmicMode ? ' (第一轮宽松判定)' : '';
+                reason = `${modeText}表现不佳${roundText} (总分${totalScore}/100, 人类特征严重程度${Math.abs(humanPenalty)}分, AI特征不足${20-aiScore}分)`;
             } else {
                 // 兼容旧格式
-                change = 42 + Math.floor(Math.random() * 19); // 42-60
-                reason = `失败回答 (使用备用计算)`;
+                if (isOpenmicMode) {
+                    // 开放麦备用：更宽松
+                    change = isFirstRound ? 
+                        15 + Math.floor(Math.random() * 11) : // 第一轮：15-25
+                        25 + Math.floor(Math.random() * 16); // 其他轮：25-40
+                    reason = `开放麦表现不佳 (使用备用计算)`;
+                } else {
+                    // 挑战模式备用：保持原有严格度
+                    change = 42 + Math.floor(Math.random() * 19); // 42-60
+                    reason = `失败回答 (使用备用计算)`;
+                }
             }
         }
         
