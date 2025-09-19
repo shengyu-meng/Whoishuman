@@ -376,6 +376,11 @@ class GameController {
         const modeOptions = document.querySelectorAll('.mode-option');
         modeOptions.forEach(option => {
             option.addEventListener('click', () => {
+                // 检查是否为禁用的模式
+                if (option.classList.contains('disabled')) {
+                    return; // 禁用的模式不允许选择
+                }
+                
                 // 清除之前的选择
                 modeOptions.forEach(opt => opt.classList.remove('selected'));
                 
