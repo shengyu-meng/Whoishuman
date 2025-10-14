@@ -275,6 +275,12 @@
     color: #666;
 }
 
+.openmic-input-footer .input-buttons {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
 .openmic-send-btn {
     background: linear-gradient(135deg, #07c160, #06ad56);
     border: none;
@@ -286,6 +292,12 @@
     cursor: pointer;
     transition: all 0.3s ease;
     min-width: 60px;
+}
+
+.debug-btn {
+    font-size: 13px;
+    padding: 6px 12px;
+    min-width: auto;
 }
 
 .openmic-send-btn:hover:not(:disabled) {

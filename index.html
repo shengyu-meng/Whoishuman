@@ -146,7 +146,10 @@
                 <span class="member-info">活跃成员: <span id="activeMembers">5</span>/9</span>
             </div>
             <div class="game-status">
-                <span class="round-info">第 <span id="gameRound">1</span> 轮</span>
+                <div style="display: flex; gap: 10px; justify-content: flex-end; align-items: center;">
+                    <span class="mode-info" id="gameMode">闯关模式</span>
+                    <span class="round-info">第 <span id="gameRound">1</span> 轮</span>
+                </div>
                 <div class="suspicion-meter-compact">
                     <span class="suspicion-label-compact">怀疑度</span>
                     <div class="suspicion-bar-compact">
@@ -191,8 +194,8 @@
                 </div>
                 <div class="button-group">
                     <button id="submitResponseBtn" class="primary-btn">提交回复</button>
-                    <button id="skipRoundBtn" class="secondary-btn">跳过本轮</button>
-                    <button id="endGameBtn" class="secondary-btn">结束游戏</button>
+                    <button id="skipRoundBtn" class="debug-btn secondary-btn hidden">跳过本轮</button>
+                    <button id="endGameBtn" class="debug-btn secondary-btn hidden">结束游戏</button>
                 </div>
             </div>
         </div>
@@ -204,6 +207,16 @@
             <h1 id="resultTitle">游戏结束</h1>
         </div>
         <div class="card-content">
+            <!-- 最终成绩放在最前面 -->
+            <div class="final-stats">
+                <h3>最终成绩</h3>
+                <p><strong>生存轮数：</strong> <span id="survivalRounds">0</span> 轮</p>
+                <p><strong>最终怀疑度：</strong> <span id="finalSuspicionLevel">0</span>%</p>
+                <p><strong>称号：</strong> <span id="playerTitle">新手AI</span></p>
+                <p><strong>评价：</strong> <span id="finalEvaluation">继续努力！</span></p>
+            </div>
+            
+            <!-- 综合表现分析放在第二位 -->
             <div class="performance-analysis hidden" id="performanceAnalysis">
                 <h3 id="analysisTitle">🎭 AI伪装表现分析</h3>
                 <div class="deep-summary" id="deepSummary">
@@ -222,15 +235,6 @@
                     <!-- AI评分将动态生成 -->
                 </div>
                 <button id="toggleAnalysisBtn" class="toggle-btn">收起分析</button>
-            </div>
-            
-            
-            <div class="final-stats">
-                <h3>最终成绩</h3>
-                <p><strong>生存轮数：</strong> <span id="survivalRounds">0</span> 轮</p>
-                <p><strong>最终怀疑度：</strong> <span id="finalSuspicionLevel">0</span>%</p>
-                <p><strong>称号：</strong> <span id="playerTitle">新手AI</span></p>
-                <p><strong>评价：</strong> <span id="finalEvaluation">继续努力！</span></p>
             </div>
         </div>
         <div class="card-footer">
