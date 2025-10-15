@@ -62,6 +62,10 @@
     margin-right: 16px;
     min-width: 48px;
     text-align: center;
+    filter: none !important;
+    color: inherit;
+    /* 确保emoji以彩色显示 */
+    font-family: "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji", sans-serif;
 }
 
 .mode-info h4 {
