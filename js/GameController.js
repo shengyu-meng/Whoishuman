@@ -721,7 +721,20 @@ class GameController {
                 
                 const msg = await this.generateWerewolfAIMessage(ai);
                 if (msg) {
-                    this.addAIMessage(ai, msg);
+                    // 检查是否应该引用最近的其他发言者
+                    let quotedMessage = null;
+                    const recentHistory = this.gameState.getRecentMessageHistory(3);
+                    
+                    // 如果有其他人最近发言，有40%概率引用（狼人杀模式互动更多）
+                    if (recentHistory.length > 0 && Math.random() < 0.4) {
+                        const recentSpeakers = recentHistory.filter(h => h.author !== ai.name);
+                        if (recentSpeakers.length > 0) {
+                            const targetSpeaker = recentSpeakers[recentSpeakers.length - 1];
+                            quotedMessage = this.findQuotableMessage(targetSpeaker.author, this.gameState.conversationHistory);
+                        }
+                    }
+                    
+                    this.addAIMessage(ai, msg, false, quotedMessage);
                     this.gameState.addMessageToHistory(ai.name, msg, 'ai');
                     await new Promise(resolve => setTimeout(resolve, 1500));
                 }
