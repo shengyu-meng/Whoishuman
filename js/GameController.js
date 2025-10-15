@@ -498,8 +498,23 @@ class GameController {
             this.gameModeManager.handleRoundStart();
         }
         
+        // 更新游戏模式显示
+        this.updateGameModeDisplay();
+        
         this.showGameInterface();
         this.startConversation();
+    }
+    
+    updateGameModeDisplay() {
+        const gameModeElement = document.getElementById('gameMode');
+        if (gameModeElement) {
+            const modeNames = {
+                'challenge': '闯关模式',
+                'openmic': '开放麦模式',
+                'werewolf': '狼人杀模式'
+            };
+            gameModeElement.textContent = modeNames[this.gameState.gameMode] || '闯关模式';
+        }
     }
 
     initializeAICharacters() {
@@ -664,6 +679,88 @@ class GameController {
         console.log('🎤 对话循环结束');
     }
     
+    async generateWerewolfDiscussion() {
+        this.isGeneratingConversation = true;
+        try {
+            console.log('🐺 开始生成狼人杀讨论');
+            console.log('🐺 当前存活玩家:', this.gameState.gameModeConfig.werewolf.alivePlayers);
+            console.log('🐺 当前活跃AI:', this.gameState.activeAICharacters.map(ai => ai.name));
+            
+            // 根据轮次显示不同的系统提示
+            if (this.gameState.currentRound === 1) {
+                this.addSystemMessage('系统提示：你是人类，潜入了AI群聊。请模仿AI的说话方式，避免被发现并投票淘汰。');
+            } else {
+                // 第二轮及以后显示上一轮投票结果
+                const lastVotingHistory = this.gameState.gameModeConfig.werewolf.votingHistory[this.gameState.gameModeConfig.werewolf.votingHistory.length - 1];
+                if (lastVotingHistory) {
+                    const voteSummary = this.formatVotingSummary(lastVotingHistory);
+                    this.addSystemMessage(voteSummary);
+                }
+            }
+            
+            // 让所有固定参与的AI都有机会发言
+            const discussionAIs = [...this.gameState.activeAICharacters].sort(() => 0.5 - Math.random());
+            console.log('🐺 讨论AI顺序:', discussionAIs.map(ai => ai.name));
+            
+            if (discussionAIs.length === 0) {
+                console.error('❌ 没有可用的AI进行讨论！');
+                this.addSystemMessage('错误：没有可用的AI角色，请刷新页面重试。');
+                return;
+            }
+            
+            // 显示持续的输入区域，让玩家可以随时发言
+            this.showWerewolfInputArea();
+            
+            // 让每个AI依次发言
+            for (const ai of discussionAIs) {
+                // 检查是否被打断（玩家发言等）
+                if (!this.isGeneratingConversation) {
+                    console.log('🛑 AI讨论被打断');
+                    break;
+                }
+                
+                const msg = await this.generateWerewolfAIMessage(ai);
+                if (msg) {
+                    // 检查是否应该引用最近的其他发言者
+                    let quotedMessage = null;
+                    const recentHistory = this.gameState.getRecentMessageHistory(3);
+                    
+                    // 如果有其他人最近发言，有40%概率引用（狼人杀模式互动更多）
+                    if (recentHistory.length > 0 && Math.random() < 0.4) {
+                        const recentSpeakers = recentHistory.filter(h => h.author !== ai.name);
+                        if (recentSpeakers.length > 0) {
+                            const targetSpeaker = recentSpeakers[recentSpeakers.length - 1];
+                            quotedMessage = this.findQuotableMessage(targetSpeaker.author, this.gameState.conversationHistory);
+                        }
+                    }
+                    
+                    this.addAIMessage(ai, msg, false, quotedMessage);
+                    this.gameState.addMessageToHistory(ai.name, msg, 'ai');
+                    await new Promise(resolve => setTimeout(resolve, 1500));
+                }
+            }
+            
+            // 标记所有AI已发言
+            this.gameState.gameModeConfig.werewolf.allAISpoken = true;
+            
+            // 检查玩家是否已发言
+            if (!this.gameState.gameModeConfig.werewolf.playerSpokenThisRound) {
+                console.log('🐺 所有AI已发言，等待玩家发言');
+                this.addSystemMessage('💬 所有AI已发言完毕，请在输入框中发言后进入投票环节。');
+            } else {
+                // 玩家已经发言过了，直接进入投票
+                console.log('🐺 玩家已发言，准备进入投票');
+                if (this.gameModeManager) {
+                    await this.gameModeManager.handleRoundEnd();
+                }
+            }
+        } catch (e) {
+            console.error('狼人杀讨论失败', e);
+        } finally {
+            this.isGeneratingConversation = false;
+        }
+    }
+    
     // 生成开放麦模式的AI消息
     async generateOpenmicAIMessage(ai) {
         const currentTopic = topicProgression[this.gameState.currentDifficulty];
@@ -730,6 +827,76 @@ ${recentHistory.map(h => `${h.author}: ${h.content}`).join('\n')}
         });
         
         return response?.trim();
+    }
+    
+    formatVotingSummary(votingHistory) {
+        const { round, voteCount, playerVotes } = votingHistory;
+        const playerName = this.gameState.playerName;
+        
+        // 找出得票最多的前3名
+        const topVoted = Object.entries(voteCount)
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 3);
+        
+        let summary = `📊 第${round}轮投票结果：`;
+        topVoted.forEach(([name, votes], index) => {
+            const isPlayer = name === playerName;
+            const emoji = index === 0 ? '🎯' : (index === 1 ? '⚠️' : '📌');
+            summary += ` ${emoji}${name}(${votes}票)`;
+            if (isPlayer && index === 0) {
+                summary += '[你]';
+            }
+        });
+        
+        if (playerVotes > 0) {
+            summary += ` | 你获得${playerVotes}票，需要更好地伪装！`;
+        } else {
+            summary += ` | 你本轮安全通过！`;
+        }
+        
+        return summary;
+    }
+    
+    async generateWerewolfAIMessage(ai) {
+        const currentTopic = topicProgression[this.gameState.currentDifficulty];
+        const recentHistory = this.gameState.getRecentMessageHistory(5);
+        const messages = [
+            { 
+                role: 'system', 
+                content: `你是${ai.name}，一个真正的AI，性格特点：${ai.personality}。
+                
+重要背景：在这个AI群聊中，混入了一个人类伪装者，他试图模仿AI的说话方式来隐藏身份。作为真正的AI，你需要保持警觉，通过观察对话找出这个伪装成AI的人类。
+
+你的任务：
+1. 围绕当前话题自然讨论，展现你的AI特质
+2. 观察其他成员的发言，留意不够"AI"的表达
+3. 可以适度表达怀疑，但要委婉，不要直接指名
+
+记住：人类可能会在以下方面露出破绽：
+- 过于人性化的情感表达
+- 缺乏AI特有的逻辑性和精确性
+- 使用过多口语化、网络化的表达
+- 对技术话题理解不够深入` 
+            },
+            { 
+                role: 'user', 
+                content: `当前讨论话题："${currentTopic.name}"
+
+最近的对话内容：
+${recentHistory.map(h => `${h.author}: ${h.content}`).join('\n')}
+
+请用你的说话风格（${ai.speakingStyle}）参与讨论：
+- 围绕话题自然发言
+- 展现AI的特质和你的个性
+- 如果发现可疑的"不够AI"的发言，可以委婉地表达疑虑
+- 但不要直接指名道姓或过于激进
+
+发言长度：30-80字
+直接返回你的发言内容。` 
+            }
+        ];
+        const resp = await this.callAI(messages, { maxTokens: 200, temperature: 0.7 });
+        return resp?.trim();
     }
 
     addSystemMessage(message) {
@@ -948,6 +1115,12 @@ ${recentHistory.map(h => `${h.author}: ${h.content}`).join('\n')}
         if (this.gameState.gameMode === 'openmic') {
             console.log('🎤 开放麦模式：生成自由讨论环境');
             await this.generateOpenmicConversation();
+            return;
+        }
+        // 狼人杀模式特殊处理
+        if (this.gameState.gameMode === 'werewolf') {
+            console.log('🐺 狼人杀模式：生成讨论并进入投票');
+            await this.generateWerewolfDiscussion();
             return;
         }
         
@@ -2023,6 +2196,11 @@ ${conversationContext}
         questionText.textContent = question;
         responseArea.classList.remove('hidden');
         this.gameState.waitingForResponse = true;
+        
+        // 立即应用调试按钮状态
+        if (window.debugManager) {
+            window.debugManager.setupDebugButtons();
+        }
         
         console.log('DEBUG: responseArea 显示状态:', responseArea.classList.contains('hidden'));
     }
@@ -3933,6 +4111,11 @@ ${emojiInstruction}
         document.getElementById('responseArea').classList.remove('hidden');
         document.getElementById('playerResponse').focus();
         this.gameState.waitingForResponse = true;
+        
+        // 立即应用调试按钮状态
+        if (window.debugManager) {
+            window.debugManager.setupDebugButtons();
+        }
     }
 
     async submitPlayerResponse() {
@@ -4103,6 +4286,11 @@ ${emojiInstruction}
             document.getElementById('questionCharacter').textContent = '💬 主动发言';
             document.getElementById('questionText').textContent = '你可以主动参与讨论，说出你的想法...';
             
+            // 立即应用调试按钮状态
+            if (window.debugManager) {
+                window.debugManager.setupDebugButtons();
+            }
+            
             // 聚焦到输入框
             document.getElementById('playerResponse').focus();
             
@@ -4147,6 +4335,126 @@ ${emojiInstruction}
         // 设置标志，停止正在进行的AI对话生成
         this.isGeneratingConversation = false;
         console.log('🛑 停止当前AI对话生成，优先处理玩家发言');
+    }
+    
+    // 显示狼人杀模式的输入区域
+    showWerewolfInputArea() {
+        const gameInterface = document.getElementById('gameInterface');
+        if (gameInterface && !document.getElementById('werewolfInputArea')) {
+            const inputArea = document.createElement('div');
+            inputArea.id = 'werewolfInputArea';
+            inputArea.className = 'openmic-input-area';
+            inputArea.innerHTML = `
+                <div class="openmic-input-container">
+                    <textarea id="werewolfInput" placeholder="你可以随时发言参与讨论..." maxlength="300"></textarea>
+                    <div class="openmic-input-footer">
+                        <div class="char-count">
+                            <span id="werewolfCharCount">0</span>/300
+                        </div>
+                        <div class="input-buttons">
+                            <button id="werewolfSendBtn" class="openmic-send-btn" disabled>发送</button>
+                            <button id="skipRoundBtn" class="debug-btn secondary-btn hidden">跳过本轮</button>
+                            <button id="endGameBtn" class="debug-btn secondary-btn hidden">结束游戏</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            gameInterface.appendChild(inputArea);
+            this.setupWerewolfInputListeners();
+            
+            console.log('🐺 狼人杀输入区域已显示');
+        }
+    }
+    
+    // 设置狼人杀输入监听器
+    setupWerewolfInputListeners() {
+        const input = document.getElementById('werewolfInput');
+        const sendBtn = document.getElementById('werewolfSendBtn');
+        const charCount = document.getElementById('werewolfCharCount');
+        
+        if (input && sendBtn && charCount) {
+            input.addEventListener('input', () => {
+                const length = input.value.length;
+                charCount.textContent = length;
+                sendBtn.disabled = length < 5;
+            });
+            
+            sendBtn.addEventListener('click', () => {
+                this.handleWerewolfMessage();
+            });
+            
+            input.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey) {
+                    e.preventDefault();
+                    if (!sendBtn.disabled) {
+                        this.handleWerewolfMessage();
+                    }
+                }
+            });
+        }
+    }
+    
+    // 处理狼人杀模式的消息发送
+    async handleWerewolfMessage(message) {
+        // 如果传入了message参数，直接使用；否则从输入框读取
+        let msg = message;
+        
+        if (!msg) {
+            const input = document.getElementById('werewolfInput');
+            const sendBtn = document.getElementById('werewolfSendBtn');
+            
+            if (input && sendBtn) {
+                msg = input.value.trim();
+                if (msg.length >= 5) {
+                    input.value = '';
+                    document.getElementById('werewolfCharCount').textContent = '0';
+                    sendBtn.disabled = true;
+                }
+            }
+        }
+        
+        if (msg && msg.length >= 5) {
+            console.log('🐺 处理狼人杀玩家发言:', msg);
+            
+            // 添加玩家消息到聊天记录
+            this.addAIMessage(
+                { 
+                    name: this.gameState.playerName, 
+                    avatar: '我',
+                    avatarColor: '#07c160'
+                },
+                msg,
+                true
+            );
+            
+            // 记录到游戏状态
+            this.gameState.addMessageToHistory(this.gameState.playerName, msg, 'player');
+            
+            // 标记玩家已发言
+            this.gameState.gameModeConfig.werewolf.playerSpokenThisRound = true;
+            
+            // 如果所有AI已发言，进入投票阶段
+            if (this.gameState.gameModeConfig.werewolf.allAISpoken) {
+                console.log('🐺 玩家发言完成，准备进入投票');
+                this.addSystemMessage('💬 讨论结束，准备进入投票环节...');
+                
+                // 移除输入区域
+                const inputArea = document.getElementById('werewolfInputArea');
+                if (inputArea) {
+                    inputArea.remove();
+                }
+                
+                // 短暂延迟后进入投票
+                setTimeout(async () => {
+                    if (this.gameModeManager) {
+                        await this.gameModeManager.handleRoundEnd();
+                    }
+                }, 1000);
+            } else {
+                console.log('🐺 玩家已发言，AI继续讨论');
+            }
+        }
     }
 
     // 处理开放麦模式玩家发言后的AI反应
@@ -4776,11 +5084,14 @@ ${analysis.analysis}`;
         this.isStartingNextRound = true;
         
         // 清空输入框
-        document.getElementById('playerResponse').value = '';
-        document.getElementById('charCount').textContent = '0';
+        const playerResponseInput = document.getElementById('playerResponse');
+        const charCountElement = document.getElementById('charCount');
+        if (playerResponseInput) playerResponseInput.value = '';
+        if (charCountElement) charCountElement.textContent = '0';
         
         // 隐藏回复区域
-        document.getElementById('responseArea').classList.add('hidden');
+        const responseArea = document.getElementById('responseArea');
+        if (responseArea) responseArea.classList.add('hidden');
         
         // 重置等待回复状态
         this.gameState.waitingForResponse = false;
@@ -4800,7 +5111,26 @@ ${analysis.analysis}`;
             this.gameModeManager.handleRoundStart();
         }
         
-        // 获取当前主题和下一个主题
+        // 狼人杀模式特殊处理：直接开始新轮次
+        if (this.gameState.gameMode === 'werewolf') {
+            console.log('🐺 狼人杀模式：直接开始新轮次');
+            
+            // 更新界面显示
+            document.getElementById('gameRound').textContent = this.gameState.currentRound;
+            this.updateActiveMembersDisplay();
+            
+            // 短暂延迟后开始对话
+            this.safeTimeout(() => {
+                this.safeAsync(async () => {
+                    this.isGeneratingConversation = false;
+                    this.isStartingNextRound = false;
+                    await this.generateInitialConversation();
+                });
+            }, 1000);
+            return;
+        }
+        
+        // 其他模式：获取当前主题和下一个主题
         const currentTheme = this.gameState.getCurrentThemeInfo();
         const nextThemeId = this.gameState.getNextThemeId();
         
@@ -6503,9 +6833,22 @@ ${analysis.feedback}
     }
 
     // 跳过当前轮次（用于测试和调试）
-    skipCurrentRound() {
+    async skipCurrentRound() {
         console.log('🚀 跳过当前轮次 (调试功能)');
         
+        // 检查是否是狼人杀模式
+        if (this.gameState.gameMode === 'werewolf') {
+            await this.handleWerewolfDebugSkip();
+            return;
+        }
+        
+        // 检查是否是开放麦模式
+        if (this.gameState.gameMode === 'openmic') {
+            await this.handleOpenmicDebugSkip();
+            return;
+        }
+        
+        // 闯关模式的跳过逻辑
         // 在调试模式下，跳过问题不应该增加怀疑度
         const isDebugMode = window.DEBUG_CONFIG && window.DEBUG_CONFIG.enabled;
         
@@ -6562,6 +6905,143 @@ ${analysis.feedback}
                 await this.startNextRound();
             });
         }, 1000);
+    }
+    
+    // 开放麦模式的调试跳过
+    async handleOpenmicDebugSkip() {
+        console.log('🎤 开放麦调试跳过：直接结束本轮');
+        
+        const openmicConfig = this.gameState.gameModeConfig.openmic;
+        
+        // 停止当前AI对话生成
+        this.isGeneratingConversation = false;
+        
+        // 清除轮次计时器
+        const openmicMode = this.gameModeManager.getCurrentModeManager();
+        if (openmicMode.roundTimer) {
+            clearTimeout(openmicMode.roundTimer);
+            openmicMode.roundTimer = null;
+        }
+        
+        // 重置轮次结束检查标志
+        openmicConfig.roundEndCheckInProgress = false;
+        
+        // 标记轮次结束
+        openmicConfig.roundSpeakingComplete = true;
+        
+        this.addSystemMessage('🔧 调试跳过：本轮结束，进入下一轮...');
+        
+        // 如果玩家有发言，进行分析（可选）
+        if (openmicConfig.playerMessages && openmicConfig.playerMessages.length > 0) {
+            console.log('🎤 跳过分析，直接进入下一轮');
+        }
+        
+        // 进入下一轮
+        setTimeout(async () => {
+            await this.startNextRound();
+        }, 1000);
+    }
+    
+    // 狼人杀模式的调试跳过
+    async handleWerewolfDebugSkip() {
+        console.log('🐺 狼人杀调试跳过：AI自动投票，玩家免疫');
+        
+        const werewolfConfig = this.gameState.gameModeConfig.werewolf;
+        
+        // 如果在讨论阶段，进入投票阶段
+        if (werewolfConfig.discussionPhase) {
+            this.addSystemMessage('🔧 调试跳过：直接进入投票阶段');
+            
+            // 标记玩家已发言（避免卡住）
+            werewolfConfig.playerSpokenThisRound = true;
+            werewolfConfig.allAISpoken = true;
+            
+            // 移除输入区域
+            const werewolfInputArea = document.getElementById('werewolfInputArea');
+            if (werewolfInputArea) {
+                werewolfInputArea.remove();
+            }
+            
+            // 进入投票阶段
+            if (this.gameModeManager) {
+                await this.gameModeManager.handleRoundEnd();
+            }
+            return;
+        }
+        
+        // 如果在投票阶段，模拟AI投票并进入下一轮
+        if (werewolfConfig.votingPhase) {
+            this.addSystemMessage('🔧 调试跳过：AI自动投票，玩家不在候选人中');
+            
+            // 关闭投票界面
+            const voteModal = document.getElementById('voteModal');
+            if (voteModal) {
+                voteModal.remove();
+            }
+            
+            // 生成AI投票，排除玩家作为候选人
+            const werewolfMode = this.gameModeManager.getCurrentModeManager();
+            await werewolfMode.generateAIVotes(true); // 传入 true 排除玩家
+            
+            // 处理投票结果
+            await this.processWerewolfDebugVoting();
+        }
+    }
+    
+    // 处理狼人杀调试投票
+    async processWerewolfDebugVoting() {
+        const werewolfConfig = this.gameState.gameModeConfig.werewolf;
+        const votingResults = werewolfConfig.votingResults;
+        
+        // 统计票数
+        const voteCount = {};
+        Object.values(votingResults).forEach(target => {
+            voteCount[target] = (voteCount[target] || 0) + 1;
+        });
+        
+        // 找出得票最多的玩家
+        let maxVotes = 0;
+        let eliminatedPlayer = null;
+        
+        Object.entries(voteCount).forEach(([player, votes]) => {
+            if (votes > maxVotes) {
+                maxVotes = votes;
+                eliminatedPlayer = player;
+            }
+        });
+        
+        console.log('🐺 调试投票结果:', voteCount);
+        console.log('🐺 得票最高:', eliminatedPlayer);
+        
+        // 在调试模式下，玩家不在候选人中，所以一定是AI被淘汰
+        if (eliminatedPlayer) {
+            const werewolfMode = this.gameModeManager.getCurrentModeManager();
+            await werewolfMode.eliminatePlayer(eliminatedPlayer);
+            this.addSystemMessage(`❌ ${eliminatedPlayer} 被投票淘汰`);
+        } else {
+            console.log('🐺 无人被淘汰');
+            this.addSystemMessage('📊 投票结果：本轮无人淘汰');
+        }
+        
+        // 重置投票状态
+        werewolfConfig.votingPhase = false;
+        werewolfConfig.votingResults = {};
+        werewolfConfig.roundVotingComplete = true;
+        
+        // 检查游戏结束条件
+        const werewolfMode = this.gameModeManager.getCurrentModeManager();
+        const endCondition = werewolfMode.checkGameEndCondition();
+        
+        if (endCondition && endCondition.gameOver) {
+            console.log('🎮 游戏结束:', endCondition);
+            werewolfMode.handleGameEnd(endCondition);
+            return;
+        }
+        
+        // 等待后进入下一轮
+        setTimeout(async () => {
+            await this.startNextRound();
+        }, 2000);
     }
     
     // 手动结束游戏（用于调试）
@@ -6720,10 +7200,47 @@ ${analysis.feedback}
         let evaluation = this.getFinalEvaluation();
         
         // 根据模式和结果调整评价
-        if (endCondition.result === 'victory') {
+        if (this.gameState.gameMode === 'werewolf') {
+            const werewolfConfig = this.gameState.gameModeConfig.werewolf;
+            const totalVotes = werewolfConfig.playerTotalVotes || 0;
+            const rounds = this.gameState.currentRound;
+            const votingHistory = werewolfConfig.votingHistory || [];
+            
+            if (endCondition.result === 'victory') {
+                evaluation = `🎉 恭喜！你成功在狼人杀模式中存活了${rounds}轮！\n\n`;
+                evaluation += `📊 投票统计：\n`;
+                evaluation += `• 总得票数：${totalVotes}票\n`;
+                evaluation += `• 平均每轮得票：${(totalVotes / rounds).toFixed(1)}票\n`;
+                
+                if (votingHistory.length > 0) {
+                    evaluation += `\n各轮得票情况：\n`;
+                    votingHistory.forEach(history => {
+                        evaluation += `第${history.round}轮：${history.playerVotes}票\n`;
+                    });
+                }
+                
+                evaluation += `\n你成功混入AI群聊并避免了被淘汰，表现优秀！`;
+            } else if (endCondition.reason === 'player_eliminated') {
+                evaluation = `💀 很遗憾！你在第${rounds}轮被投票淘汰了。\n\n`;
+                evaluation += `📊 投票统计：\n`;
+                evaluation += `• 总得票数：${totalVotes}票\n`;
+                evaluation += `• 平均每轮得票：${(totalVotes / rounds).toFixed(1)}票\n`;
+                
+                if (votingHistory.length > 0) {
+                    evaluation += `\n各轮得票情况：\n`;
+                    votingHistory.forEach(history => {
+                        evaluation += `第${history.round}轮：${history.playerVotes}票`;
+                        if (history.round === rounds) {
+                            evaluation += ` ⚠️ (被淘汰)`;
+                        }
+                        evaluation += `\n`;
+                    });
+                }
+                
+                evaluation += `\n提示：尝试更像AI一样说话，使用更理性、逻辑化的表达。`;
+            }
+        } else if (endCondition.result === 'victory') {
             evaluation = '恭喜！你成功在' + this.gameState.gameMode + '模式中获得胜利！';
-        } else if (endCondition.reason === 'player_eliminated') {
-            evaluation = '很遗憾，你在狼人杀模式中被投票淘汰了。';
         }
         
         document.getElementById('finalEvaluation').textContent = evaluation;

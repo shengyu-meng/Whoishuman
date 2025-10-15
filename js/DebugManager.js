@@ -64,18 +64,30 @@ class DebugManager {
     
     // 设置调试按钮的显示/隐藏
     setupDebugButtons() {
-        const skipBtn = document.getElementById('skipRoundBtn');
-        const endGameBtn = document.getElementById('endGameBtn');
+        // 查找所有的调试按钮（可能在不同的容器中）
+        // 支持的ID模式: skipRoundBtn, skipRoundBtn_openmic, skipRoundBtn_werewolf 等
+        const skipBtns = document.querySelectorAll('[id^="skipRoundBtn"]');
+        const endGameBtns = document.querySelectorAll('[id^="endGameBtn"]');
+        
+        if (this.isDebugEnabled && this.config.features?.showConsoleLogs) {
+            console.log('🐛 setupDebugButtons 被调用');
+            console.log('🐛 找到按钮:', {
+                skip: Array.from(skipBtns).map(b => b.id),
+                end: Array.from(endGameBtns).map(b => b.id)
+            });
+        }
         
         if (this.isDebugEnabled) {
-            if (skipBtn && this.config.features?.showSkipButton) {
-                skipBtn.style.display = 'inline-block';
-                skipBtn.classList.remove('hidden');
+            if (this.config.features?.showSkipButton) {
+                skipBtns.forEach(btn => {
+                    if (btn) btn.classList.remove('hidden');
+                });
             }
             
-            if (endGameBtn && this.config.features?.showEndGameButton) {
-                endGameBtn.style.display = 'inline-block';
-                endGameBtn.classList.remove('hidden');
+            if (this.config.features?.showEndGameButton) {
+                endGameBtns.forEach(btn => {
+                    if (btn) btn.classList.remove('hidden');
+                });
             }
         } else {
             this.hideDebugButtons();
@@ -84,18 +96,17 @@ class DebugManager {
     
     // 隐藏调试按钮
     hideDebugButtons() {
-        const skipBtn = document.getElementById('skipRoundBtn');
-        const endGameBtn = document.getElementById('endGameBtn');
+        // 查找所有的调试按钮（可能在不同的容器中）
+        const skipBtns = document.querySelectorAll('[id^="skipRoundBtn"]');
+        const endGameBtns = document.querySelectorAll('[id^="endGameBtn"]');
         
-        if (skipBtn) {
-            skipBtn.style.display = 'none';
-            skipBtn.classList.add('hidden');
-        }
+        skipBtns.forEach(btn => {
+            if (btn) btn.classList.add('hidden');
+        });
         
-        if (endGameBtn) {
-            endGameBtn.style.display = 'none';  
-            endGameBtn.classList.add('hidden');
-        }
+        endGameBtns.forEach(btn => {
+            if (btn) btn.classList.add('hidden');
+        });
     }
     
     // 设置控制台日志拦截
