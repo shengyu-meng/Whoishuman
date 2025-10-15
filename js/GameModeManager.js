@@ -441,6 +441,15 @@ class OpenMicMode extends BaseGameMode {
             const inputArea = document.createElement('div');
             inputArea.id = 'openmicInputArea';
             inputArea.className = 'openmic-input-area';
+            
+            // 检查调试模式以决定按钮初始class
+            const isDebugEnabled = window.DEBUG_CONFIG && window.DEBUG_CONFIG.enabled;
+            const showSkip = isDebugEnabled && window.DEBUG_CONFIG.features?.showSkipButton;
+            const showEnd = isDebugEnabled && window.DEBUG_CONFIG.features?.showEndGameButton;
+            
+            const skipBtnClass = showSkip ? 'debug-btn secondary-btn' : 'debug-btn secondary-btn hidden';
+            const endBtnClass = showEnd ? 'debug-btn secondary-btn' : 'debug-btn secondary-btn hidden';
+            
             inputArea.innerHTML = `
                 <div class="openmic-input-container">
                     <textarea id="openmicInput" placeholder="在开放麦模式中，你可以随时发言参与讨论..." maxlength="500"></textarea>
@@ -450,8 +459,8 @@ class OpenMicMode extends BaseGameMode {
                         </div>
                         <div class="input-buttons">
                             <button id="openmicSendBtn" class="openmic-send-btn" disabled>发送</button>
-                            <button id="skipRoundBtn" class="debug-btn secondary-btn hidden">跳过本轮</button>
-                            <button id="endGameBtn" class="debug-btn secondary-btn hidden">结束游戏</button>
+                            <button id="skipRoundBtn" class="${skipBtnClass}" onclick="console.log('直接onclick触发！'); window.gameController && window.gameController.skipCurrentRound();">跳过本轮</button>
+                            <button id="endGameBtn" class="${endBtnClass}" onclick="console.log('结束游戏onclick触发！'); window.gameController && window.gameController.endGameManually();">结束游戏</button>
                         </div>
                     </div>
                 </div>
@@ -463,33 +472,7 @@ class OpenMicMode extends BaseGameMode {
             // 绑定事件监听器
             this.setupOpenmicInputListeners();
             
-            // 如果调试模式已启用，立即显示按钮（不依赖异步初始化）
-            if (window.DEBUG_CONFIG && window.DEBUG_CONFIG.enabled) {
-                console.log('🎤 开放麦：调试模式已启用，直接显示按钮');
-                const skipBtn = document.getElementById('skipRoundBtn');
-                const endGameBtn = document.getElementById('endGameBtn');
-                if (skipBtn && window.DEBUG_CONFIG.features?.showSkipButton) {
-                    skipBtn.classList.remove('hidden');
-                    console.log('🎤 显示跳过按钮');
-                }
-                if (endGameBtn && window.DEBUG_CONFIG.features?.showEndGameButton) {
-                    endGameBtn.classList.remove('hidden');
-                    console.log('🎤 显示结束按钮');
-                }
-            }
-            
-            // 延迟应用调试按钮状态，确保debugManager已初始化
-            setTimeout(() => {
-                if (window.debugManager && window.debugManager.initialized) {
-                    console.log('🎤 开放麦：通过debugManager应用调试按钮状态');
-                    window.debugManager.setupDebugButtons();
-                } else if (window.DEBUG_CONFIG && window.DEBUG_CONFIG.enabled) {
-                    // debugManager还在初始化中，但按钮已经通过直接方式显示了
-                    console.log('🎤 开放麦：调试按钮已通过直接方式显示');
-                }
-            }, 100);
-            
-            console.log('🎤 开放麦输入区域已显示');
+            console.log('🎤 开放麦输入区域已显示，调试按钮初始状态:', { showSkip, showEnd });
         }
     }
     
@@ -497,6 +480,8 @@ class OpenMicMode extends BaseGameMode {
         const input = document.getElementById('openmicInput');
         const sendBtn = document.getElementById('openmicSendBtn');
         const charCount = document.getElementById('openmicCharCount');
+        const skipBtn = document.getElementById('skipRoundBtn');
+        const endGameBtn = document.getElementById('endGameBtn');
         
         if (input && sendBtn && charCount) {
             // 字符计数
@@ -520,6 +505,51 @@ class OpenMicMode extends BaseGameMode {
                     }
                 }
             });
+        }
+        
+        // 绑定调试按钮事件
+        console.log('🎤 开始绑定开放麦调试按钮事件...');
+        if (skipBtn) {
+            console.log('🎤 找到 skipRoundBtn，绑定点击事件');
+            console.log('🎤 skipBtn当前状态:', {
+                id: skipBtn.id,
+                className: skipBtn.className,
+                display: window.getComputedStyle(skipBtn).display,
+                visibility: window.getComputedStyle(skipBtn).visibility,
+                pointerEvents: window.getComputedStyle(skipBtn).pointerEvents
+            });
+            skipBtn.addEventListener('click', (e) => {
+                console.log('🐛 开放麦：skipRoundBtn 被点击！', e);
+                console.log('🎤 点击时按钮状态:', {
+                    className: skipBtn.className,
+                    display: window.getComputedStyle(skipBtn).display
+                });
+                if (this.gameController && typeof this.gameController.skipCurrentRound === 'function') {
+                    console.log('🐛 开放麦：调用 gameController.skipCurrentRound()');
+                    this.gameController.skipCurrentRound();
+                } else {
+                    console.error('❌ gameController.skipCurrentRound 不存在', this.gameController);
+                }
+            }, true); // 使用捕获阶段
+            console.log('✅ 开放麦：skipRoundBtn 事件已绑定');
+        } else {
+            console.warn('⚠️ 开放麦：skipRoundBtn 未找到');
+        }
+        
+        if (endGameBtn) {
+            console.log('🎤 找到 endGameBtn，绑定点击事件');
+            endGameBtn.addEventListener('click', () => {
+                console.log('🐛 开放麦：endGameBtn 被点击！');
+                if (this.gameController && typeof this.gameController.endGameManually === 'function') {
+                    console.log('🐛 开放麦：调用 gameController.endGameManually()');
+                    this.gameController.endGameManually();
+                } else {
+                    console.error('❌ gameController.endGameManually 不存在', this.gameController);
+                }
+            });
+            console.log('✅ 开放麦：endGameBtn 事件已绑定');
+        } else {
+            console.warn('⚠️ 开放麦：endGameBtn 未找到');
         }
     }
     

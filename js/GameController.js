@@ -6829,6 +6829,13 @@ ${analysis.feedback}
             return;
         }
         
+        // 检查是否是开放麦模式
+        if (this.gameState.gameMode === 'openmic') {
+            await this.handleOpenmicDebugSkip();
+            return;
+        }
+        
+        // 闯关模式的跳过逻辑
         // 在调试模式下，跳过问题不应该增加怀疑度
         const isDebugMode = window.DEBUG_CONFIG && window.DEBUG_CONFIG.enabled;
         
@@ -6884,6 +6891,41 @@ ${analysis.feedback}
             this.safeAsync(async () => {
                 await this.startNextRound();
             });
+        }, 1000);
+    }
+    
+    // 开放麦模式的调试跳过
+    async handleOpenmicDebugSkip() {
+        console.log('🎤 开放麦调试跳过：直接结束本轮');
+        
+        const openmicConfig = this.gameState.gameModeConfig.openmic;
+        
+        // 停止当前AI对话生成
+        this.isGeneratingConversation = false;
+        
+        // 清除轮次计时器
+        const openmicMode = this.gameModeManager.getCurrentModeManager();
+        if (openmicMode.roundTimer) {
+            clearTimeout(openmicMode.roundTimer);
+            openmicMode.roundTimer = null;
+        }
+        
+        // 重置轮次结束检查标志
+        openmicConfig.roundEndCheckInProgress = false;
+        
+        // 标记轮次结束
+        openmicConfig.roundSpeakingComplete = true;
+        
+        this.addSystemMessage('🔧 调试跳过：本轮结束，进入下一轮...');
+        
+        // 如果玩家有发言，进行分析（可选）
+        if (openmicConfig.playerMessages && openmicConfig.playerMessages.length > 0) {
+            console.log('🎤 跳过分析，直接进入下一轮');
+        }
+        
+        // 进入下一轮
+        setTimeout(async () => {
+            await this.startNextRound();
         }, 1000);
     }
     
