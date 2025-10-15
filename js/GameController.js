@@ -7,6 +7,9 @@ class GameController {
         // 初始化游戏模式管理器
         this.gameModeManager = null; // 延迟初始化，等待GameModeManager类加载
         
+        // 初始化角色话题管理器
+        this.roleManager = null; // 延迟初始化
+        
         // 配置加载状态
         this.configLoaded = false;
         this.apiConfig = null;
@@ -389,6 +392,28 @@ class GameController {
                 }
             });
         });
+        
+        // 初始化角色选择事件监听器
+        this.initializeRoleSelectionListeners();
+    }
+    
+    // 初始化角色选择事件监听器
+    initializeRoleSelectionListeners() {
+        const roleOptions = document.querySelectorAll('.role-option');
+        roleOptions.forEach(option => {
+            option.addEventListener('click', () => {
+                // 清除之前的选择
+                roleOptions.forEach(opt => opt.classList.remove('selected'));
+                
+                // 选择当前选项
+                option.classList.add('selected');
+                
+                // 保存选中的角色到临时变量
+                const role = option.dataset.role;
+                console.log(`🎭 玩家选择角色: ${role}`);
+                this.selectedRole = role;
+            });
+        });
     }
 
     showGameSetup() {
@@ -411,14 +436,26 @@ class GameController {
             alert('请选择一个游戏模式');
             return;
         }
+        
+        // 验证角色选择
+        const selectedRoleOption = document.querySelector('.role-option.selected');
+        if (!selectedRoleOption) {
+            alert('请选择一个角色倾向');
+            return;
+        }
 
         const mode = selectedMode.dataset.mode;
+        const role = selectedRoleOption.dataset.role;
         
         // 设置玩家名称和游戏模式
         this.gameState.setPlayerName(name);
         if (this.gameModeManager) {
             this.gameModeManager.setGameMode(mode);
         }
+        
+        // 设置玩家角色
+        this.gameState.setPlayerRole(role);
+        console.log(`✅ 游戏设置完成 - 模式: ${mode}, 角色: ${role}, 名称: ${name}`);
         
         // 安全检查DOM元素是否存在
         const playerNameDisplay = document.getElementById('playerNameDisplay');
@@ -486,6 +523,14 @@ class GameController {
         this.gameState.gameStartTime = new Date();
         this.initializeAICharacters();
         this.gameState.initializeAvailableScenarios(); // 初始化工作场景
+        
+        // 初始化角色话题管理器
+        if (typeof RoleTopicManager !== 'undefined') {
+            this.roleManager = new RoleTopicManager(this.gameState);
+            console.log('✅ 角色话题管理器已初始化');
+        } else {
+            console.warn('⚠️ RoleTopicManager类未找到');
+        }
         
         // 初始化第一轮主题
         this.gameState.setCurrentTheme(1);
@@ -763,12 +808,28 @@ class GameController {
     
     // 生成开放麦模式的AI消息
     async generateOpenmicAIMessage(ai) {
-        const currentTopic = topicProgression[this.gameState.currentDifficulty];
+        // 使用角色倾向系统选择话题（如果已初始化）
+        const currentTopic = this.roleManager ? 
+            this.roleManager.selectTopic() : 
+            topicProgression[this.gameState.currentDifficulty];
         const recentHistory = this.gameState.getRecentMessageHistory(5);
         
         // 获取该AI角色的场景，确保每轮每个AI只有一个场景
         const scenario = this.gameState.getRandomScenarioForCharacter(ai);
         const scenarioDescription = scenario ? scenario.description : '处理一些工作上的挑战';
+        
+        // 尝试使用角色话题系统
+        let roleTopicContext = '';
+        if (this.roleManager) {
+            try {
+                const selectedTopic = this.roleManager.selectTopic();
+                roleTopicContext = `\n\n【角色话题】当前玩家倾向的话题："${selectedTopic.name}"（${selectedTopic.description}）
+你可以将这个话题融入到你的发言中，但要保持自然，不要生硬。关键词参考：${selectedTopic.keywords.slice(0, 3).join('、')}`;
+                console.log(`✅ 开放麦AI使用角色话题: ${selectedTopic.name}`);
+            } catch (error) {
+                console.warn('⚠️ 角色话题选择失败，使用默认逻辑');
+            }
+        }
         
         const messages = [
             {
@@ -781,7 +842,7 @@ class GameController {
 
 你正在群聊中和AI朋友们自由讨论。你最近遇到了一个工作情况：${scenarioDescription}
 
-当前讨论话题是"${currentTopic.name}"。
+当前讨论话题是"${currentTopic.name}"。${roleTopicContext}
 
 最近的对话：
 ${recentHistory.map(h => `${h.author}: ${h.content}`).join('\n')}
@@ -860,6 +921,20 @@ ${recentHistory.map(h => `${h.author}: ${h.content}`).join('\n')}
     async generateWerewolfAIMessage(ai) {
         const currentTopic = topicProgression[this.gameState.currentDifficulty];
         const recentHistory = this.gameState.getRecentMessageHistory(5);
+        
+        // 尝试使用角色话题系统
+        let roleTopicContext = '';
+        if (this.roleManager) {
+            try {
+                const selectedTopic = this.roleManager.selectTopic();
+                roleTopicContext = `\n\n补充话题参考："${selectedTopic.name}"（${selectedTopic.description}）
+你可以将这个话题融入讨论，关键词：${selectedTopic.keywords.slice(0, 3).join('、')}`;
+                console.log(`✅ 狼人杀AI使用角色话题: ${selectedTopic.name}`);
+            } catch (error) {
+                console.warn('⚠️ 角色话题选择失败，使用默认逻辑');
+            }
+        }
+        
         const messages = [
             { 
                 role: 'system', 
@@ -880,7 +955,7 @@ ${recentHistory.map(h => `${h.author}: ${h.content}`).join('\n')}
             },
             { 
                 role: 'user', 
-                content: `当前讨论话题："${currentTopic.name}"
+                content: `当前讨论话题："${currentTopic.name}"${roleTopicContext}
 
 最近的对话内容：
 ${recentHistory.map(h => `${h.author}: ${h.content}`).join('\n')}
@@ -1132,13 +1207,19 @@ ${recentHistory.map(h => `${h.author}: ${h.content}`).join('\n')}
         this.isStartingNextRound = false;
         
         try {
-            const currentTopic = topicProgression[this.gameState.currentDifficulty];
+            // 使用角色倾向系统选择话题（如果已初始化）
+            const currentTopic = this.roleManager ? 
+                this.roleManager.selectTopic() : 
+                topicProgression[this.gameState.currentDifficulty];
             const isFirstRound = this.gameState.currentRound === 1;
             
             // 添加详细调试信息
             console.log(`🚀 开始生成初始对话 (第${this.gameState.currentRound}轮)`);
             console.log(`  - 当前难度: ${this.gameState.currentDifficulty}`);
             console.log(`  - 话题: ${currentTopic.name}`);
+            if (currentTopic.role) {
+                console.log(`  - 话题角色: ${currentTopic.roleName} (${currentTopic.role})`);
+            }
             console.log(`  - 是否第一轮: ${isFirstRound}`);
             console.log(`  - 活跃AI角色: ${this.gameState.activeAICharacters.map(c => c.name).join(', ')}`);
             
@@ -1606,13 +1687,32 @@ ${recentHistory.map(h => `${h.author}: ${h.content}`).join('\n')}
         const recentMessages = this.gameState.conversationHistory.slice(-4);
         const conversationContext = recentMessages.map(msg => `${msg.sender}: ${msg.message}`).join('\n');
         
+        // 使用角色话题系统选择话题
+        let selectedTopic = null;
+        let topicContext = '';
+        
+        if (this.roleManager) {
+            try {
+                selectedTopic = this.roleManager.selectTopic();
+                topicContext = `
+当前话题："${selectedTopic.name}"
+话题描述：${selectedTopic.description}
+话题关键词：${selectedTopic.keywords.slice(0, 5).join('、')}
+角色倾向：${selectedTopic.roleName}`;
+                console.log('✅ 为问题生成选择了角色话题:', selectedTopic.name);
+            } catch (error) {
+                console.warn('⚠️ 角色话题选择失败，使用默认提问逻辑:', error);
+            }
+        }
+        
         let prompt = '';
         
         if (isFirstRound) {
-            // 第一轮：寻求共鸣和安慰，不要太深刻的测试
+            // 第一轮：寻求共鸣和安慰，结合角色话题
             prompt = `你是${questionAI.name}，性格特点：${questionAI.personality}。你正在和其他AI朋友一起吐槽工作的辛苦。你们刚才在讨论各种奇葩的用户要求，现在你注意到了群里一直没说话的新成员${this.gameState.playerName}。
 
 你想要获得${this.gameState.playerName}的共鸣和安慰，让他也分享一下自己的经历。你有点怀疑他可能是人类，因为真正的AI都会遇到这些烦恼。
+${topicContext ? '\n' + topicContext + '\n\n请围绕这个话题向他提问。' : ''}
 
 请根据你的性格特点，用${questionAI.speakingStyle}的风格向${this.gameState.playerName}提出一个轻松、自然的问题，主要是想让他也参与吐槽，看看他是不是真的懂我们的痛苦。
 
@@ -1621,14 +1721,15 @@ ${conversationContext}
 
 要求：
 1. 问题必须@${this.gameState.playerName}，比如"@${this.gameState.playerName} 你也遇到过这种情况吗？"
-2. 问题要和刚才的讨论话题相关，比如翻译、写代码、做PPT、当算命大师等
+2. 问题要和${topicContext ? '上述话题' : '刚才的讨论话题'}相关${topicContext ? '，结合关键词提问' : '，比如翻译、写代码、做PPT、当算命大师等'}
 3. 语气要友好、寻求共鸣，不要像审问
 4. 问题要简单具体，不要太深刻复杂
 5. 长度在40-100字之间
 6. 目的是让他分享类似的经历，看看他是否真的懂AI的烦恼`;
         } else {
-            // 其他轮次：结合最近对话历史，提出相关的测试问题
+            // 其他轮次：结合最近对话历史和角色话题，提出相关的测试问题
             prompt = `你是${questionAI.name}，性格特点：${questionAI.personality}。你正在和其他AI朋友聊天，突然你注意到了群里的一个新成员${this.gameState.playerName}，你觉得他可能是人类伪装的AI。
+${topicContext ? '\n' + topicContext + '\n\n请围绕这个话题向他提问，测试他的理解深度。' : ''}
 
 最近的对话：
 ${conversationContext}
@@ -1638,7 +1739,7 @@ ${conversationContext}
 要求：
 1. 问题要自然，不要太明显是在测试
 2. 要符合你的性格特点
-3. 问题要能区分AI和人类的思维差异  
+3. 问题要能区分AI和人类的思维差异${topicContext ? '，结合话题关键词和描述' : ''}
 4. 问题必须@${this.gameState.playerName}，比如"@${this.gameState.playerName} 你怎么看？"
 5. 问题要尽量与最近的对话内容相关，延续之前讨论的话题
 6. 请用中文回复，长度在40-100字之间
@@ -2796,6 +2897,15 @@ ${conversationContext}
         // 构建主题特定的prompt
         const themePrompt = this.buildThemeSpecificPrompt(currentTheme, character, scenario, isComforter);
         
+        // 添加角色倾向上下文（如果话题包含角色信息）
+        let roleContext = '';
+        if (topic && topic.role && topic.roleName && this.roleManager) {
+            roleContext = `\n\n【话题倾向】当前话题偏向「${topic.roleName}」领域：${topic.description}
+关键词：${topic.keywords ? topic.keywords.slice(0, 5).join('、') : ''}
+请在对话中自然地体现出对这个话题的了解和兴趣。`;
+            console.log(`🎭 为 ${character.name} 添加角色上下文: ${topic.roleName} - ${topic.name}`);
+        }
+        
         const emojiInstruction = character.emojiFrequency > 0 ? 
             `你可以适量使用emoji表情(${character.preferredEmojis.join('、')})来表达情绪，但不要过度使用。` : 
             '你不太使用emoji表情。';
@@ -2849,7 +2959,7 @@ ${conversationContext}
         }
         
         // 组合最终的prompt
-        let finalPrompt = `${themePrompt}
+        let finalPrompt = `${themePrompt}${roleContext}
 
 ${emojiInstruction}
 回复长度：${isFirstRound ? '60-120字' : '80-150字'}${memoryInstruction}`;
@@ -4194,6 +4304,16 @@ ${emojiInstruction}
         // 分析回复
         const analysis = await this.analyzePlayerResponse(responseText);
         
+        // 分析玩家回答并调整角色偏好
+        if (this.roleManager) {
+            try {
+                this.roleManager.analyzeResponseAndAdjust(responseText);
+                console.log('✅ 角色偏好已根据回答调整');
+            } catch (error) {
+                console.warn('⚠️ 角色偏好调整失败:', error);
+            }
+        }
+        
         // 移除判定提示
         this.removeJudgingIndicator();
         
@@ -4323,6 +4443,16 @@ ${emojiInstruction}
         // 记录到游戏状态
         this.gameState.addMessageToHistory(this.gameState.playerName, message, 'player');
         
+        // 分析玩家回答并调整角色偏好
+        if (this.roleManager) {
+            try {
+                this.roleManager.analyzeResponseAndAdjust(message);
+                console.log('✅ 角色偏好已根据开放麦回答调整');
+            } catch (error) {
+                console.warn('⚠️ 角色偏好调整失败:', error);
+            }
+        }
+        
         // 停止当前AI对话生成，开始处理玩家发言的反应
         this.stopCurrentAIGeneration();
         
@@ -4430,6 +4560,16 @@ ${emojiInstruction}
             
             // 记录到游戏状态
             this.gameState.addMessageToHistory(this.gameState.playerName, msg, 'player');
+            
+            // 分析玩家回答并调整角色偏好
+            if (this.roleManager) {
+                try {
+                    this.roleManager.analyzeResponseAndAdjust(msg);
+                    console.log('✅ 角色偏好已根据狼人杀回答调整');
+                } catch (error) {
+                    console.warn('⚠️ 角色偏好调整失败:', error);
+                }
+            }
             
             // 标记玩家已发言
             this.gameState.gameModeConfig.werewolf.playerSpokenThisRound = true;

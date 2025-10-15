@@ -33,25 +33,8 @@ body {
     position: relative;
 }
 
-/* 添加微妙的边框光效 */
-.game-card::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    border-radius: 8px;
-    padding: 1px;
-    background: linear-gradient(135deg, 
-        rgba(7, 193, 96, 0.3) 0%, 
-        rgba(102, 126, 234, 0.2) 50%, 
-        rgba(7, 193, 96, 0.1) 100%
-    );
-    mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-    mask-composite: exclude;
-    pointer-events: none;
-}
+/* 移除伪元素边框光效，因为它在滚动时会导致视觉问题 */
+/* 改为使用简单的border */
 
 @keyframes slideIn {
     from {

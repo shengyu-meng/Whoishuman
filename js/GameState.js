@@ -19,6 +19,15 @@ class GameState {
         this.availableScenarios = []; // 当前轮次可用的工作场景
         this.aiMessageHistory = {}; // 跟踪每个AI的历史消息，防止重复
         
+        // 角色倾向系统
+        this.playerRole = null; // 'scientist' | 'philosopher' | 'empath'
+        this.rolePreferences = {
+            scientist: 0.33,
+            philosopher: 0.33,
+            empath: 0.34
+        };
+        this.topicHistory = []; // 记录已讨论的话题ID
+        
         // 游戏模式系统
         this.gameMode = 'challenge'; // 'challenge', 'openmic', 'werewolf'
         this.gameModeConfig = {
@@ -93,6 +102,18 @@ class GameState {
         this.usedScenarios = [];
         this.availableScenarios = [];
         this.aiMessageHistory = {};
+        
+        // 角色系统不重置（保留玩家选择）
+        // this.playerRole 保持不变
+        // 重置角色偏好权重（根据选中角色设置初始权重）
+        if (this.playerRole) {
+            this.rolePreferences = {
+                scientist: this.playerRole === 'scientist' ? 0.70 : 0.15,
+                philosopher: this.playerRole === 'philosopher' ? 0.70 : 0.15,
+                empath: this.playerRole === 'empath' ? 0.70 : 0.15
+            };
+        }
+        this.topicHistory = [];
         
         // 重置游戏模式状态
         this.gameMode = 'challenge';
@@ -920,6 +941,61 @@ class GameState {
         this.transitionState = null;
         this.themeTransitionInProgress = false;
         console.log('🔄 过渡状态已重置');
+    }
+
+    // ===== 角色倾向系统方法 =====
+    
+    // 设置玩家角色
+    setPlayerRole(role) {
+        if (!['scientist', 'philosopher', 'empath'].includes(role)) {
+            console.error('❌ 无效的角色类型:', role);
+            return false;
+        }
+        
+        this.playerRole = role;
+        
+        // 设置初始权重（选中角色70%，其他各15%）
+        this.rolePreferences = {
+            scientist: role === 'scientist' ? 0.70 : 0.15,
+            philosopher: role === 'philosopher' ? 0.70 : 0.15,
+            empath: role === 'empath' ? 0.70 : 0.15
+        };
+        
+        console.log(`🎭 玩家角色已设置: ${role}`, this.rolePreferences);
+        return true;
+    }
+    
+    // 获取玩家角色
+    getPlayerRole() {
+        return this.playerRole;
+    }
+    
+    // 获取角色偏好权重
+    getRolePreferences() {
+        return { ...this.rolePreferences };
+    }
+    
+    // 更新角色偏好权重
+    updateRolePreferences(newPreferences) {
+        Object.assign(this.rolePreferences, newPreferences);
+        console.log('🎭 角色偏好已更新:', this.rolePreferences);
+    }
+    
+    // 添加已讨论话题
+    addDiscussedTopic(topicId) {
+        if (!this.topicHistory.includes(topicId)) {
+            this.topicHistory.push(topicId);
+        }
+    }
+    
+    // 检查话题是否已讨论
+    isTopicDiscussed(topicId) {
+        return this.topicHistory.includes(topicId);
+    }
+    
+    // 获取话题历史
+    getTopicHistory() {
+        return [...this.topicHistory];
     }
 
     addPlayerResponse(question, response) {
