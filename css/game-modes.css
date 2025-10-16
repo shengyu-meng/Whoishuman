@@ -12,14 +12,16 @@
 
 .mode-options {
     display: grid;
-    grid-template-columns: 1fr;
-    gap: 12px;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
 }
 
 .mode-option {
     display: flex;
+    flex-direction: column;
     align-items: center;
-    padding: 12px;
+    text-align: center;
+    padding: 12px 8px;
     border: 2px solid #e0e0e0;
     border-radius: 10px;
     cursor: pointer;
@@ -58,27 +60,34 @@
 }
 
 .mode-icon {
-    font-size: 28px;
-    margin-right: 12px;
-    min-width: 40px;
+    font-size: 32px;
+    margin-right: 0;
+    margin-bottom: 8px;
+    min-width: auto;
     text-align: center;
     filter: none !important;
     color: inherit;
-    /* 确保emoji以彩色显示 */
+    background: transparent;
     font-family: "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji", sans-serif;
+}
+
+.mode-info {
+    background: transparent;
 }
 
 .mode-info h4 {
     font-size: 15px;
     font-weight: 600;
     color: #333;
-    margin-bottom: 3px;
+    margin-bottom: 4px;
+    background: transparent;
 }
 
 .mode-info p {
     font-size: 13px;
     color: #666;
     line-height: 1.3;
+    background: transparent;
 }
 
 .name-input-section {
@@ -103,20 +112,22 @@
 .role-description {
     margin-bottom: 12px;
     color: #666;
-    font-size: 13px;
+    font-size: 15px;
     line-height: 1.4;
 }
 
 .role-options {
     display: grid;
-    grid-template-columns: 1fr;
-    gap: 12px;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
 }
 
 .role-option {
     display: flex;
+    flex-direction: column;
     align-items: center;
-    padding: 12px;
+    text-align: center;
+    padding: 12px 8px;
     border: 2px solid #e0e0e0;
     border-radius: 10px;
     cursor: pointer;
@@ -155,9 +166,10 @@
 }
 
 .role-icon {
-    font-size: 28px;
-    margin-right: 12px;
-    min-width: 40px;
+    font-size: 32px;
+    margin-right: 0;
+    margin-bottom: 8px;
+    min-width: auto;
     text-align: center;
     filter: none !important;
     color: inherit;
@@ -168,7 +180,7 @@
     font-size: 15px;
     font-weight: 600;
     color: #333;
-    margin-bottom: 3px;
+    margin-bottom: 4px;
 }
 
 .role-info p {
@@ -192,7 +204,7 @@
 .name-input-section p {
     margin-bottom: 12px;
     color: #666;
-    font-size: 13px;
+    font-size: 15px;
     line-height: 1.4;
 }
 
@@ -217,7 +229,7 @@
 
 .name-input-section #playerNameInput::placeholder {
     color: #999;
-    font-size: 13px;
+    font-size: 14px;
 }
 
 /* 名字建议按钮样式增强 */
@@ -234,7 +246,7 @@
     border-radius: 6px;
     background: white;
     color: #666;
-    font-size: 13px;
+    font-size: 14px;
     cursor: pointer;
     transition: all 0.3s ease;
 }
@@ -530,16 +542,20 @@
 /* 响应式设计 */
 @media (max-width: 768px) {
     .mode-options {
+        grid-template-columns: 1fr;
         gap: 10px;
     }
     
     .mode-option {
+        flex-direction: row;
+        text-align: left;
         padding: 12px;
     }
     
     .mode-icon {
         font-size: 28px;
         margin-right: 12px;
+        margin-bottom: 0;
         min-width: 40px;
     }
     
@@ -548,6 +564,31 @@
     }
     
     .mode-info p {
+        font-size: 13px;
+    }
+    
+    .role-options {
+        grid-template-columns: 1fr;
+    }
+    
+    .role-option {
+        flex-direction: row;
+        text-align: left;
+        padding: 12px;
+    }
+    
+    .role-icon {
+        font-size: 28px;
+        margin-right: 12px;
+        margin-bottom: 0;
+        min-width: 40px;
+    }
+    
+    .role-info h4 {
+        font-size: 15px;
+    }
+    
+    .role-info p {
         font-size: 13px;
     }
     

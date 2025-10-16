@@ -426,7 +426,7 @@ class GameController {
         const name = nameInput.value.trim();
         
         if (!name) {
-            alert('请输入一个AI名称');
+            alert('请输入你的AI角色名称');
             return;
         }
 
@@ -487,7 +487,7 @@ class GameController {
         const guideCard = document.getElementById('guideCard');
         const modeDescriptions = {
             challenge: '你即将进入AI群聊环境。记住，你必须伪装成AI，避免被识破！',
-            openmic: '你即将进入开放讨论环境。你可以主动发言，但每轮至少要发言一次！',
+            openmic: '你即将进入开放讨论环境。你可以主动发言，但每轮至少要发言一次！记住，你必须要伪装成AI，避免被其他AI识破！',
             werewolf: '你即将进入狼人杀模式。AI们知道群里有人类，你需要在投票中活到最后！'
         };
         
@@ -508,7 +508,7 @@ class GameController {
         const name = nameInput.value.trim();
         
         if (!name) {
-            alert('请输入一个AI名称');
+            alert('请输入你的AI角色名称');
             return;
         }
 
