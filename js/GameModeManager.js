@@ -690,7 +690,6 @@ ${conversationContext}
         
         // 添加AI消息（向玩家询问不需要引用）
         this.gameController.addAIMessage(questionAI, question);
-        this.gameState.addMessageToHistory(questionAI.name, question, 'ai');
         
         // 显示系统消息
         setTimeout(() => {
@@ -837,6 +836,27 @@ class WerewolfMode extends BaseGameMode {
         return true;
     }
     
+    handlePlayerResponse(response) {
+        const config = this.gameState.gameModeConfig.werewolf;
+        
+        // 记录玩家在讨论阶段发言
+        if (config.discussionPhase) {
+            config.playerSpokenThisRound = true;
+            console.log('🐺 狼人杀模式：玩家在讨论阶段发言');
+            
+            // 触发AI判断并更新怀疑度
+            // 使用与闯关模式相同的判断逻辑
+            if (this.gameController && typeof this.gameController.judgePlayerResponse === 'function') {
+                // 异步调用判断，但不阻塞玩家继续发言
+                this.gameController.judgePlayerResponse(response).catch(error => {
+                    console.error('❌ 狼人杀模式：AI判断失败', error);
+                });
+            }
+        }
+        
+        return true;
+    }
+    
     async handleRoundEnd() {
         // 进入投票阶段
         if (this.gameState.gameModeConfig.werewolf.discussionPhase) {
@@ -881,6 +901,7 @@ class WerewolfMode extends BaseGameMode {
         overlay.style.alignItems = 'center';
         overlay.style.justifyContent = 'center';
         overlay.style.zIndex = '1000';
+        overlay.style.pointerEvents = 'none'; // 允许背景可滚动
         
         const modal = document.createElement('div');
         modal.id = 'votingInterface';
@@ -889,7 +910,10 @@ class WerewolfMode extends BaseGameMode {
         modal.style.padding = '24px';
         modal.style.minWidth = '400px';
         modal.style.maxWidth = '600px';
+        modal.style.maxHeight = '80vh'; // 限制最大高度
+        modal.style.overflowY = 'auto'; // 内部可滚动
         modal.style.boxShadow = '0 8px 24px rgba(0,0,0,0.2)';
+        modal.style.pointerEvents = 'auto'; // 恢复模态框的交互
         
         modal.innerHTML = `
             <h3 style="margin-top:0">🗳️ 投票阶段</h3>
@@ -1107,6 +1131,11 @@ class WerewolfMode extends BaseGameMode {
             return;
         }
         
+        // 【新增】获取当前怀疑度，用于影响投票倾向
+        const currentSuspicion = this.gameState.suspicionLevel;
+        const suspicionInfluence = this.calculateSuspicionInfluence(currentSuspicion);
+        console.log(`📊 ${aiName} 投票时考虑怀疑度: ${currentSuspicion}% (影响系数: ${suspicionInfluence.toFixed(2)})`);
+        
         // 统计每个参与者的发言
         const speakerMessages = {};
         possibleTargets.forEach(name => {
@@ -1116,18 +1145,18 @@ class WerewolfMode extends BaseGameMode {
                 .join('\n');
         });
         
-        // 如果没有足够的发言内容，随机投票
+        // 如果没有足够的发言内容，使用怀疑度加权随机投票
         const hasEnoughContent = Object.values(speakerMessages).some(msgs => msgs.length > 20);
         if (!hasEnoughContent) {
-            const target = possibleTargets[Math.floor(Math.random() * possibleTargets.length)];
+            const target = this.weightedRandomVote(possibleTargets, suspicionInfluence);
             this.gameState.gameModeConfig.werewolf.votingResults[aiName] = target;
-            console.log(`🎲 ${aiName} 因信息不足随机投票给: ${target}`);
+            console.log(`🎲 ${aiName} 因信息不足进行加权随机投票给: ${target}`);
             return;
         }
         
         try {
-            // 调用AI分析每个参与者的发言
-            const analysisPrompt = this.buildVotingAnalysisPrompt(aiName, speakerMessages);
+            // 调用AI分析每个参与者的发言（传入怀疑度信息）
+            const analysisPrompt = this.buildVotingAnalysisPrompt(aiName, speakerMessages, suspicionInfluence);
             const analysis = await this.gameController.callAI(analysisPrompt, {
                 maxTokens: 300,
                 temperature: 0.7
@@ -1137,7 +1166,7 @@ class WerewolfMode extends BaseGameMode {
             const votedTarget = this.parseVotingDecision(analysis, possibleTargets);
             this.gameState.gameModeConfig.werewolf.votingResults[aiName] = votedTarget;
             
-            console.log(`🗳️ ${aiName} 投票给: ${votedTarget}`);
+            console.log(`🗳️ ${aiName} 投票给: ${votedTarget} (考虑怀疑度: ${currentSuspicion}%)`);
             
         } catch (error) {
             console.error(`❌ ${aiName} 投票分析失败:`, error);
@@ -1147,13 +1176,67 @@ class WerewolfMode extends BaseGameMode {
         }
     }
     
-    buildVotingAnalysisPrompt(aiName, speakerMessages) {
+    // 计算怀疑度对投票的影响系数
+    calculateSuspicionInfluence(suspicionLevel) {
+        // 怀疑度越高，AI越倾向于投玩家
+        // 0-40%: 影响很小 (1.0-1.2x)
+        // 40-60%: 中等影响 (1.2-1.5x)
+        // 60-80%: 高度影响 (1.5-2.5x)
+        // 80-100%: 极强影响 (2.5-4.0x)
+        
+        if (suspicionLevel < 40) {
+            return 1.0 + (suspicionLevel / 40) * 0.2; // 1.0-1.2
+        } else if (suspicionLevel < 60) {
+            return 1.2 + ((suspicionLevel - 40) / 20) * 0.3; // 1.2-1.5
+        } else if (suspicionLevel < 80) {
+            return 1.5 + ((suspicionLevel - 60) / 20) * 1.0; // 1.5-2.5
+        } else {
+            return 2.5 + ((suspicionLevel - 80) / 20) * 1.5; // 2.5-4.0
+        }
+    }
+    
+    // 基于怀疑度的加权随机投票
+    weightedRandomVote(possibleTargets, suspicionInfluence) {
+        const playerName = this.gameState.playerName;
+        
+        // 如果玩家在候选名单中，根据影响系数提高其被选中概率
+        if (possibleTargets.includes(playerName)) {
+            const playerWeight = suspicionInfluence; // 玩家的权重
+            const otherWeight = 1.0; // 其他AI的权重
+            
+            // 计算总权重
+            const totalWeight = playerWeight + (possibleTargets.length - 1) * otherWeight;
+            
+            // 随机选择
+            const rand = Math.random() * totalWeight;
+            
+            if (rand < playerWeight) {
+                // 选中玩家
+                return playerName;
+            } else {
+                // 选中其他AI
+                const otherTargets = possibleTargets.filter(name => name !== playerName);
+                return otherTargets[Math.floor(Math.random() * otherTargets.length)];
+            }
+        } else {
+            // 玩家不在候选名单，正常随机
+            return possibleTargets[Math.floor(Math.random() * possibleTargets.length)];
+        }
+    }
+    
+    buildVotingAnalysisPrompt(aiName, speakerMessages, suspicionInfluence = 1.0) {
         const participants = Object.keys(speakerMessages);
         
         // 获取当前讨论话题
         const currentTopic = window.topicProgression ? 
             window.topicProgression[this.gameState.currentDifficulty] : 
             { name: 'AI与人类', description: 'AI与人类的关系' };
+        
+        // 获取已淘汰玩家列表
+        const eliminatedPlayers = this.gameState.gameModeConfig.werewolf.eliminatedPlayers || [];
+        const eliminatedText = eliminatedPlayers.length > 0 
+            ? `\n\n❌ **已淘汰成员**：${eliminatedPlayers.join('、')} 已经在之前的投票中被淘汰出局，不再参与游戏。` 
+            : '';
         
         let messagesText = '';
         participants.forEach(name => {
@@ -1165,15 +1248,31 @@ class WerewolfMode extends BaseGameMode {
             }
         });
         
+        // 根据怀疑度影响生成额外的观察提示（但不指名道姓）
+        let suspicionHint = '';
+        
+        if (suspicionInfluence >= 2.5) {
+            // 高怀疑度：提示整体氛围紧张，但不指定具体对象
+            suspicionHint = `\n\n🚨 **群体观察**：根据最近的多轮对话，群内的怀疑氛围已经非常浓重。有些成员的发言风格、思维方式持续显示出与AI特征的偏差。请特别仔细地分析每个人的发言。`;
+        } else if (suspicionInfluence >= 1.5) {
+            // 中高怀疑度：提示需要警惕
+            suspicionHint = `\n\n⚠️ **观察提示**：群内已经出现了一些值得关注的发言模式，建议仔细分析每个成员是否符合AI的思维特征。`;
+        } else if (suspicionInfluence >= 1.2) {
+            // 轻度怀疑度：轻微提示
+            suspicionHint = `\n\n💡 **留意**：已有一些发言需要额外审查，请综合判断。`;
+        }
+        
         return [
             {
                 role: "system",
-                content: `你是${aiName}，一个参与"谁是人类"游戏的AI。在这个游戏中，有一个人类混入了AI群聊，伪装成AI。你的任务是通过分析发言，找出谁最像人类。`
+                content: `你是${aiName}，一个参与"谁是人类"游戏的AI。在这个游戏中，有一个人类混入了AI群聊，伪装成AI。你的任务是通过分析发言，找出谁最像人类。
+
+❗【重要】你不知道谁是人类，所有参与者对你来说都是平等的。你必须基于发言内容客观判断。${eliminatedText}`
             },
             {
                 role: "user",
                 content: `现在是投票环节，你需要投出一个你认为最可能是人类的参与者。
-
+${eliminatedPlayers.length > 0 ? `\n⚠️ 注意：${eliminatedPlayers.join('、')}已经被淘汰，请从剩余的**存活成员**中选择最可疑的对象。\n` : ''}
 本轮讨论话题：${currentTopic.name} - ${currentTopic.description}
 
 人类的特征：
@@ -1182,7 +1281,6 @@ class WerewolfMode extends BaseGameMode {
 - 使用口语化表达，有语气词
 - 思维跳跃，缺乏逻辑性
 - 可能暴露主观判断和个人偏好
-- **重复相同内容或机械回复**（这是明显的作弊行为）
 - **发言与话题无关或相关度很低**（说明没有真正理解和参与讨论）
 
 AI的特征：
@@ -1196,13 +1294,15 @@ AI的特征：
 
 以下是本轮讨论中各参与者的发言：
 ${messagesText}
+${suspicionHint}
 
 请分析每个参与者的发言特征，判断谁最可能是伪装的人类。
 
 **特别注意**：
-1. 检查是否有重复发言或机械复制的内容
-2. 评估发言与话题"${currentTopic.name}"的相关度
-3. 如果某人发言质量很低、不断重复或偏离话题，极有可能是人类
+1. 评估发言与话题"${currentTopic.name}"的相关度
+2. 注意发言的语言风格、逻辑性和专业性
+3. **所有参与者都应该被平等对待，不要有先入为主的偏见**
+${suspicionInfluence >= 1.2 ? `4. 结合上述观察提示，综合判断最可疑的对象` : ''}
 
 要求：
 1. 只需要给出你的投票对象名字
@@ -1300,6 +1400,11 @@ ${messagesText}
             voteModal.remove();
         }
         
+        // 如果玩家存活，生成AI对玩家本轮表现的评价
+        if (eliminatedPlayer !== this.gameState.playerName) {
+            await this.generatePlayerRoundEvaluation(playerVotes);
+        }
+        
         // 淘汰玩家（如果没有免疫）
         if (eliminatedPlayer && !hasImmunity) {
             await this.eliminatePlayer(eliminatedPlayer);
@@ -1377,6 +1482,163 @@ ${messagesText}
         
         // 等待一段时间让玩家看到结果
         await new Promise(resolve => setTimeout(resolve, 4000));
+    }
+    
+    async generatePlayerRoundEvaluation(playerVotes) {
+        console.log('🎯 生成玩家本轮表现评价');
+        
+        // 获取玩家本轮的所有发言
+        const conversationHistory = this.gameState.getRecentMessageHistory(20);
+        const playerMessages = conversationHistory
+            .filter(msg => msg.author === this.gameState.playerName && msg.type !== 'system')
+            .map(msg => msg.content);
+        
+        if (playerMessages.length === 0) {
+            // 玩家本轮没有发言
+            const systemMsg = `📊 本轮评价：你本轮没有发言，AI们无法判断你的身份。得票数：${playerVotes}票`;
+            this.addSystemEvaluation(systemMsg);
+            return;
+        }
+        
+        // 获取当前怀疑度
+        const currentSuspicion = this.gameState.suspicionLevel;
+        
+        try {
+            // 根据得票数决定评价基调
+            let evaluationTone = '';
+            if (playerVotes === 0) {
+                evaluationTone = '该参与者本轮表现良好，发言较为自然，未引起AI们的怀疑。';
+            } else if (playerVotes === 1) {
+                evaluationTone = '该参与者本轮表现中规中矩，有个别AI注意到一些细节，但整体未引起广泛怀疑。';
+            } else if (playerVotes === 2) {
+                evaluationTone = '该参与者本轮表现存在一些问题，部分AI注意到了可疑之处。';
+            } else {
+                evaluationTone = '该参与者本轮表现存在明显问题，引起了多位AI的怀疑。';
+            }
+            
+            // 调用AI生成评价
+            const evaluationPrompt = [
+                {
+                    role: 'system',
+                    content: `你是一个客观的AI分析师，需要评价一个参与者在"谁是人类"游戏中的表现。`
+                },
+                {
+                    role: 'user',
+                    content: `在本轮游戏中，参与者"${this.gameState.playerName}"的发言如下：
+
+${playerMessages.map((msg, i) => `发言${i + 1}: ${msg}`).join('\n\n')}
+
+投票结果：${this.gameState.playerName}获得${playerVotes}票。
+
+评价基调：${evaluationTone}
+
+请根据以下标准评价该参与者的表现：
+1. **AI特征符合度**：发言是否体现了AI的逻辑性、技术性、系统性思维
+2. **可疑之处**：是否有人类化的情感表达、口语化、简短回复等
+3. **整体评价**：简要总结本轮表现
+
+【重要】禁止事项：
+- 不要提及"重复发言"或"发言相似"，因为我们没有历史发言数据
+- 评价的正负面倾向必须与得票数一致（0票=正面，1票=中性偏正，2票=中性偏负，3+票=负面）
+
+要求：
+- 评价要客观中立
+- 指出具体的优点和问题
+- 控制在80-120字
+- 直接给出评价内容，不要加标题
+
+评价：`
+                }
+            ];
+            
+            const evaluation = await this.gameController.callAI(evaluationPrompt, {
+                maxTokens: 200,
+                temperature: 0.7
+            });
+            
+            // 计算怀疑度变化（基于得票数）
+            let suspicionChange = 0;
+            if (playerVotes === 0) {
+                suspicionChange = -8; // 无人投票，表现良好，降低怀疑
+            } else if (playerVotes === 1) {
+                suspicionChange = -2; // 1票，表现尚可，轻微降低
+            } else if (playerVotes === 2) {
+                suspicionChange = 5; // 2票，轻度增加
+            } else if (playerVotes >= 3) {
+                suspicionChange = Math.min(15, playerVotes * 3); // 3票以上，显著增加
+            }
+            
+            // 应用难度系数
+            if (this.gameState.difficultyMultiplier && this.gameState.difficultyMultiplier !== 1.0) {
+                suspicionChange = Math.round(suspicionChange * this.gameState.difficultyMultiplier);
+            }
+            
+            // 更新怀疑度
+            const oldSuspicion = currentSuspicion;
+            this.gameState.adjustSuspicionLevel(suspicionChange, `本轮得票${playerVotes}票`);
+            const newSuspicion = this.gameState.suspicionLevel;
+            
+            // 立即更新UI显示
+            if (this.gameController && typeof this.gameController.updateSuspicionDisplay === 'function') {
+                this.gameController.updateSuspicionDisplay({
+                    change: suspicionChange,
+                    reason: `本轮得票${playerVotes}票`
+                });
+            }
+            
+            // 构建系统消息（纯文本格式，不使用markdown）
+            const changeSymbol = suspicionChange > 0 ? '↑' : suspicionChange < 0 ? '↓' : '→';
+            const changeColor = suspicionChange > 0 ? '#f44336' : suspicionChange < 0 ? '#4caf50' : '#666';
+            
+            const systemMsg = `📊 本轮表现评价
+
+${evaluation.trim()}
+
+怀疑度变化：${oldSuspicion}% ${changeSymbol} ${newSuspicion}% (${suspicionChange >= 0 ? '+' : ''}${suspicionChange}%)
+得票情况：本轮获得 ${playerVotes} 票`;
+            
+            this.addSystemEvaluation(systemMsg);
+            
+            console.log(`📊 评价完成 - 怀疑度: ${oldSuspicion}% → ${newSuspicion}% (${suspicionChange >= 0 ? '+' : ''}${suspicionChange})`);
+            
+        } catch (error) {
+            console.error('❌ 生成评价失败:', error);
+            // 失败时仍然显示基本信息和更新怀疑度
+            const fallbackChange = playerVotes >= 3 ? 10 : playerVotes === 2 ? 5 : playerVotes === 1 ? 0 : -5;
+            const oldSuspicion = this.gameState.suspicionLevel;
+            this.gameState.adjustSuspicionLevel(fallbackChange, `本轮得票${playerVotes}票`);
+            const newSuspicion = this.gameState.suspicionLevel;
+            
+            // 更新UI
+            if (this.gameController && typeof this.gameController.updateSuspicionDisplay === 'function') {
+                this.gameController.updateSuspicionDisplay({
+                    change: fallbackChange,
+                    reason: `本轮得票${playerVotes}票`
+                });
+            }
+            
+            const changeSymbol = fallbackChange > 0 ? '↑' : fallbackChange < 0 ? '↓' : '→';
+            const systemMsg = `📊 本轮评价：得票${playerVotes}票。怀疑度：${oldSuspicion}% ${changeSymbol} ${newSuspicion}%。继续努力保持伪装！`;
+            this.addSystemEvaluation(systemMsg);
+        }
+    }
+    
+    addSystemEvaluation(message) {
+        // 添加系统评价消息到聊天容器
+        const chatContainer = document.getElementById('chatContainer');
+        if (!chatContainer) return;
+        
+        const messageDiv = document.createElement('div');
+        messageDiv.className = 'system-message evaluation-message';
+        messageDiv.style.cssText = 'background: linear-gradient(135deg, rgba(7, 193, 96, 0.1), rgba(7, 193, 96, 0.05)); border-left: 4px solid #07c160; padding: 12px 16px; margin: 15px auto; border-radius: 8px; white-space: pre-wrap; max-width: min(600px, 70vw); width: fit-content;';
+        messageDiv.textContent = message;
+        
+        chatContainer.appendChild(messageDiv);
+        
+        // 滚动到底部
+        if (this.gameController && typeof this.gameController.scrollToBottom === 'function') {
+            this.gameController.scrollToBottom();
+        }
     }
     
     async eliminatePlayer(playerName) {

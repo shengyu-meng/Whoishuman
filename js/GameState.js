@@ -1226,6 +1226,13 @@ class GameState {
             }
         }
         
+        // 应用难度系数
+        if (this.difficultyMultiplier && this.difficultyMultiplier !== 1.0) {
+            const originalChange = change;
+            change = Math.round(change * this.difficultyMultiplier);
+            console.log(`🎯 难度调整: ${originalChange} → ${change} (系数: ${this.difficultyMultiplier}x)`);
+        }
+        
         return { change, reason };
     }
 }
