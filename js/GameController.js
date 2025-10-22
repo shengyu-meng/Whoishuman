@@ -6304,6 +6304,20 @@ ${analysis.feedback}
         // 设置结果标题
         document.getElementById('resultTitle').textContent = isWin ? '🎉 恭喜通关！' : '💥 游戏结束！你被识破了！';
         
+        // 设置玩家信息
+        const playerNameElement = document.getElementById('resultPlayerName');
+        if (playerNameElement) {
+            playerNameElement.textContent = this.gameState.playerName || 'AGI';
+        }
+        
+        // 设置结束时间
+        const endTimeElement = document.getElementById('gameEndTime');
+        if (endTimeElement) {
+            const endTime = this.gameState.gameEndTime;
+            const formattedTime = `${endTime.getFullYear()}-${String(endTime.getMonth() + 1).padStart(2, '0')}-${String(endTime.getDate()).padStart(2, '0')} ${String(endTime.getHours()).padStart(2, '0')}:${String(endTime.getMinutes()).padStart(2, '0')}`;
+            endTimeElement.textContent = formattedTime;
+        }
+        
         // 生成并显示AI伪装分析
         this.showPerformanceAnalysis();
         
@@ -6316,7 +6330,12 @@ ${analysis.feedback}
         
         const gameTime = Math.floor((this.gameState.gameEndTime - this.gameState.gameStartTime) / 1000);
         const evaluation = this.getFinalEvaluation();
-        document.getElementById('finalEvaluation').textContent = evaluation;
+        const finalEvaluationElement = document.getElementById('finalEvaluation');
+        if (finalEvaluationElement) {
+            finalEvaluationElement.textContent = evaluation;
+        } else {
+            console.warn('⚠️ finalEvaluation 元素未找到，跳过评价显示');
+        }
         
         // 初始化导出功能
         this.exportService.initializeExportFunction(this);
@@ -6398,13 +6417,24 @@ ${playerMessages.slice(0, 5).map((msg, i) => `${i + 1}. ${msg}`).join('\n')}
    - 怀疑度控制
    - 发言质量和AI特征
 
+3. 一句深度洞察金句（30-60字），这句话应该：
+   - 从哲学层面反思AI与人类的关系
+   - 可以是反讽的、深刻的、引人思考的
+   - 联系游戏体验（AI伪装AI）与现实（AI伪装人类/人类伪装AI）的荒谬性或深层意义
+   - 引发玩家对"真实性"、"认同"、"表演"等概念的思考
+   - 例如："当人类学会像AI一样思考，AI也在学习如何模仿人类的不完美，边界在哪里？"
+   - 例如："你在伪装AI的过程中，是否也在质疑自己的人性？"
+   - 例如："完美的伪装意味着失去自我，还是找到了另一个自我？"
+
 输出格式：
 评价：[你的评价内容]
 评分：[数字]
+洞察：[金句内容]
 
 要求：
 - 评价要具体、独特，避免套话
 - 每个玩家的评价都应该不同
+- 洞察金句要有深度，不要说教，要留有思考空间
 - 语气友好、有趣
 - 直接输出，不要额外的标题或格式`
                 }
@@ -6412,16 +6442,18 @@ ${playerMessages.slice(0, 5).map((msg, i) => `${i + 1}. ${msg}`).join('\n')}
             
             try {
                 const response = await this.callAI(evaluationPrompt, {
-                    maxTokens: 300,
-                    temperature: 0.8
+                    maxTokens: 400,
+                    temperature: 0.85
                 });
                 
-                // 解析评分和评价
+                // 解析评分、评价和洞察
                 const scoreMatch = response.match(/评分[：:]\s*(\d+)/);
-                const evaluationMatch = response.match(/评价[：:]\s*(.+?)(?=评分|$)/s);
+                const evaluationMatch = response.match(/评价[：:]\s*(.+?)(?=评分|洞察|$)/s);
+                const insightMatch = response.match(/洞察[：:]\s*(.+?)(?=评价|评分|$)/s);
                 
                 const score = scoreMatch ? parseInt(scoreMatch[1]) : Math.min(100, 30 + survivalRounds * 10);
                 const evaluation = evaluationMatch ? evaluationMatch[1].trim() : response.trim();
+                const insight = insightMatch ? insightMatch[1].trim() : null;
                 
                 // 显示评价
                 summaryElement.innerHTML = `<p style="margin: 0; white-space: pre-wrap;">${evaluation}</p>`;
@@ -6431,10 +6463,33 @@ ${playerMessages.slice(0, 5).map((msg, i) => `${i + 1}. ${msg}`).join('\n')}
                     scoreElement.textContent = score;
                 }
                 
+                // 显示洞察金句
+                if (insight) {
+                    const insightContainer = document.getElementById('philosophicalInsight');
+                    const insightQuote = document.getElementById('insightQuote');
+                    if (insightContainer && insightQuote) {
+                        insightQuote.textContent = insight;
+                        insightContainer.style.display = 'block';
+                        // 添加淡入动画
+                        setTimeout(() => {
+                            insightContainer.style.opacity = '0';
+                            insightContainer.style.transform = 'translateY(10px)';
+                            insightContainer.style.transition = 'opacity 0.6s ease, transform 0.6s ease';
+                            setTimeout(() => {
+                                insightContainer.style.opacity = '1';
+                                insightContainer.style.transform = 'translateY(0)';
+                            }, 50);
+                        }, 300);
+                    }
+                }
+                
+                // 二维码已预生成为静态图片，无需动态生成
+                
                 // 存储分析结果供导出使用
                 this.performanceAnalysis = {
                     summary: evaluation,
                     aiScore: score,
+                    philosophicalInsight: insight,
                     survivalRounds,
                     finalSuspicion,
                     messageCount: playerMessages.length
@@ -6453,6 +6508,23 @@ ${playerMessages.slice(0, 5).map((msg, i) => `${i + 1}. ${msg}`).join('\n')}
                 if (scoreElement) {
                     scoreElement.textContent = fallbackScore;
                 }
+                
+                // 显示备用洞察金句
+                const fallbackInsights = [
+                    "当人类学会像AI一样思考，我们是在进化，还是在异化？",
+                    "完美的伪装意味着失去自我，还是找到了另一个自我？",
+                    "你在模仿AI的过程中，是否也在质疑自己的人性？",
+                    "AI在学习人类的不完美，人类在追求AI的完美——这场游戏谁才是演员？",
+                    "当边界模糊时，真实性本身是否也成为了一种表演？"
+                ];
+                const randomInsight = fallbackInsights[Math.floor(Math.random() * fallbackInsights.length)];
+                
+                const insightContainer = document.getElementById('philosophicalInsight');
+                const insightQuote = document.getElementById('insightQuote');
+                if (insightContainer && insightQuote) {
+                    insightQuote.textContent = randomInsight;
+                    insightContainer.style.display = 'block';
+                }
             }
             
         } catch (error) {
@@ -6461,6 +6533,7 @@ ${playerMessages.slice(0, 5).map((msg, i) => `${i + 1}. ${msg}`).join('\n')}
             if (summaryElement) {
                 summaryElement.innerHTML = `<p style="margin: 0; color: #999;">评价生成失败，但这不影响你的精彩表现！</p>`;
             }
+            // 二维码已预生成为静态图片，无需动态生成
         }
     }
     
@@ -6476,6 +6549,7 @@ ${playerMessages.slice(0, 5).map((msg, i) => `${i + 1}. ${msg}`).join('\n')}
             return `游戏刚开始就被识破了。不要气馁！多观察AI的发言风格，下次会更好。你已经迈出了第一步！`;
         }
     }
+    
 
     restartGame() {
         // 重置游戏状态
@@ -7434,7 +7508,12 @@ ${playerMessages.slice(0, 5).map((msg, i) => `${i + 1}. ${msg}`).join('\n')}
             document.getElementById('playerTitle').textContent = '调试者 - ' + this.gameState.getPlayerTitle();
             
             const gameTime = Math.floor((this.gameState.gameEndTime - this.gameState.gameStartTime) / 1000);
-            document.getElementById('finalEvaluation').textContent = '调试模式结束 - 功能测试完成';
+            const finalEvaluationElement = document.getElementById('finalEvaluation');
+            if (finalEvaluationElement) {
+                finalEvaluationElement.textContent = '调试模式结束 - 功能测试完成';
+            } else {
+                console.warn('⚠️ finalEvaluation 元素未找到，跳过评价显示');
+            }
             
             // 初始化导出功能
             this.exportService.initializeExportFunction(this);
@@ -7581,7 +7660,12 @@ ${playerMessages.slice(0, 5).map((msg, i) => `${i + 1}. ${msg}`).join('\n')}
             evaluation = '恭喜！你成功在' + this.gameState.gameMode + '模式中获得胜利！';
         }
         
-        document.getElementById('finalEvaluation').textContent = evaluation;
+        const finalEvaluationElement = document.getElementById('finalEvaluation');
+        if (finalEvaluationElement) {
+            finalEvaluationElement.textContent = evaluation;
+        } else {
+            console.warn('⚠️ finalEvaluation 元素未找到，跳过评价显示');
+        }
         
         // 初始化导出功能
         this.exportService.initializeExportFunction(this);
@@ -7616,7 +7700,12 @@ ${playerMessages.slice(0, 5).map((msg, i) => `${i + 1}. ${msg}`).join('\n')}
         
         const gameTime = Math.floor((this.gameState.gameEndTime - this.gameState.gameStartTime) / 1000);
         const evaluation = this.getFinalEvaluation();
-        document.getElementById('finalEvaluation').textContent = evaluation;
+        const finalEvaluationElement = document.getElementById('finalEvaluation');
+        if (finalEvaluationElement) {
+            finalEvaluationElement.textContent = evaluation;
+        } else {
+            console.warn('⚠️ finalEvaluation 元素未找到，跳过评价显示');
+        }
         
         // 初始化导出功能
         this.exportService.initializeExportFunction(this);

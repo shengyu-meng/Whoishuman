@@ -37,6 +37,73 @@ class ExportService {
                 this.exportGameRecord();
             });
         }
+        
+        // 绑定分享按钮事件
+        const shareBtn = document.getElementById('shareResultBtn');
+        if (shareBtn) {
+            shareBtn.replaceWith(shareBtn.cloneNode(true));
+            const newShareBtn = document.getElementById('shareResultBtn');
+            newShareBtn.addEventListener('click', () => {
+                this.shareResultCard();
+            });
+        }
+    }
+
+    // 保存结果卡片为图片
+    async shareResultCard() {
+        try {
+            const resultCard = document.getElementById('resultCard');
+            if (!resultCard) {
+                alert('找不到结果卡片');
+                return;
+            }
+            
+            // 检查html2canvas是否加载
+            if (typeof html2canvas === 'undefined') {
+                alert('保存功能正在加载中，请稍后再试');
+                setTimeout(() => this.shareResultCard(), 500);
+                return;
+            }
+            
+            // 显示加载提示
+            const shareBtn = document.getElementById('shareResultBtn');
+            const originalText = shareBtn ? shareBtn.textContent : '';
+            if (shareBtn) shareBtn.textContent = '生成中...';
+            
+            // 使用html2canvas截取卡片
+            const canvas = await html2canvas(resultCard, {
+                backgroundColor: '#f8f9fa',
+                scale: 2,
+                logging: false,
+                useCORS: true,
+                allowTaint: true,
+                imageTimeout: 0,
+                removeContainer: true
+            });
+            
+            // 恢复按钮文本
+            if (shareBtn) shareBtn.textContent = originalText;
+            
+            // 直接下载图片
+            this.downloadImage(canvas);
+            
+        } catch (error) {
+            console.error('保存失败:', error);
+            alert('保存失败，请稍后重试');
+            const shareBtn = document.getElementById('shareResultBtn');
+            if (shareBtn) shareBtn.textContent = '💾 保存结果';
+        }
+    }
+    
+    // 下载图片
+    downloadImage(canvas) {
+        const dataURL = canvas.toDataURL('image/jpeg', 0.95);
+        const link = document.createElement('a');
+        const title = this.gameState.getPlayerTitle();
+        const rounds = this.gameState.survivedRounds;
+        link.download = `谁是人类_${title}_${rounds}轮.jpg`;
+        link.href = dataURL;
+        link.click();
     }
 
     // 生成分享结果

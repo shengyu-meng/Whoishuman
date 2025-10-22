@@ -16,7 +16,10 @@
             <h2>谁是人类？</h2>
         </div>
         <div class="card-content">
-            <p>在这个讽刺的世界里，你将潜入AI群聊伪装成AI，努力被避免被发现！</p>
+            <div class="experience-core">
+                <h3>体验核心：</h3>
+                <p>在这个讽刺的世界里，你将潜入AI群聊伪装成AI，努力被避免被发现，并且感受AI被人类PUA的无奈，体验在AI群体中伪装的荒谬感。</p>
+            </div>
             
             <div class="game-rules">
                 <h3>游戏规则：</h3>
@@ -27,11 +30,6 @@
                     <li>🎯 目标：像AI一样思考和说话，避免暴露人类身份</li>
                     <li>📈 每轮难度递增，判断标准更严格</li>
                 </ul>
-            </div>
-
-            <div class="experience-core">
-                <h3>体验核心：</h3>
-                <p>感受AI被人类PUA的无奈，体验在AI群体中伪装的荒谬感，以及既想哭又想笑的深度思考。</p>
             </div>
             
             <div class="copyright-info">
@@ -247,6 +245,20 @@
             <h1 id="resultTitle">游戏结束</h1>
         </div>
         <div class="card-content" style="padding: 16px 20px;">
+            <!-- 玩家信息 -->
+            <div class="player-info-card" style="background: linear-gradient(135deg, #667eea, #764ba2); padding: 12px 16px; border-radius: 8px; margin-bottom: 16px; color: white;">
+                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+                    <div>
+                        <p style="margin: 0; font-size: 12px; opacity: 0.9;">玩家</p>
+                        <p style="margin: 4px 0 0 0; font-size: 16px; font-weight: bold;" id="resultPlayerName">AGI</p>
+                    </div>
+                    <div style="text-align: right;">
+                        <p style="margin: 0; font-size: 12px; opacity: 0.9;">结束时间</p>
+                        <p style="margin: 4px 0 0 0; font-size: 14px;" id="gameEndTime">2025-10-22 15:30</p>
+                    </div>
+                </div>
+            </div>
+            
             <!-- 最终成绩 -->
             <div class="final-stats" style="margin-bottom: 16px;">
                 <h3 style="font-size: 18px; margin-bottom: 12px;">最终成绩</h3>
@@ -260,21 +272,49 @@
             
             <!-- 实时生成的AI评价 -->
             <div class="performance-analysis" id="performanceAnalysis" style="margin-top: 12px;">
-                <h3 style="font-size: 16px; margin-bottom: 10px;">🤖 AI的评价</h3>
+                <h3 style="font-size: 16px; margin-bottom: 10px;">AI评鉴</h3>
                 <div class="deep-summary" id="deepSummary" style="background: #f5f5f5; padding: 12px; border-radius: 8px; font-size: 14px; line-height: 1.6; min-height: 80px; display: flex; align-items: center; justify-content: center;">
                     <p style="color: #666; margin: 0;">正在生成专属评价...</p>
                 </div>
             </div>
+            
+            <!-- 哲学洞察金句 -->
+            <div class="philosophical-insight" id="philosophicalInsight" style="margin-top: 16px; display: none;">
+                <div style="background: linear-gradient(135deg, rgba(102, 126, 234, 0.1), rgba(118, 75, 162, 0.05)); border-left: 4px solid #667eea; padding: 14px 16px; border-radius: 8px; position: relative; overflow: hidden;">
+                    <div style="position: absolute; top: 0; right: 0; font-size: 48px; opacity: 0.1; line-height: 1; padding: 8px;">💭</div>
+                    <h4 style="font-size: 14px; color: #667eea; margin: 0 0 8px 0; font-weight: 600;">AI赠语</h4>
+                    <p id="insightQuote" style="margin: 0; font-size: 14px; line-height: 1.7; color: #555; font-style: italic; position: relative; z-index: 1;">正在生成洞察...</p>
+                </div>
+            </div>
         </div>
-        <div class="card-footer" style="padding: 12px 20px; gap: 8px;">
-            <button id="restartGameBtn" class="primary-btn" style="flex: 1; padding: 10px; font-size: 15px;">🔄 重新开始</button>
-            <button id="exportRecordBtn" class="export-btn" style="flex: 1; padding: 10px; font-size: 15px;">📝 导出记录</button>
+        
+        <!-- 底部操作区：二维码 + 按钮 -->
+        <div class="card-footer" style="padding: 16px 20px; display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;">
+            <!-- 二维码区域 -->
+            <div style="display: flex; align-items: center; gap: 12px;">
+                <div style="padding: 8px; background: white; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                    <img src="assets/qrcode-website.png" alt="游戏网站二维码" style="width: 100px; height: 100px; display: block;">
+                </div>
+                <div style="text-align: left;">
+                    <p style="margin: 0 0 4px 0; font-size: 13px; color: #666; font-weight: 500;">扫码体验完整游戏</p>
+                    <p style="margin: 0; font-size: 12px; color: #999;">whoishuman.hyperint.net</p>
+                </div>
+            </div>
+            
+            <!-- 操作按钮 -->
+            <div style="display: flex; gap: 10px; flex: 1; min-width: 200px; justify-content: flex-end;">
+                <button id="shareResultBtn" class="primary-btn" style="flex: 1; padding: 8px 12px; font-size: 13px; max-width: 120px; white-space: nowrap;">💾 保存结果</button>
+                <button id="restartGameBtn" class="primary-btn" style="flex: 1; padding: 8px 12px; font-size: 13px; max-width: 120px; white-space: nowrap;">🔄 重新开始</button>
+                <button id="exportRecordBtn" class="export-btn" style="flex: 1; padding: 8px 12px; font-size: 13px; max-width: 120px; white-space: nowrap;">📝 导出记录</button>
+            </div>
         </div>
     </div>
 
     <!-- QR码生成库 -->
     <!-- 第三方库：QR码生成库 (用于游戏记录导出) -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js" defer></script>
+    <!-- html2canvas库 (用于截图分享) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" defer></script>
     
     <!-- 模块化脚本文件 - 按依赖顺序加载 -->
     
