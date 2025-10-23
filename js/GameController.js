@@ -1171,8 +1171,31 @@ currentRound >= 3 ?
         
         const avatar = document.createElement('div');
         avatar.className = 'avatar';
-        avatar.textContent = character.avatar || (isPlayer ? '我' : character.name.charAt(0));
-        avatar.style.backgroundColor = character.avatarColor || (isPlayer ? '#07c160' : '#999');
+        
+        // 根据配置选择文字头像或图片头像
+        if (window.AvatarConfig && window.AvatarConfig.useImage) {
+            if (isPlayer && window.AvatarConfig.playerAvatarImage) {
+                // 玩家使用专用头像
+                avatar.style.backgroundImage = `url('${window.AvatarConfig.imagePath}${window.AvatarConfig.playerAvatarImage}')`;
+                avatar.style.backgroundSize = 'cover';
+                avatar.style.backgroundPosition = 'center';
+                avatar.style.backgroundColor = character.avatarColor || '#07c160';
+            } else if (character.avatarImage) {
+                // AI角色使用各自头像
+                avatar.style.backgroundImage = `url('${window.AvatarConfig.imagePath}${character.avatarImage}')`;
+                avatar.style.backgroundSize = 'cover';
+                avatar.style.backgroundPosition = 'center';
+                avatar.style.backgroundColor = character.avatarColor || '#999';
+            } else {
+                // 降级到文字头像
+                avatar.textContent = character.avatar || (isPlayer ? '我' : character.name.charAt(0));
+                avatar.style.backgroundColor = character.avatarColor || (isPlayer ? '#07c160' : '#999');
+            }
+        } else {
+            // 使用文字头像
+            avatar.textContent = character.avatar || (isPlayer ? '我' : character.name.charAt(0));
+            avatar.style.backgroundColor = character.avatarColor || (isPlayer ? '#07c160' : '#999');
+        }
         
         const content = document.createElement('div');
         content.className = 'message-content';
@@ -4178,8 +4201,17 @@ ${emojiInstruction}
         
         const avatar = document.createElement('div');
         avatar.className = 'avatar';
-        avatar.textContent = character.avatar;
-        avatar.style.backgroundColor = character.avatarColor;
+        
+        // 根据配置选择文字头像或图片头像
+        if (window.AvatarConfig && window.AvatarConfig.useImage && character.avatarImage) {
+            avatar.style.backgroundImage = `url('${window.AvatarConfig.imagePath}${character.avatarImage}')`;
+            avatar.style.backgroundSize = 'cover';
+            avatar.style.backgroundPosition = 'center';
+            avatar.style.backgroundColor = character.avatarColor;
+        } else {
+            avatar.textContent = character.avatar;
+            avatar.style.backgroundColor = character.avatarColor;
+        }
         
         const content = document.createElement('div');
         content.className = 'message-content';
