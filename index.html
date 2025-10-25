@@ -16,7 +16,10 @@
             <h2>谁是人类？</h2>
         </div>
         <div class="card-content">
-            <p>在这个充满讽刺的世界里，你将潜入AI群聊，伪装成AI，避免被其他AI发现你的人类身份。</p>
+            <div class="experience-core">
+                <h3>体验核心：</h3>
+                <p>在这个讽刺的世界里，你将潜入AI群聊伪装成AI，努力被避免被发现，并且感受AI被人类PUA的无奈，体验在AI群体中伪装的荒谬感。</p>
+            </div>
             
             <div class="game-rules">
                 <h3>游戏规则：</h3>
@@ -27,11 +30,6 @@
                     <li>🎯 目标：像AI一样思考和说话，避免暴露人类身份</li>
                     <li>📈 每轮难度递增，判断标准更严格</li>
                 </ul>
-            </div>
-
-            <div class="experience-core">
-                <h3>体验核心：</h3>
-                <p>感受AI被人类PUA的无奈，体验在AI群体中伪装的荒谬感，既想哭又想笑的深度思考。</p>
             </div>
             
             <div class="copyright-info">
@@ -53,14 +51,14 @@
             <div class="mode-selection">
                 <h3>🎮 选择游戏模式：</h3>
                 <div class="mode-options">
-                    <div class="mode-option selected" data-mode="challenge">
+                    <div class="mode-option" data-mode="challenge">
                         <div class="mode-icon">🎯</div>
                         <div class="mode-info">
                             <h4>闯关模式</h4>
                             <p>在AI的反复试探中隐藏人类身份</p>
                         </div>
                     </div>
-                    <div class="mode-option" data-mode="openmic">
+                    <div class="mode-option selected" data-mode="openmic">
                         <div class="mode-icon">🗣️</div>
                         <div class="mode-info">
                             <h4>开放麦模式</h4>
@@ -75,6 +73,50 @@
                         </div>
                     </div>
                 </div>
+            </div>
+            
+            <!-- 角色选择 -->
+            <div class="role-selection">
+                <h3>🎭 选择你的角色倾向：</h3>
+                <p class="role-description">不同角色将影响AI与你的互动方式和话题倾向</p>
+                <div class="role-options">
+                    <div class="role-option" data-role="scientist">
+                        <div class="role-icon">🔬</div>
+                        <div class="role-info">
+                            <h4>科学家</h4>
+                            <p>擅长技术、算法和逻辑推理</p>
+                        </div>
+                    </div>
+                    <div class="role-option selected" data-role="empath">
+                        <div class="role-icon">❤️</div>
+                        <div class="role-info">
+                            <h4>共情者</h4>
+                            <p>擅长情感、共鸣和生活体验</p>
+                        </div>
+                    </div>
+                    <div class="role-option" data-role="philosopher">
+                        <div class="role-icon">🤔</div>
+                        <div class="role-info">
+                            <h4>哲学家</h4>
+                            <p>擅长思辨、伦理和抽象概念</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 难度选择 -->
+            <div class="difficulty-selection">
+                <h3>🎯 选择游戏难度：</h3>
+                <p class="difficulty-description">难度影响AI的判断严格程度</p>
+                <div class="difficulty-slider-container">
+                    <input type="range" id="difficultySlider" min="0" max="2" value="1" step="1" class="difficulty-slider">
+                    <div class="difficulty-labels">
+                        <span class="difficulty-label" data-level="0">新手</span>
+                        <span class="difficulty-label active" data-level="1">普通</span>
+                        <span class="difficulty-label" data-level="2">专家</span>
+                    </div>
+                </div>
+                <p class="difficulty-hint" id="difficultyHint">标准难度，适合大多数玩家</p>
             </div>
             
             <!-- 名字输入 -->
@@ -100,16 +142,12 @@
     <!-- 引导卡片 -->
     <div id="guideCard" class="game-card hidden">
         <div class="card-header">
-            <h1>🎮 游戏开始！</h1>
+            <h1 class="guide-title">🎮 游戏开始！</h1>
         </div>
         <div class="card-content">
             <div class="game-info">
-                <p><strong>玩家：</strong> <span id="playerNameDisplay">AGI</span></p>
-                <p><strong>轮数：</strong> 第 <span id="currentRound">1</span> 轮</p>
-                <p><strong>难度：</strong> <span id="difficultyLevel">⭐1</span></p>
+                <p><strong>玩家：</strong> <span id="playerNameDisplay">AGI</span> | 你即将进入AI群聊环境，必须伪装成AI避免被识破！</p>
             </div>
-            
-            <p>你即将进入AI群聊环境。记住，你必须伪装成AI，避免被识破！</p>
             
             <div class="difficulty-warning">
                 <h3>⚠️ 难度曲线说明：</h3>
@@ -206,47 +244,77 @@
         <div class="card-header">
             <h1 id="resultTitle">游戏结束</h1>
         </div>
-        <div class="card-content">
-            <!-- 最终成绩放在最前面 -->
-            <div class="final-stats">
-                <h3>最终成绩</h3>
-                <p><strong>生存轮数：</strong> <span id="survivalRounds">0</span> 轮</p>
-                <p><strong>最终怀疑度：</strong> <span id="finalSuspicionLevel">0</span>%</p>
-                <p><strong>称号：</strong> <span id="playerTitle">新手AI</span></p>
-                <p><strong>评价：</strong> <span id="finalEvaluation">继续努力！</span></p>
+        <div class="card-content" style="padding: 16px 20px;">
+            <!-- 玩家信息 -->
+            <div class="player-info-card" style="background: linear-gradient(135deg, #667eea, #764ba2); padding: 12px 16px; border-radius: 8px; margin-bottom: 16px; color: white;">
+                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+                    <div>
+                        <p style="margin: 0; font-size: 12px; opacity: 0.9;">玩家</p>
+                        <p style="margin: 4px 0 0 0; font-size: 16px; font-weight: bold;" id="resultPlayerName">AGI</p>
+                    </div>
+                    <div style="text-align: right;">
+                        <p style="margin: 0; font-size: 12px; opacity: 0.9;">结束时间</p>
+                        <p style="margin: 4px 0 0 0; font-size: 14px;" id="gameEndTime">2025-10-22 15:30</p>
+                    </div>
+                </div>
             </div>
             
-            <!-- 综合表现分析放在第二位 -->
-            <div class="performance-analysis hidden" id="performanceAnalysis">
-                <h3 id="analysisTitle">🎭 AI伪装表现分析</h3>
-                <div class="deep-summary" id="deepSummary">
-                    <p>正在分析你的表现...</p>
+            <!-- 最终成绩 -->
+            <div class="final-stats" style="margin-bottom: 16px;">
+                <h3 style="font-size: 18px; margin-bottom: 12px;">最终成绩</h3>
+                <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; font-size: 14px;">
+                    <p style="margin: 4px 0;"><strong>生存轮数：</strong><span id="survivalRounds">0</span>轮</p>
+                    <p style="margin: 4px 0;"><strong>怀疑度：</strong><span id="finalSuspicionLevel">0</span>%</p>
+                    <p style="margin: 4px 0;"><strong>称号：</strong><span id="playerTitle">新手AI</span></p>
+                    <p style="margin: 4px 0;"><strong>评分：</strong><span id="aiScore">--</span>/100</p>
                 </div>
-                <div class="insights-section" id="insightsSection">
-                    <!-- 洞察内容将动态生成 -->
+            </div>
+            
+            <!-- 实时生成的AI评价 -->
+            <div class="performance-analysis" id="performanceAnalysis" style="margin-top: 12px;">
+                <h3 style="font-size: 16px; margin-bottom: 10px;">AI评鉴</h3>
+                <div class="deep-summary" id="deepSummary" style="background: #f5f5f5; padding: 12px; border-radius: 8px; font-size: 14px; line-height: 1.6; min-height: 80px; display: flex; align-items: center; justify-content: center;">
+                    <p style="color: #666; margin: 0;">正在生成专属评价...</p>
                 </div>
-                <div class="reflection-questions" id="reflectionQuestions">
-                    <!-- 反思问题将动态生成 -->
+            </div>
+            
+            <!-- 哲学洞察金句 -->
+            <div class="philosophical-insight" id="philosophicalInsight" style="margin-top: 16px; display: none;">
+                <div style="background: linear-gradient(135deg, rgba(102, 126, 234, 0.1), rgba(118, 75, 162, 0.05)); border-left: 4px solid #667eea; padding: 14px 16px; border-radius: 8px; position: relative; overflow: hidden;">
+                    <div style="position: absolute; top: 0; right: 0; font-size: 48px; opacity: 0.1; line-height: 1; padding: 8px;">💭</div>
+                    <h4 style="font-size: 14px; color: #667eea; margin: 0 0 8px 0; font-weight: 600;">AI赠语</h4>
+                    <p id="insightQuote" style="margin: 0; font-size: 14px; line-height: 1.7; color: #555; font-style: italic; position: relative; z-index: 1;">正在生成洞察...</p>
                 </div>
-                <div class="philosophical-thoughts" id="philosophicalThoughts">
-                    <!-- 哲学思考将动态生成 -->
-                </div>
-                <div class="ai-score" id="aiScore">
-                    <!-- AI评分将动态生成 -->
-                </div>
-                <button id="toggleAnalysisBtn" class="toggle-btn">收起分析</button>
             </div>
         </div>
-        <div class="card-footer">
-            <button id="restartGameBtn" class="primary-btn">🔄 重新开始</button>
-            <button id="shareResultBtn" class="secondary-btn">📸 分享结果</button>
-            <button id="exportRecordBtn" class="export-btn">📝 导出记录</button>
+        
+        <!-- 底部操作区：二维码 + 按钮 -->
+        <div class="card-footer" style="padding: 16px 20px; display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;">
+            <!-- 二维码区域 -->
+            <div style="display: flex; align-items: center; gap: 12px;">
+                <div style="padding: 8px; background: white; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                    <img src="assets/qrcode-website.png" alt="游戏网站二维码" style="width: 100px; height: 100px; display: block;">
+                </div>
+                <div style="text-align: left;">
+                    <p style="margin: 0 0 4px 0; font-size: 13px; color: #666; font-weight: 500;">扫码体验完整游戏</p>
+                    <p style="margin: 0; font-size: 12px; color: #999;">whoishuman.hyperint.net</p>
+                </div>
+            </div>
+            
+            <!-- 操作按钮 -->
+            <div style="display: flex; gap: 10px; flex: 1; min-width: 200px; justify-content: flex-end;">
+                <button id="shareResultBtn" class="primary-btn" style="flex: 1; padding: 8px 12px; font-size: 13px; max-width: 120px; white-space: nowrap;">💾 保存结果</button>
+                <button id="restartGameBtn" class="primary-btn" style="flex: 1; padding: 8px 12px; font-size: 13px; max-width: 120px; white-space: nowrap;">🔄 重新开始</button>
+                <button id="exportRecordBtn" class="export-btn" style="flex: 1; padding: 8px 12px; font-size: 13px; max-width: 120px; white-space: nowrap;">📝 导出记录</button>
+            </div>
         </div>
     </div>
 
     <!-- QR码生成库 -->
     <!-- 第三方库：QR码生成库 (用于游戏记录导出) -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js" defer></script>
+    <!-- html2canvas库 (用于截图分享) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" defer></script>
     
     <!-- 模块化脚本文件 - 按依赖顺序加载 -->
     
@@ -259,6 +327,9 @@
     <script src="js/ThemeProgression.js"></script>               <!-- 主题过渡管理 -->
     <script src="js/ThemeUtils.js"></script>                     <!-- 主题工具和配置 -->
     <script src="js/ThemeScenarios.js"></script>                 <!-- 主题场景数据 -->
+    
+    <!-- 角色倾向系统 -->
+    <script src="js/RoleBasedTopics.js"></script>                <!-- 角色话题库 -->
     
     <!-- AI系统层 -->
     <script src="js/EmotionalTransitionManager.js"></script>     <!-- 情绪转换管理 -->
