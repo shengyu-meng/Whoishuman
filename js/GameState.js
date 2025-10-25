@@ -321,12 +321,13 @@ class GameState {
         return titles[Math.min(this.survivedRounds, 10)] || 'AI之神';
     }
 
-    addMessageToHistory(sender, message, type = 'ai') {
+    addMessageToHistory(sender, message, type = 'ai', round = null) {
         this.conversationHistory.push({
             sender,
             message,
             type,
-            timestamp: new Date().toISOString()
+            timestamp: new Date().toISOString(),
+            round: round !== null ? round : this.currentRound // 添加轮次信息
         });
         
         // 跟踪AI消息历史，防止重复
@@ -351,7 +352,8 @@ class GameState {
                 author: entry.sender,
                 content: entry.message,
                 type: entry.type,
-                timestamp: entry.timestamp
+                timestamp: entry.timestamp,
+                round: entry.round // 添加轮次信息
             }));
     }
     

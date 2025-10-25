@@ -1017,19 +1017,24 @@ ${recentHistory.map(h => `${h.author}: ${h.content}`).join('\n')}
         const currentTopic = topicProgression[this.gameState.currentDifficulty];
         const currentRound = this.gameState.currentRound;
         
-        // 只获取本轮的对话历史，避免AI看到跨轮次的重复内容
-        const allHistory = this.gameState.getRecentMessageHistory(20);
-        const recentHistory = allHistory.filter(msg => {
-            // 过滤出本讨论轮次的消息（排除系统消息和投票结果）
-            return msg.type !== 'system' && !msg.content?.includes('投票结果');
-        }).slice(-5); // 只取最近5条
+        // 获取本轮的对话历史（使用round字段精确过滤）
+        const allHistory = this.gameState.getRecentMessageHistory(30);
+        const thisRoundHistory = allHistory.filter(msg => {
+            // 只获取本轮的消息（排除系统消息和投票结果）
+            return msg.round === currentRound && 
+                   msg.type !== 'system' && 
+                   !msg.content?.includes('投票结果');
+        });
         
         // 检查该AI在本轮是否已经发言过
-        const aiAlreadySpoke = recentHistory.some(msg => msg.author === ai.name);
+        const aiAlreadySpoke = thisRoundHistory.some(msg => msg.author === ai.name);
         if (aiAlreadySpoke) {
-            console.log(`⚠️ ${ai.name} 在本轮已经发言过,跳过重复发言`);
+            console.log(`⚠️ ${ai.name} 在第${currentRound}轮已经发言过,跳过重复发言`);
             return null;
         }
+        
+        // 用于AI参考的最近对话（取本轮最近5条）
+        const recentHistory = thisRoundHistory.slice(-5);
         
         // 获取已淘汰玩家列表
         const eliminatedPlayers = this.gameState.gameModeConfig.werewolf.eliminatedPlayers || [];

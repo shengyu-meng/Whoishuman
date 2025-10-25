@@ -816,6 +816,12 @@ class WerewolfMode extends BaseGameMode {
         let fixed = this.gameState.gameModeConfig.werewolf.fixedParticipants || [];
         const aliveSet = new Set(this.gameState.gameModeConfig.werewolf.alivePlayers);
         
+        console.log('🐺 轮次开始调试信息:');
+        console.log('  - 当前轮次:', this.gameState.currentRound);
+        console.log('  - 固定参与AI列表:', fixed);
+        console.log('  - 存活玩家列表:', Array.from(aliveSet));
+        console.log('  - 已淘汰玩家:', this.gameState.gameModeConfig.werewolf.eliminatedPlayers);
+        
         // 如果固定参与者为空或不足，重新选择（保持6个AI）
         if (!fixed || fixed.length === 0) {
             const candidates = this.gameState.allAICharacters.filter(ai => aliveSet.has(ai.name));
@@ -826,10 +832,13 @@ class WerewolfMode extends BaseGameMode {
             }
         }
         
-        // 更新活跃AI角色
+        // 更新活跃AI角色（只包含存活且在固定名单中的AI）
         this.gameState.activeAICharacters = this.gameState.allAICharacters.filter(ai => 
             fixed.includes(ai.name) && aliveSet.has(ai.name)
         );
+        
+        console.log('  - 过滤后的活跃AI数量:', this.gameState.activeAICharacters.length);
+        console.log('  - 活跃AI名单:', this.gameState.activeAICharacters.map(ai => ai.name));
         
         // 显示持久的输入区域（类似开放麦模式）
         this.showWerewolfInputArea();
