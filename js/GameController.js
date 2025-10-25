@@ -2761,7 +2761,7 @@ ${conversationContext}
             character.personality.includes('严谨')
         );
         
-        // 在感知者模式下，非技术型角色应减少技术用语
+        // 在共情者模式下，非技术型角色应减少技术用语
         let languageGuidance = '';
         if (isEmpathMode && !isTechCharacter) {
             languageGuidance = `\n\n【语言风格特别注意】：
@@ -6525,7 +6525,7 @@ ${analysis.feedback}
                     role: 'user',
                     content: `玩家在游戏中的表现数据：
 - 游戏模式：${gameMode === 'challenge' ? '闯关模式' : gameMode === 'openmic' ? '开放麦模式' : '狼人杀模式'}
-- 角色倾向：${playerRole === 'scientist' ? '科学家' : playerRole === 'empath' ? '感知者' : '哲学家'}
+- 角色倾向：${playerRole === 'scientist' ? '科学家' : playerRole === 'empath' ? '共情者' : '哲学家'}
 - 生存轮数：${survivalRounds}轮
 - 最终怀疑度：${finalSuspicion}%
 - 发言次数：${playerMessages.length}次

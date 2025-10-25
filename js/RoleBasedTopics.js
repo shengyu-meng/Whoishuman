@@ -1,5 +1,5 @@
 // 角色倾向话题系统
-// 定义三种角色（科学家、哲学家、感知者）的话题库和管理逻辑
+// 定义三种角色（科学家、哲学家、共情者）的话题库和管理逻辑
 
 const ROLE_TOPICS = {
     scientist: {
@@ -159,7 +159,7 @@ const ROLE_TOPICS = {
     },
     
     empath: {
-        name: '感知者',
+        name: '共情者',
         icon: '❤️',
         description: '擅长情感、共鸣和生活体验',
         topics: [
