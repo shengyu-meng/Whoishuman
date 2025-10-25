@@ -33,25 +33,8 @@ body {
     position: relative;
 }
 
-/* 添加微妙的边框光效 */
-.game-card::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    border-radius: 8px;
-    padding: 1px;
-    background: linear-gradient(135deg, 
-        rgba(7, 193, 96, 0.3) 0%, 
-        rgba(102, 126, 234, 0.2) 50%, 
-        rgba(7, 193, 96, 0.1) 100%
-    );
-    mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-    mask-composite: exclude;
-    pointer-events: none;
-}
+/* 移除伪元素边框光效，因为它在滚动时会导致视觉问题 */
+/* 改为使用简单的border */
 
 @keyframes slideIn {
     from {
@@ -110,15 +93,21 @@ body {
 }
 
 .card-header h1 {
-    font-size: 18px;  /* 从28px减少到18px，比对话字体大2px */
+    font-size: 20px;
     margin-bottom: 10px;
     position: relative;
     z-index: 2;
     text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+    font-weight: 500;
+}
+
+.card-header h1.guide-title {
+    font-size: 20px;
+    font-weight: normal;
 }
 
 .card-header h2 {
-    font-size: 17px;  /* 从20px减少到17px，比对话字体大1px */
+    font-size: 20px;
     opacity: 0.9;
     position: relative;
     z-index: 2;
@@ -126,7 +115,7 @@ body {
 }
 
 .card-content {
-    padding: 30px;
+    padding: 25px;
 }
 
 .card-footer {
@@ -496,15 +485,25 @@ body {
     border-color: #07c160;
 }
 
+.card-content p {
+    font-size: 15px;
+    line-height: 1.6;
+    margin-bottom: 15px;
+}
+
+#welcomeCard .card-content > p {
+    text-align: center;
+}
+
 /* 游戏规则样式 - 微信风格 */
 .game-rules {
     margin: 20px 0;
 }
 
 .game-rules h3 {
-    color: #07c160;  /* 微信绿色 */
+    color: #07c160;
     margin-bottom: 15px;
-    font-size: 17px;  /* 从18px减少到17px，比对话字体大1px */
+    font-size: 16px;
 }
 
 .game-rules ul {
@@ -515,9 +514,10 @@ body {
 .game-rules li {
     margin: 8px 0;
     padding: 12px 15px;
-    background: #f7f7f7;  /* 微信背景色 */
-    border-radius: 6px;  /* 微信风格圆角 */
-    border-left: 3px solid #07c160;  /* 微信绿色强调边 */
+    background: #f7f7f7;
+    border-radius: 6px;
+    border-left: 3px solid #07c160;
+    font-size: 15px;
 }
 
 /* 角色介绍样式 */
@@ -599,11 +599,13 @@ body {
     font-weight: 500;
     position: relative;
     z-index: 2;
+    font-size: 16px;
 }
 
 .experience-core p {
     position: relative;
     z-index: 2;
+    font-size: 15px;
 }
 
 /* 名称输入样式 */
@@ -630,28 +632,30 @@ body {
 /* 引导卡片样式 */
 .game-info {
     background: #f8f9fa;
-    padding: 20px;
+    padding: 15px;
     border-radius: 10px;
-    margin-bottom: 20px;
+    margin-bottom: 15px;
 }
 
 .game-info p {
-    margin: 5px 0;
-    font-size: 16px;
+    margin: 3px 0;
+    font-size: 15px;
 }
 
 .difficulty-warning {
     background: #fff3cd;
-    border: 1px solid #07c160;  /* 微信绿色边框 */
-    border-radius: 8px;  /* 微信风格圆角 */
-    padding: 20px;
-    margin: 20px 0;
-    border-left: 3px solid #07c160;  /* 微信绿色强调边 */
+    border: 1px solid #07c160;
+    border-radius: 8px;
+    padding: 15px;
+    margin: 15px 0;
+    border-left: 3px solid #07c160;
 }
 
 .difficulty-warning h3 {
     color: #856404;
-    margin-bottom: 15px;
+    margin-bottom: 10px;
+    font-size: 16px;
+    font-weight: 600;
 }
 
 .difficulty-warning ul {
@@ -660,23 +664,26 @@ body {
 }
 
 .difficulty-warning li {
-    margin: 8px 0;
-    padding: 5px 0;
+    margin: 5px 0;
+    padding: 3px 0;
     color: #856404;
+    font-size: 15px;
 }
 
 .key-tips {
     background: #e8f4f8;
-    border: 1px solid #07c160;  /* 微信绿色边框 */
-    border-radius: 8px;  /* 微信风格圆角 */
-    padding: 20px;
-    margin: 20px 0;
-    border-left: 3px solid #07c160;  /* 微信绿色强调边 */
+    border: 1px solid #07c160;
+    border-radius: 8px;
+    padding: 15px;
+    margin: 15px 0;
+    border-left: 3px solid #07c160;
 }
 
 .key-tips h3 {
     color: #0c5460;
-    margin-bottom: 15px;
+    margin-bottom: 10px;
+    font-size: 16px;
+    font-weight: 600;
 }
 
 .key-tips ul {
@@ -685,9 +692,10 @@ body {
 }
 
 .key-tips li {
-    margin: 8px 0;
-    padding: 5px 0;
+    margin: 5px 0;
+    padding: 3px 0;
     color: #0c5460;
+    font-size: 15px;
 }
 
 /* 游戏主界面样式 */
@@ -963,12 +971,17 @@ body {
     padding: 12px;
     border: 1px solid #d0d0d0;
     border-radius: 6px;
-    font-size: 15px;
+    font-size: 14px;
     resize: vertical;
     transition: border-color 0.3s ease;
     background: #fff;
     font-family: inherit;
     line-height: 1.4;
+}
+
+.input-area textarea::placeholder {
+    font-size: 14px;
+    color: #999;
 }
 
 .input-area textarea:focus {
@@ -1325,7 +1338,7 @@ body {
     background: rgba(7, 193, 96, 0.05);
     border-radius: 8px;
     border-left: 3px solid #07c160;
-    font-size: 15px;
+    font-size: 14px;
     text-align: center;
 }
 

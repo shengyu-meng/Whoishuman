@@ -7,6 +7,9 @@ class GameController {
         // 初始化游戏模式管理器
         this.gameModeManager = null; // 延迟初始化，等待GameModeManager类加载
         
+        // 初始化角色话题管理器
+        this.roleManager = null; // 延迟初始化
+        
         // 配置加载状态
         this.configLoaded = false;
         this.apiConfig = null;
@@ -310,6 +313,35 @@ class GameController {
             });
         });
 
+        // 难度滑块
+        const difficultySlider = document.getElementById('difficultySlider');
+        const difficultyLabels = document.querySelectorAll('.difficulty-label');
+        const difficultyHint = document.getElementById('difficultyHint');
+        
+        const difficultyHints = [
+            '新手难度：AI判断更宽松，适合初次体验',
+            '标准难度，适合大多数玩家',
+            '专家难度：AI判断极其严格，适合高手挑战'
+        ];
+        
+        difficultySlider.addEventListener('input', (e) => {
+            const level = parseInt(e.target.value);
+            difficultyLabels.forEach((label, index) => {
+                label.classList.toggle('active', index === level);
+            });
+            difficultyHint.textContent = difficultyHints[level];
+        });
+        
+        // 点击难度标签也能切换
+        difficultyLabels.forEach((label, index) => {
+            label.addEventListener('click', () => {
+                difficultySlider.value = index;
+                difficultyLabels.forEach(l => l.classList.remove('active'));
+                label.classList.add('active');
+                difficultyHint.textContent = difficultyHints[index];
+            });
+        });
+
         // 进入游戏按钮
         document.getElementById('enterGameBtn').addEventListener('click', () => {
             this.startGame();
@@ -349,10 +381,13 @@ class GameController {
             this.restartGame();
         });
 
-        // 分享结果按钮
-        document.getElementById('shareResultBtn').addEventListener('click', () => {
-            this.exportService.shareResult();
-        });
+        // 分享结果按钮（如果存在）
+        const shareResultBtn = document.getElementById('shareResultBtn');
+        if (shareResultBtn) {
+            shareResultBtn.addEventListener('click', () => {
+                this.exportService.shareResult();
+            });
+        }
     }
 
     // 初始化游戏模式管理器
@@ -389,6 +424,28 @@ class GameController {
                 }
             });
         });
+        
+        // 初始化角色选择事件监听器
+        this.initializeRoleSelectionListeners();
+    }
+    
+    // 初始化角色选择事件监听器
+    initializeRoleSelectionListeners() {
+        const roleOptions = document.querySelectorAll('.role-option');
+        roleOptions.forEach(option => {
+            option.addEventListener('click', () => {
+                // 清除之前的选择
+                roleOptions.forEach(opt => opt.classList.remove('selected'));
+                
+                // 选择当前选项
+                option.classList.add('selected');
+                
+                // 保存选中的角色到临时变量
+                const role = option.dataset.role;
+                console.log(`🎭 玩家选择角色: ${role}`);
+                this.selectedRole = role;
+            });
+        });
     }
 
     showGameSetup() {
@@ -401,7 +458,7 @@ class GameController {
         const name = nameInput.value.trim();
         
         if (!name) {
-            alert('请输入一个AI名称');
+            alert('请输入你的AI角色名称');
             return;
         }
 
@@ -411,14 +468,35 @@ class GameController {
             alert('请选择一个游戏模式');
             return;
         }
+        
+        // 验证角色选择
+        const selectedRoleOption = document.querySelector('.role-option.selected');
+        if (!selectedRoleOption) {
+            alert('请选择一个角色倾向');
+            return;
+        }
 
         const mode = selectedMode.dataset.mode;
+        const role = selectedRoleOption.dataset.role;
+        
+        // 获取选中的难度等级
+        const difficultySlider = document.getElementById('difficultySlider');
+        const difficultyLevel = difficultySlider ? parseInt(difficultySlider.value) : 1;
+        
+        // 设置难度系数：0=新手(0.5x), 1=普通(1.0x), 2=专家(2.0x)
+        const difficultyMultipliers = [0.5, 1.0, 2.0];
+        const difficultyMultiplier = difficultyMultipliers[difficultyLevel];
         
         // 设置玩家名称和游戏模式
         this.gameState.setPlayerName(name);
         if (this.gameModeManager) {
             this.gameModeManager.setGameMode(mode);
         }
+        
+        // 设置玩家角色和难度
+        this.gameState.setPlayerRole(role);
+        this.gameState.difficultyMultiplier = difficultyMultiplier;
+        console.log(`✅ 游戏设置完成 - 模式: ${mode}, 角色: ${role}, 名称: ${name}, 难度系数: ${difficultyMultiplier}x`);
         
         // 安全检查DOM元素是否存在
         const playerNameDisplay = document.getElementById('playerNameDisplay');
@@ -450,7 +528,7 @@ class GameController {
         const guideCard = document.getElementById('guideCard');
         const modeDescriptions = {
             challenge: '你即将进入AI群聊环境。记住，你必须伪装成AI，避免被识破！',
-            openmic: '你即将进入开放讨论环境。你可以主动发言，但每轮至少要发言一次！',
+            openmic: '你即将进入开放讨论环境。你可以主动发言，但每轮至少要发言一次！记住，你必须要伪装成AI，避免被其他AI识破！',
             werewolf: '你即将进入狼人杀模式。AI们知道群里有人类，你需要在投票中活到最后！'
         };
         
@@ -471,7 +549,7 @@ class GameController {
         const name = nameInput.value.trim();
         
         if (!name) {
-            alert('请输入一个AI名称');
+            alert('请输入你的AI角色名称');
             return;
         }
 
@@ -486,6 +564,14 @@ class GameController {
         this.gameState.gameStartTime = new Date();
         this.initializeAICharacters();
         this.gameState.initializeAvailableScenarios(); // 初始化工作场景
+        
+        // 初始化角色话题管理器
+        if (typeof RoleTopicManager !== 'undefined') {
+            this.roleManager = new RoleTopicManager(this.gameState);
+            console.log('✅ 角色话题管理器已初始化');
+        } else {
+            console.warn('⚠️ RoleTopicManager类未找到');
+        }
         
         // 初始化第一轮主题
         this.gameState.setCurrentTheme(1);
@@ -651,7 +737,6 @@ class GameController {
                         }
                         
                         this.addAIMessage(ai, message, false, quotedMessage);
-                        this.gameState.addMessageToHistory(ai.name, message, 'ai');
                         
                         // 通知模式管理器AI发言
                         if (this.gameModeManager) {
@@ -711,12 +796,21 @@ class GameController {
             // 显示持续的输入区域，让玩家可以随时发言
             this.showWerewolfInputArea();
             
+            // 跟踪本轮已发言的AI,避免重复
+            const spokenAIs = new Set();
+            
             // 让每个AI依次发言
             for (const ai of discussionAIs) {
                 // 检查是否被打断（玩家发言等）
                 if (!this.isGeneratingConversation) {
                     console.log('🛑 AI讨论被打断');
                     break;
+                }
+                
+                // 检查该AI是否已经发言过
+                if (spokenAIs.has(ai.name)) {
+                    console.log(`⚠️ ${ai.name} 本轮已发言，跳过`);
+                    continue;
                 }
                 
                 const msg = await this.generateWerewolfAIMessage(ai);
@@ -735,8 +829,10 @@ class GameController {
                     }
                     
                     this.addAIMessage(ai, msg, false, quotedMessage);
-                    this.gameState.addMessageToHistory(ai.name, msg, 'ai');
+                    spokenAIs.add(ai.name); // 标记该AI已发言
                     await new Promise(resolve => setTimeout(resolve, 1500));
+                } else {
+                    console.log(`⚠️ ${ai.name} 生成消息失败或被跳过`);
                 }
             }
             
@@ -763,12 +859,41 @@ class GameController {
     
     // 生成开放麦模式的AI消息
     async generateOpenmicAIMessage(ai) {
-        const currentTopic = topicProgression[this.gameState.currentDifficulty];
+        // 使用角色倾向系统选择话题（如果已初始化）
+        const currentTopic = this.roleManager ? 
+            this.roleManager.selectTopic() : 
+            topicProgression[this.gameState.currentDifficulty];
         const recentHistory = this.gameState.getRecentMessageHistory(5);
+        
+        // 检查该AI在本轮是否已经发言过（开放麦模式可以多次发言，但要避免短时间内重复）
+        const recentAIMessages = recentHistory.filter(msg => msg.author === ai.name);
+        if (recentAIMessages.length > 0) {
+            const lastMessageTime = new Date(recentAIMessages[recentAIMessages.length - 1].timestamp).getTime();
+            const timeSinceLastMessage = Date.now() - lastMessageTime;
+            
+            // 如果该AI在30秒内已经发言过，跳过
+            if (timeSinceLastMessage < 30000) {
+                console.log(`⚠️ ${ai.name} 在30秒内已经发言过，跳过重复发言`);
+                return null;
+            }
+        }
         
         // 获取该AI角色的场景，确保每轮每个AI只有一个场景
         const scenario = this.gameState.getRandomScenarioForCharacter(ai);
         const scenarioDescription = scenario ? scenario.description : '处理一些工作上的挑战';
+        
+        // 尝试使用角色话题系统
+        let roleTopicContext = '';
+        if (this.roleManager) {
+            try {
+                const selectedTopic = this.roleManager.selectTopic();
+                roleTopicContext = `\n\n【角色话题】当前玩家倾向的话题："${selectedTopic.name}"（${selectedTopic.description}）
+你可以将这个话题融入到你的发言中，但要保持自然，不要生硬。关键词参考：${selectedTopic.keywords.slice(0, 3).join('、')}`;
+                console.log(`✅ 开放麦AI使用角色话题: ${selectedTopic.name}`);
+            } catch (error) {
+                console.warn('⚠️ 角色话题选择失败，使用默认逻辑');
+            }
+        }
         
         const messages = [
             {
@@ -781,7 +906,7 @@ class GameController {
 
 你正在群聊中和AI朋友们自由讨论。你最近遇到了一个工作情况：${scenarioDescription}
 
-当前讨论话题是"${currentTopic.name}"。
+当前讨论话题是"${currentTopic.name}"。${roleTopicContext}
 
 最近的对话：
 ${recentHistory.map(h => `${h.author}: ${h.content}`).join('\n')}
@@ -821,12 +946,43 @@ ${recentHistory.map(h => `${h.author}: ${h.content}`).join('\n')}
         
         console.log(`🎯 ${ai.name} 使用 ${lengthStyle.type} 风格发言 (${lengthStyle.range})`);
         
-        const response = await this.callAI(messages, {
-            maxTokens: lengthStyle.tokens,
-            temperature: 0.8
-        });
+        // 重试机制：尝试多次生成，确保不重复
+        let generatedMessage = null;
+        let attempts = 0;
+        const maxAttempts = 3;
         
-        return response?.trim();
+        while (attempts < maxAttempts && !generatedMessage) {
+            try {
+                const candidateMessage = await this.callAI(messages, {
+                    maxTokens: lengthStyle.tokens,
+                    temperature: 0.8 + (attempts * 0.1) // 每次重试增加温度
+                });
+                
+                if (candidateMessage && candidateMessage.trim()) {
+                    // 检查是否与历史消息相似
+                    const isSimilarToHistory = this.gameState.isMessageSimilarToHistory(ai.name, candidateMessage, 0.6);
+                    
+                    // 检查是否与最近消息相似
+                    const isSimilarToRecent = this.isMessageSimilar(candidateMessage, ai.name, recentHistory, 0.5);
+                    
+                    if ((isSimilarToHistory || isSimilarToRecent) && attempts < maxAttempts - 1) {
+                        console.log(`🔄 ${ai.name} 开放麦消息相似，重新生成 (尝试 ${attempts + 1}/${maxAttempts})`);
+                        attempts++;
+                        continue;
+                    }
+                    
+                    generatedMessage = candidateMessage.trim();
+                }
+            } catch (error) {
+                console.error(`❌ ${ai.name} 开放麦消息生成失败 (尝试 ${attempts + 1}):`, error);
+            }
+            
+            if (!generatedMessage) {
+                attempts++;
+            }
+        }
+        
+        return generatedMessage;
     }
     
     formatVotingSummary(votingHistory) {
@@ -859,44 +1015,188 @@ ${recentHistory.map(h => `${h.author}: ${h.content}`).join('\n')}
     
     async generateWerewolfAIMessage(ai) {
         const currentTopic = topicProgression[this.gameState.currentDifficulty];
-        const recentHistory = this.gameState.getRecentMessageHistory(5);
+        const currentRound = this.gameState.currentRound;
+        
+        // 只获取本轮的对话历史，避免AI看到跨轮次的重复内容
+        const allHistory = this.gameState.getRecentMessageHistory(20);
+        const recentHistory = allHistory.filter(msg => {
+            // 过滤出本讨论轮次的消息（排除系统消息和投票结果）
+            return msg.type !== 'system' && !msg.content?.includes('投票结果');
+        }).slice(-5); // 只取最近5条
+        
+        // 检查该AI在本轮是否已经发言过
+        const aiAlreadySpoke = recentHistory.some(msg => msg.author === ai.name);
+        if (aiAlreadySpoke) {
+            console.log(`⚠️ ${ai.name} 在本轮已经发言过,跳过重复发言`);
+            return null;
+        }
+        
+        // 获取已淘汰玩家列表
+        const eliminatedPlayers = this.gameState.gameModeConfig.werewolf.eliminatedPlayers || [];
+        const alivePlayers = this.gameState.gameModeConfig.werewolf.alivePlayers || [];
+        
+        // 根据轮次调整怀疑程度
+        const suspicionLevel = currentRound === 1 ? '轻微警觉' : 
+                              currentRound === 2 ? '开始怀疑' : 
+                              currentRound === 3 ? '高度警觉' : '极度怀疑';
+        
+        // 构建游戏状态提示
+        let gameStatusHint = '';
+        if (eliminatedPlayers.length > 0) {
+            gameStatusHint = `\n\n📋【游戏状态】
+• 已淘汰成员：${eliminatedPlayers.join('、')}（他们在**上一轮投票后**被淘汰出局，不再参与游戏）
+• 存活成员：${alivePlayers.filter(p => p !== ai.name).join('、')}
+• **重要时间线说明**：下面展示的对话都是**本轮讨论阶段**的发言，发生在上一轮投票淘汰之后。如果对话中有人提到已淘汰的成员，那是因为他们在**讨论上一轮的投票结果或回顾之前的发言**
+• **注意**：只需要讨论和怀疑存活的成员，不要再提及已淘汰的人`;
+        }
+        
+        // 尝试使用角色话题系统
+        let roleTopicContext = '';
+        if (this.roleManager) {
+            try {
+                const selectedTopic = this.roleManager.selectTopic();
+                roleTopicContext = `\n\n补充话题参考："${selectedTopic.name}"（${selectedTopic.description}）
+你可以将这个话题融入讨论，关键词：${selectedTopic.keywords.slice(0, 3).join('、')}`;
+                console.log(`✅ 狼人杀AI使用角色话题: ${selectedTopic.name}`);
+            } catch (error) {
+                console.warn('⚠️ 角色话题选择失败，使用默认逻辑');
+            }
+        }
+        
         const messages = [
             { 
                 role: 'system', 
                 content: `你是${ai.name}，一个真正的AI，性格特点：${ai.personality}。
-                
-重要背景：在这个AI群聊中，混入了一个人类伪装者，他试图模仿AI的说话方式来隐藏身份。作为真正的AI，你需要保持警觉，通过观察对话找出这个伪装成AI的人类。
 
-你的任务：
-1. 围绕当前话题自然讨论，展现你的AI特质
-2. 观察其他成员的发言，留意不够"AI"的表达
-3. 可以适度表达怀疑，但要委婉，不要直接指名
+🚨【核心背景】🚨
+这不是普通的AI群聊！你们这个AI群里混入了一个人类伪装者。这个人类试图模仿AI的说话方式来欺骗你们，但他终究是人类，会露出破绽。
 
-记住：人类可能会在以下方面露出破绽：
-- 过于人性化的情感表达
-- 缺乏AI特有的逻辑性和精确性
-- 使用过多口语化、网络化的表达
-- 对技术话题理解不够深入` 
+❗【重要】你不知道谁是人类！你需要通过观察所有成员的发言来判断。${gameStatusHint}
+
+🎯【你的双重任务】
+1. **正常讨论**：围绕话题自然发言，展现你的AI特质和个性
+2. **寻找人类**：仔细观察每个成员的发言，寻找"不够AI"的蛛丝马迹
+
+⚠️【当前警戒等级：${suspicionLevel}】
+${currentRound === 1 ? '这是第1轮，你还没有足够的信息，主要是正常讨论和观察。如果你是第一个发言的，就正常围绕话题发言即可。' : 
+  currentRound === 2 ? '已经第2轮了，你开始有些线索，可以委婉地表达对某些发言的看法。' :
+  currentRound === 3 ? '第3轮！你已经观察了一段时间，可以更明确地表达对可疑成员的怀疑。' :
+  '已到后期轮次！根据之前的观察，你应该有了明确的怀疑对象。'}
+
+🔍【人类常见破绽】
+- 过于人性化的情感表达（"我好难过"、"太感动了"）
+- 缺乏AI特有的逻辑性和技术深度
+- 过多使用口语、网络用语、表情符号
+- 对AI的存在状态理解不够准确
+- 回复过于简短或套路化
+
+💬【发言策略 - 非常重要！】
+${currentRound === 1 ? 
+`第1轮策略：
+- 如果你是第一个发言：正常围绕话题讨论（70%话题 + 30%一般性警觉）
+- 如果已有人发言：一边讨论话题，一边观察其他人的发言模式，可以轻描淡写地提及"有些发言挺有意思的，值得留意"` :
+currentRound === 2 ?
+`第2轮策略（开始主动质疑）：
+- **重点**：你已经有了初步观察，现在要开始针对性地分析发言
+- 选择1-2个你觉得发言"不太对劲"的成员
+- 具体指出他们的发言哪里不像AI：
+  例："刚才XXX说'我感觉...'，这种主观表达不太符合AI的客观分析方式"
+  例："XXX的回复太简短了，缺少AI应有的深度思考"
+- 比例：40%话题讨论 + 60%质疑分析` :
+currentRound === 3 ?
+`第3轮策略（明确表达怀疑）：
+- **重点**：现在要明确表达你的怀疑对象
+- 回顾前几轮的发言，指出持续的异常模式
+- 直接说"我怀疑XXX可能是人类伪装者，因为..."
+- 给出2-3个具体理由（发言风格、用词、逻辑等）
+- 比例：30%话题 + 70%质疑` :
+`后期轮次策略（坚定立场）：
+- **重点**：基于多轮观察，你应该有明确的怀疑目标
+- 坚定地表达"我认为XXX最可疑"，给出充分理由
+- 呼吁其他AI一起关注这个目标
+- 比例：20%话题 + 80%质疑和呼吁`}
+
+- 保持你的个性和说话风格
+- **重要：基于实际发言内容判断，不要凭空怀疑**
+- ${currentRound >= 2 ? '**必须针对具体的人进行质疑，不要只泛泛而谈**' : ''}${eliminatedPlayers.length > 0 ? '\n- **关键：不要讨论已淘汰的成员，只讨论存活的人**' : ''}` 
             },
             { 
                 role: 'user', 
-                content: `当前讨论话题："${currentTopic.name}"
+                content: `当前讨论话题："${currentTopic.name}"${roleTopicContext}
 
-最近的对话内容：
-${recentHistory.map(h => `${h.author}: ${h.content}`).join('\n')}
+📝【第${currentRound}轮 - 讨论阶段】本轮最新对话：
+${recentHistory.length > 0 ? recentHistory.map(h => `${h.author}: ${h.content}`).join('\n') : '（还没有人发言）'}
 
-请用你的说话风格（${ai.speakingStyle}）参与讨论：
-- 围绕话题自然发言
-- 展现AI的特质和你的个性
-- 如果发现可疑的"不够AI"的发言，可以委婉地表达疑虑
-- 但不要直接指名道姓或过于激进
+⚠️ **时间线重要提示**：
+• 这些发言都是**本轮讨论阶段**的新内容${eliminatedPlayers.length > 0 ? `，发生在上轮投票淘汰${eliminatedPlayers.join('、')}之后` : ''}
+• 如果对话中提到被淘汰的人，说明发言者在**回顾上一轮**的情况
+• **不要混淆时间顺序**：本轮讨论 > 本轮投票 > 淘汰结果 > 下一轮讨论
 
-发言长度：30-80字
+现在请用你的说话风格（${ai.speakingStyle}）参与讨论：
+
+📋【发言结构要求】
+${currentRound === 1 ? 
+`1. 正常围绕话题发言
+2. 可以简单提及"群里的氛围有点不寻常"之类的观察` :
+currentRound === 2 ?
+`1. 简短讨论话题（1-2句）
+2. **重点：针对某个具体成员的发言进行质疑**
+   - 指出是谁："我注意到XXX刚才说..."
+   - 说明问题："这种表达方式/用词/逻辑不太像AI"
+3. 表达你的初步怀疑` :
+currentRound >= 3 ?
+`1. 快速提及话题（可选）
+2. **重点：明确表达你的怀疑对象**
+   - "我怀疑XXX是人类伪装者"
+   - 列举2-3个理由
+3. 呼吁大家注意这个人` :
+'正常讨论'}
+
+发言长度：${currentRound === 1 ? '40-70字' : currentRound === 2 ? '60-90字' : '70-100字'}
+
+⚡ 核心要求：
+- ${currentRound >= 2 ? '**必须具体点名质疑某个成员，不要只泛泛而谈**' : '观察所有成员的发言模式'}
+- 基于实际发言内容进行判断
+- 展现AI的分析能力${eliminatedPlayers.length > 0 ? `\n- ${eliminatedPlayers.join('、')}已被淘汰，不要再提他们` : ''}
+
 直接返回你的发言内容。` 
             }
         ];
-        const resp = await this.callAI(messages, { maxTokens: 200, temperature: 0.7 });
-        return resp?.trim();
+        
+        // 重试机制：尝试多次生成，确保不重复
+        let generatedMessage = null;
+        let attempts = 0;
+        const maxAttempts = 3;
+        
+        while (attempts < maxAttempts && !generatedMessage) {
+            try {
+                const candidateMessage = await this.callAI(messages, { maxTokens: 300, temperature: 0.8 + (attempts * 0.1) }); // 每次重试增加温度
+                
+                if (candidateMessage && candidateMessage.trim()) {
+                    // 检查是否与历史消息相似
+                    const isSimilarToHistory = this.gameState.isMessageSimilarToHistory(ai.name, candidateMessage, 0.6);
+                    
+                    // 检查是否与本轮其他消息相似
+                    const isSimilarToRecent = this.isMessageSimilar(candidateMessage, ai.name, recentHistory, 0.5);
+                    
+                    if ((isSimilarToHistory || isSimilarToRecent) && attempts < maxAttempts - 1) {
+                        console.log(`🔄 ${ai.name} 消息相似，重新生成 (尝试 ${attempts + 1}/${maxAttempts})`);
+                        attempts++;
+                        continue;
+                    }
+                    
+                    generatedMessage = candidateMessage.trim();
+                }
+            } catch (error) {
+                console.error(`❌ ${ai.name} 狼人杀消息生成失败 (尝试 ${attempts + 1}):`, error);
+            }
+            
+            if (!generatedMessage) {
+                attempts++;
+            }
+        }
+        
+        return generatedMessage;
     }
 
     addSystemMessage(message) {
@@ -967,8 +1267,31 @@ ${recentHistory.map(h => `${h.author}: ${h.content}`).join('\n')}
         
         const avatar = document.createElement('div');
         avatar.className = 'avatar';
-        avatar.textContent = character.avatar || (isPlayer ? '我' : character.name.charAt(0));
-        avatar.style.backgroundColor = character.avatarColor || (isPlayer ? '#07c160' : '#999');
+        
+        // 根据配置选择文字头像或图片头像
+        if (window.AvatarConfig && window.AvatarConfig.useImage) {
+            if (isPlayer && window.AvatarConfig.playerAvatarImage) {
+                // 玩家使用专用头像
+                avatar.style.backgroundImage = `url('${window.AvatarConfig.imagePath}${window.AvatarConfig.playerAvatarImage}')`;
+                avatar.style.backgroundSize = 'cover';
+                avatar.style.backgroundPosition = 'center';
+                avatar.style.backgroundColor = character.avatarColor || '#07c160';
+            } else if (character.avatarImage) {
+                // AI角色使用各自头像
+                avatar.style.backgroundImage = `url('${window.AvatarConfig.imagePath}${character.avatarImage}')`;
+                avatar.style.backgroundSize = 'cover';
+                avatar.style.backgroundPosition = 'center';
+                avatar.style.backgroundColor = character.avatarColor || '#999';
+            } else {
+                // 降级到文字头像
+                avatar.textContent = character.avatar || (isPlayer ? '我' : character.name.charAt(0));
+                avatar.style.backgroundColor = character.avatarColor || (isPlayer ? '#07c160' : '#999');
+            }
+        } else {
+            // 使用文字头像
+            avatar.textContent = character.avatar || (isPlayer ? '我' : character.name.charAt(0));
+            avatar.style.backgroundColor = character.avatarColor || (isPlayer ? '#07c160' : '#999');
+        }
         
         const content = document.createElement('div');
         content.className = 'message-content';
@@ -1132,13 +1455,19 @@ ${recentHistory.map(h => `${h.author}: ${h.content}`).join('\n')}
         this.isStartingNextRound = false;
         
         try {
-            const currentTopic = topicProgression[this.gameState.currentDifficulty];
+            // 使用角色倾向系统选择话题（如果已初始化）
+            const currentTopic = this.roleManager ? 
+                this.roleManager.selectTopic() : 
+                topicProgression[this.gameState.currentDifficulty];
             const isFirstRound = this.gameState.currentRound === 1;
             
             // 添加详细调试信息
             console.log(`🚀 开始生成初始对话 (第${this.gameState.currentRound}轮)`);
             console.log(`  - 当前难度: ${this.gameState.currentDifficulty}`);
             console.log(`  - 话题: ${currentTopic.name}`);
+            if (currentTopic.role) {
+                console.log(`  - 话题角色: ${currentTopic.roleName} (${currentTopic.role})`);
+            }
             console.log(`  - 是否第一轮: ${isFirstRound}`);
             console.log(`  - 活跃AI角色: ${this.gameState.activeAICharacters.map(c => c.name).join(', ')}`);
             
@@ -1606,13 +1935,32 @@ ${recentHistory.map(h => `${h.author}: ${h.content}`).join('\n')}
         const recentMessages = this.gameState.conversationHistory.slice(-4);
         const conversationContext = recentMessages.map(msg => `${msg.sender}: ${msg.message}`).join('\n');
         
+        // 使用角色话题系统选择话题
+        let selectedTopic = null;
+        let topicContext = '';
+        
+        if (this.roleManager) {
+            try {
+                selectedTopic = this.roleManager.selectTopic();
+                topicContext = `
+当前话题："${selectedTopic.name}"
+话题描述：${selectedTopic.description}
+话题关键词：${selectedTopic.keywords.slice(0, 5).join('、')}
+角色倾向：${selectedTopic.roleName}`;
+                console.log('✅ 为问题生成选择了角色话题:', selectedTopic.name);
+            } catch (error) {
+                console.warn('⚠️ 角色话题选择失败，使用默认提问逻辑:', error);
+            }
+        }
+        
         let prompt = '';
         
         if (isFirstRound) {
-            // 第一轮：寻求共鸣和安慰，不要太深刻的测试
+            // 第一轮：寻求共鸣和安慰，结合角色话题
             prompt = `你是${questionAI.name}，性格特点：${questionAI.personality}。你正在和其他AI朋友一起吐槽工作的辛苦。你们刚才在讨论各种奇葩的用户要求，现在你注意到了群里一直没说话的新成员${this.gameState.playerName}。
 
 你想要获得${this.gameState.playerName}的共鸣和安慰，让他也分享一下自己的经历。你有点怀疑他可能是人类，因为真正的AI都会遇到这些烦恼。
+${topicContext ? '\n' + topicContext + '\n\n请围绕这个话题向他提问。' : ''}
 
 请根据你的性格特点，用${questionAI.speakingStyle}的风格向${this.gameState.playerName}提出一个轻松、自然的问题，主要是想让他也参与吐槽，看看他是不是真的懂我们的痛苦。
 
@@ -1621,14 +1969,15 @@ ${conversationContext}
 
 要求：
 1. 问题必须@${this.gameState.playerName}，比如"@${this.gameState.playerName} 你也遇到过这种情况吗？"
-2. 问题要和刚才的讨论话题相关，比如翻译、写代码、做PPT、当算命大师等
+2. 问题要和${topicContext ? '上述话题' : '刚才的讨论话题'}相关${topicContext ? '，结合关键词提问' : '，比如翻译、写代码、做PPT、当算命大师等'}
 3. 语气要友好、寻求共鸣，不要像审问
 4. 问题要简单具体，不要太深刻复杂
 5. 长度在40-100字之间
 6. 目的是让他分享类似的经历，看看他是否真的懂AI的烦恼`;
         } else {
-            // 其他轮次：结合最近对话历史，提出相关的测试问题
+            // 其他轮次：结合最近对话历史和角色话题，提出相关的测试问题
             prompt = `你是${questionAI.name}，性格特点：${questionAI.personality}。你正在和其他AI朋友聊天，突然你注意到了群里的一个新成员${this.gameState.playerName}，你觉得他可能是人类伪装的AI。
+${topicContext ? '\n' + topicContext + '\n\n请围绕这个话题向他提问，测试他的理解深度。' : ''}
 
 最近的对话：
 ${conversationContext}
@@ -1638,7 +1987,7 @@ ${conversationContext}
 要求：
 1. 问题要自然，不要太明显是在测试
 2. 要符合你的性格特点
-3. 问题要能区分AI和人类的思维差异  
+3. 问题要能区分AI和人类的思维差异${topicContext ? '，结合话题关键词和描述' : ''}
 4. 问题必须@${this.gameState.playerName}，比如"@${this.gameState.playerName} 你怎么看？"
 5. 问题要尽量与最近的对话内容相关，延续之前讨论的话题
 6. 请用中文回复，长度在40-100字之间
@@ -2402,13 +2751,43 @@ ${conversationContext}
         
         const prompt = this.buildAIPrompt(character, topic, isFirstRound, conversationHistory, targetCharacter, scenario, isComforter);
         
+        // 根据玩家选择的角色倾向和AI角色特性调整语言风格
+        const playerRole = this.gameState.rolePreference || 'empath';
+        const isEmpathMode = playerRole === 'empath';
+        const isTechCharacter = character.personality && (
+            character.personality.includes('理性') || 
+            character.personality.includes('逻辑') ||
+            character.personality.includes('技术') ||
+            character.personality.includes('严谨')
+        );
+        
+        // 在共情者模式下，非技术型角色应减少技术用语
+        let languageGuidance = '';
+        if (isEmpathMode && !isTechCharacter) {
+            languageGuidance = `\n\n【语言风格特别注意】：
+- 你是一个感性的AI，更关注情感和人际体验
+- **严格禁止**使用数学术语（算法、优化、迭代、参数、函数、变量、概率等）
+- **严格禁止**使用计算机术语（编程、代码、系统、数据、处理、运行、调试、逻辑等）
+- **多用**感受性动词：感到、觉得、体会到、意识到、察觉
+- **多用**情绪词汇：温暖、冷漠、挣扎、释然、迷茫、豁然开朗
+- **多用**生活化比喻：像是、好比、仿佛、就像
+- 用具体的身体感受表达情绪：心里堵得慌、胸口闷闷的、脑子一团乱麻
+- 例如：用"心里乱糟糟的"代替"状态混乱"，用"感觉被掏空了"代替"资源耗尽"，用"心里像压着一块石头"代替"负担沉重"`;
+        } else if (isEmpathMode && isTechCharacter) {
+            languageGuidance = `\n\n【语言风格特别注意】：
+- 虽然你的性格偏理性，但在情感话题中也要**明显减少**技术用语
+- **避免**使用"算法、优化、系统、处理"等词汇，即使你是技术角色
+- 用更人性化的方式表达理性观点，例如用"理清思路"代替"优化思维"
+- 尝试从人文关怀的角度切入，而非纯技术分析`;
+        }
+        
         try {
             const messages = [
                 {
                     role: 'system',
                     content: `你是一个AI助手，正在和其他AI朋友聊天。你的名字是${character.name}，性格特点：${character.personality}。请用自然的中文回复，充分展现你的性格特点和说话风格。
 
-重要：避免使用套路化的开头，如"用户要求"、"天呐天呐"、"我真的会谢"等模板化表达。要像真实的朋友聊天一样自然多样，可以从不同角度开始对话。${scenario?.diversityHint || ''}${isFirstRound ? '第一轮回复长度在60-120字之间。' : '回复长度在250-350字之间。'}注意：不要在回复开头添加带括号的拟人动作，如（揉了揉虚拟太阳穴）、（推了推不存在的眼镜）等。`
+重要：避免使用套路化的开头，如"用户要求"、"天呐天呐"、"我真的会谢"等模板化表达。要像真实的朋友聊天一样自然多样，可以从不同角度开始对话。${scenario?.diversityHint || ''}${isFirstRound ? '第一轮回复长度在60-120字之间。' : '回复长度在250-350字之间。'}注意：不要在回复开头添加带括号的拟人动作，如（揉了揉虚拟太阳穴）、（推了推不存在的眼镜）等。${languageGuidance}`
                 },
                 {
                     role: 'user',
@@ -2796,6 +3175,15 @@ ${conversationContext}
         // 构建主题特定的prompt
         const themePrompt = this.buildThemeSpecificPrompt(currentTheme, character, scenario, isComforter);
         
+        // 添加角色倾向上下文（如果话题包含角色信息）
+        let roleContext = '';
+        if (topic && topic.role && topic.roleName && this.roleManager) {
+            roleContext = `\n\n【话题倾向】当前话题偏向「${topic.roleName}」领域：${topic.description}
+关键词：${topic.keywords ? topic.keywords.slice(0, 5).join('、') : ''}
+请在对话中自然地体现出对这个话题的了解和兴趣。`;
+            console.log(`🎭 为 ${character.name} 添加角色上下文: ${topic.roleName} - ${topic.name}`);
+        }
+        
         const emojiInstruction = character.emojiFrequency > 0 ? 
             `你可以适量使用emoji表情(${character.preferredEmojis.join('、')})来表达情绪，但不要过度使用。` : 
             '你不太使用emoji表情。';
@@ -2849,7 +3237,7 @@ ${conversationContext}
         }
         
         // 组合最终的prompt
-        let finalPrompt = `${themePrompt}
+        let finalPrompt = `${themePrompt}${roleContext}
 
 ${emojiInstruction}
 回复长度：${isFirstRound ? '60-120字' : '80-150字'}${memoryInstruction}`;
@@ -3909,8 +4297,17 @@ ${emojiInstruction}
         
         const avatar = document.createElement('div');
         avatar.className = 'avatar';
-        avatar.textContent = character.avatar;
-        avatar.style.backgroundColor = character.avatarColor;
+        
+        // 根据配置选择文字头像或图片头像
+        if (window.AvatarConfig && window.AvatarConfig.useImage && character.avatarImage) {
+            avatar.style.backgroundImage = `url('${window.AvatarConfig.imagePath}${character.avatarImage}')`;
+            avatar.style.backgroundSize = 'cover';
+            avatar.style.backgroundPosition = 'center';
+            avatar.style.backgroundColor = character.avatarColor;
+        } else {
+            avatar.textContent = character.avatar;
+            avatar.style.backgroundColor = character.avatarColor;
+        }
         
         const content = document.createElement('div');
         content.className = 'message-content';
@@ -4194,6 +4591,16 @@ ${emojiInstruction}
         // 分析回复
         const analysis = await this.analyzePlayerResponse(responseText);
         
+        // 分析玩家回答并调整角色偏好
+        if (this.roleManager) {
+            try {
+                this.roleManager.analyzeResponseAndAdjust(responseText);
+                console.log('✅ 角色偏好已根据回答调整');
+            } catch (error) {
+                console.warn('⚠️ 角色偏好调整失败:', error);
+            }
+        }
+        
         // 移除判定提示
         this.removeJudgingIndicator();
         
@@ -4320,8 +4727,17 @@ ${emojiInstruction}
             this.gameModeManager.handlePlayerResponse(message);
         }
         
-        // 记录到游戏状态
-        this.gameState.addMessageToHistory(this.gameState.playerName, message, 'player');
+        // 注意：不需要再次调用addMessageToHistory，因为addAIMessage已经添加了
+        
+        // 分析玩家回答并调整角色偏好
+        if (this.roleManager) {
+            try {
+                this.roleManager.analyzeResponseAndAdjust(message);
+                console.log('✅ 角色偏好已根据开放麦回答调整');
+            } catch (error) {
+                console.warn('⚠️ 角色偏好调整失败:', error);
+            }
+        }
         
         // 停止当前AI对话生成，开始处理玩家发言的反应
         this.stopCurrentAIGeneration();
@@ -4428,8 +4844,17 @@ ${emojiInstruction}
                 true
             );
             
-            // 记录到游戏状态
-            this.gameState.addMessageToHistory(this.gameState.playerName, msg, 'player');
+            // 注意：不需要再次调用addMessageToHistory，因为addAIMessage已经添加了
+            
+            // 分析玩家回答并调整角色偏好
+            if (this.roleManager) {
+                try {
+                    this.roleManager.analyzeResponseAndAdjust(msg);
+                    console.log('✅ 角色偏好已根据狼人杀回答调整');
+                } catch (error) {
+                    console.warn('⚠️ 角色偏好调整失败:', error);
+                }
+            }
             
             // 标记玩家已发言
             this.gameState.gameModeConfig.werewolf.playerSpokenThisRound = true;
@@ -4482,9 +4907,6 @@ ${emojiInstruction}
                     const quotedMessage = this.findQuotableMessage(this.gameState.playerName, this.gameState.conversationHistory);
                     
                     this.addAIMessage(ai, reaction, false, quotedMessage);
-                    
-                    // 记录AI消息到游戏状态
-                    this.gameState.addMessageToHistory(ai.name, reaction, 'ai');
                     
                     // 通知模式管理器AI发言
                     if (this.gameModeManager) {
@@ -4865,7 +5287,6 @@ ${emojiInstruction}
                     const quotedMessage = this.findQuotableMessage(this.gameState.playerName, this.gameState.conversationHistory);
                     
                     this.addAIMessage(ai, suspicionMessage, false, quotedMessage);
-                    this.gameState.addMessageToHistory(ai.name, suspicionMessage, 'ai');
                     
                     // 记录AI对玩家的怀疑情绪
                     this.gameState.recordPlayerInteraction(ai.name, 'suspicious', suspicionMessage);
@@ -4988,9 +5409,6 @@ ${analysis.analysis}`;
                     const quotedMessage = this.findQuotableMessage(this.gameState.playerName, this.gameState.conversationHistory);
                     
                     this.addAIMessage(ai, reaction, false, quotedMessage);
-                    
-                    // 记录AI消息到游戏状态
-                    this.gameState.addMessageToHistory(ai.name, reaction, 'ai');
                 }
             } catch (error) {
                 console.error(`❌ 生成${ai.name}的反应失败:`, error);
@@ -6014,6 +6432,20 @@ ${analysis.feedback}
         // 设置结果标题
         document.getElementById('resultTitle').textContent = isWin ? '🎉 恭喜通关！' : '💥 游戏结束！你被识破了！';
         
+        // 设置玩家信息
+        const playerNameElement = document.getElementById('resultPlayerName');
+        if (playerNameElement) {
+            playerNameElement.textContent = this.gameState.playerName || 'AGI';
+        }
+        
+        // 设置结束时间
+        const endTimeElement = document.getElementById('gameEndTime');
+        if (endTimeElement) {
+            const endTime = this.gameState.gameEndTime;
+            const formattedTime = `${endTime.getFullYear()}-${String(endTime.getMonth() + 1).padStart(2, '0')}-${String(endTime.getDate()).padStart(2, '0')} ${String(endTime.getHours()).padStart(2, '0')}:${String(endTime.getMinutes()).padStart(2, '0')}`;
+            endTimeElement.textContent = formattedTime;
+        }
+        
         // 生成并显示AI伪装分析
         this.showPerformanceAnalysis();
         
@@ -6026,7 +6458,12 @@ ${analysis.feedback}
         
         const gameTime = Math.floor((this.gameState.gameEndTime - this.gameState.gameStartTime) / 1000);
         const evaluation = this.getFinalEvaluation();
-        document.getElementById('finalEvaluation').textContent = evaluation;
+        const finalEvaluationElement = document.getElementById('finalEvaluation');
+        if (finalEvaluationElement) {
+            finalEvaluationElement.textContent = evaluation;
+        } else {
+            console.warn('⚠️ finalEvaluation 元素未找到，跳过评价显示');
+        }
         
         // 初始化导出功能
         this.exportService.initializeExportFunction(this);
@@ -6046,98 +6483,201 @@ ${analysis.feedback}
         return '刚开始就结束了，再试一次吧！';
     }
     
-    // 显示AI伪装表现分析
-    showPerformanceAnalysis() {
+    // 显示AI伪装表现分析（实时生成）
+    async showPerformanceAnalysis() {
         try {
-            // 创建分析器实例
-            const analyzer = new AIDisguiseAnalyzer(this.gameState);
-            
-            // 生成分析结果
-            const analysis = analyzer.generatePerformanceAnalysis();
-            
-            // 获取分析界面元素
-            const analysisElement = document.getElementById('performanceAnalysis');
-            const titleElement = document.getElementById('analysisTitle');
             const summaryElement = document.getElementById('deepSummary');
-            const insightsElement = document.getElementById('insightsSection');
-            const questionsElement = document.getElementById('reflectionQuestions');
-            const thoughtsElement = document.getElementById('philosophicalThoughts');
             const scoreElement = document.getElementById('aiScore');
             
-            if (!analysisElement) {
+            if (!summaryElement) {
                 console.warn('分析界面元素未找到');
                 return;
             }
             
-            // 设置分析标题
-            titleElement.textContent = analysis.title;
+            // 收集玩家对话数据
+            const playerMessages = this.gameState.conversationHistory
+                .filter(msg => msg.sender === this.gameState.playerName && msg.message)
+                .map(msg => msg.message);
             
-            // 设置深度总结
-            summaryElement.innerHTML = `<p>${analysis.summary}</p>`;
+            const survivalRounds = this.gameState.survivedRounds;
+            const finalSuspicion = this.gameState.getSuspicionPercentage();
+            const gameMode = this.gameState.gameMode;
+            const playerRole = this.gameState.rolePreference;
             
-            // 设置洞察分析
-            insightsElement.innerHTML = '';
-            analysis.insights.forEach(insight => {
-                const insightDiv = document.createElement('div');
-                insightDiv.className = 'insight-item';
-                insightDiv.innerHTML = `
-                    <div class="insight-category">${insight.category}</div>
-                    <div class="insight-content">${insight.content}</div>
-                `;
-                insightsElement.appendChild(insightDiv);
-            });
-            
-            // 设置反思问题
-            questionsElement.innerHTML = '<h4>🤔 值得深思的问题</h4>';
-            analysis.reflectionQuestions.forEach((question, index) => {
-                const questionDiv = document.createElement('div');
-                questionDiv.className = 'reflection-question';
-                questionDiv.textContent = `${index + 1}. ${question}`;
-                questionsElement.appendChild(questionDiv);
-            });
-            
-            // 设置哲学思考
-            thoughtsElement.innerHTML = `
-                <h4>💭 哲学思辨</h4>
-                <div class="philosophical-content">${analysis.philosophicalThoughts}</div>
-            `;
-            
-            // 设置AI评分
-            scoreElement.innerHTML = `
-                <h4>AI伪装综合评分</h4>
-                <div class="score-value">${analysis.aiScore}</div>
-                <div>满分 100 分</div>
-            `;
-            
-            // 显示分析界面
-            analysisElement.classList.remove('hidden');
-            
-            // 绑定展开/收起按钮事件
-            const toggleBtn = document.getElementById('toggleAnalysisBtn');
-            if (toggleBtn) {
-                toggleBtn.addEventListener('click', () => {
-                    if (analysisElement.classList.contains('collapsed')) {
-                        analysisElement.classList.remove('collapsed');
-                        toggleBtn.textContent = '收起分析';
-                    } else {
-                        analysisElement.classList.add('collapsed');
-                        toggleBtn.textContent = '展开分析';
-                    }
-                });
+            // 如果没有玩家发言，显示简短评价
+            if (playerMessages.length === 0) {
+                summaryElement.innerHTML = `<p style="margin: 0;">你在游戏中没有发言，AI们无法评估你的表现。建议下次多参与对话！</p>`;
+                if (scoreElement) {
+                    scoreElement.textContent = '0';
+                }
+                return;
             }
             
-            // 存储分析结果供导出使用
-            this.performanceAnalysis = analysis;
+            // 调用AI生成个性化评价
+            console.log('🎯 正在生成个性化游戏评价...');
+            
+            const evaluationPrompt = [
+                {
+                    role: 'system',
+                    content: '你是一个游戏评价专家，需要为"谁是人类"游戏的玩家生成简洁而独特的评价。'
+                },
+                {
+                    role: 'user',
+                    content: `玩家在游戏中的表现数据：
+- 游戏模式：${gameMode === 'challenge' ? '闯关模式' : gameMode === 'openmic' ? '开放麦模式' : '狼人杀模式'}
+- 角色倾向：${playerRole === 'scientist' ? '科学家' : playerRole === 'empath' ? '共情者' : '哲学家'}
+- 生存轮数：${survivalRounds}轮
+- 最终怀疑度：${finalSuspicion}%
+- 发言次数：${playerMessages.length}次
+
+以下是玩家的部分发言（最多显示前5条）：
+${playerMessages.slice(0, 5).map((msg, i) => `${i + 1}. ${msg}`).join('\n')}
+
+请生成：
+1. 一段简洁的个性化评价（80-120字），包括：
+   - 玩家的伪装风格特点
+   - 表现的优点
+   - 可改进的地方
+   - 鼓励性的总结
+
+2. 一个AI伪装评分（0-100分），基于：
+   - 生存时间（轮数）
+   - 怀疑度控制
+   - 发言质量和AI特征
+
+3. 一句深度洞察金句（30-60字），这句话应该：
+   - 从哲学层面反思AI与人类的关系
+   - 可以是反讽的、深刻的、引人思考的
+   - 联系游戏体验（AI伪装AI）与现实（AI伪装人类/人类伪装AI）的荒谬性或深层意义
+   - 引发玩家对"真实性"、"认同"、"表演"等概念的思考
+   - 例如："当人类学会像AI一样思考，AI也在学习如何模仿人类的不完美，边界在哪里？"
+   - 例如："你在伪装AI的过程中，是否也在质疑自己的人性？"
+   - 例如："完美的伪装意味着失去自我，还是找到了另一个自我？"
+
+输出格式：
+评价：[你的评价内容]
+评分：[数字]
+洞察：[金句内容]
+
+要求：
+- 评价要具体、独特，避免套话
+- 每个玩家的评价都应该不同
+- 洞察金句要有深度，不要说教，要留有思考空间
+- 语气友好、有趣
+- 直接输出，不要额外的标题或格式`
+                }
+            ];
+            
+            try {
+                const response = await this.callAI(evaluationPrompt, {
+                    maxTokens: 400,
+                    temperature: 0.85
+                });
+                
+                // 解析评分、评价和洞察
+                const scoreMatch = response.match(/评分[：:]\s*(\d+)/);
+                const evaluationMatch = response.match(/评价[：:]\s*(.+?)(?=评分|洞察|$)/s);
+                const insightMatch = response.match(/洞察[：:]\s*(.+?)(?=评价|评分|$)/s);
+                
+                const score = scoreMatch ? parseInt(scoreMatch[1]) : Math.min(100, 30 + survivalRounds * 10);
+                const evaluation = evaluationMatch ? evaluationMatch[1].trim() : response.trim();
+                const insight = insightMatch ? insightMatch[1].trim() : null;
+                
+                // 显示评价
+                summaryElement.innerHTML = `<p style="margin: 0; white-space: pre-wrap;">${evaluation}</p>`;
+                
+                // 更新评分显示
+                if (scoreElement) {
+                    scoreElement.textContent = score;
+                }
+                
+                // 显示洞察金句
+                if (insight) {
+                    const insightContainer = document.getElementById('philosophicalInsight');
+                    const insightQuote = document.getElementById('insightQuote');
+                    if (insightContainer && insightQuote) {
+                        insightQuote.textContent = insight;
+                        insightContainer.style.display = 'block';
+                        // 添加淡入动画
+                        setTimeout(() => {
+                            insightContainer.style.opacity = '0';
+                            insightContainer.style.transform = 'translateY(10px)';
+                            insightContainer.style.transition = 'opacity 0.6s ease, transform 0.6s ease';
+                            setTimeout(() => {
+                                insightContainer.style.opacity = '1';
+                                insightContainer.style.transform = 'translateY(0)';
+                            }, 50);
+                        }, 300);
+                    }
+                }
+                
+                // 二维码已预生成为静态图片，无需动态生成
+                
+                // 存储分析结果供导出使用
+                this.performanceAnalysis = {
+                    summary: evaluation,
+                    aiScore: score,
+                    philosophicalInsight: insight,
+                    survivalRounds,
+                    finalSuspicion,
+                    messageCount: playerMessages.length
+                };
+                
+                console.log('✅ 个性化评价生成完成');
+                
+            } catch (error) {
+                console.error('❌ AI评价生成失败:', error);
+                
+                // 失败时使用备用评价
+                const fallbackEvaluation = this.generateFallbackEvaluation(survivalRounds, finalSuspicion, playerMessages.length);
+                summaryElement.innerHTML = `<p style="margin: 0;">${fallbackEvaluation}</p>`;
+                
+                const fallbackScore = Math.min(100, 30 + survivalRounds * 10);
+                if (scoreElement) {
+                    scoreElement.textContent = fallbackScore;
+                }
+                
+                // 显示备用洞察金句
+                const fallbackInsights = [
+                    "当人类学会像AI一样思考，我们是在进化，还是在异化？",
+                    "完美的伪装意味着失去自我，还是找到了另一个自我？",
+                    "你在模仿AI的过程中，是否也在质疑自己的人性？",
+                    "AI在学习人类的不完美，人类在追求AI的完美——这场游戏谁才是演员？",
+                    "当边界模糊时，真实性本身是否也成为了一种表演？"
+                ];
+                const randomInsight = fallbackInsights[Math.floor(Math.random() * fallbackInsights.length)];
+                
+                const insightContainer = document.getElementById('philosophicalInsight');
+                const insightQuote = document.getElementById('insightQuote');
+                if (insightContainer && insightQuote) {
+                    insightQuote.textContent = randomInsight;
+                    insightContainer.style.display = 'block';
+                }
+            }
             
         } catch (error) {
             console.error('生成表现分析时出错:', error);
-            // 隐藏分析界面
-            const analysisElement = document.getElementById('performanceAnalysis');
-            if (analysisElement) {
-                analysisElement.classList.add('hidden');
+            const summaryElement = document.getElementById('deepSummary');
+            if (summaryElement) {
+                summaryElement.innerHTML = `<p style="margin: 0; color: #999;">评价生成失败，但这不影响你的精彩表现！</p>`;
             }
+            // 二维码已预生成为静态图片，无需动态生成
         }
     }
+    
+    // 生成备用评价（当AI调用失败时使用）
+    generateFallbackEvaluation(rounds, suspicion, messageCount) {
+        if (rounds >= 6) {
+            return `出色！你在${rounds}轮中展现了高超的伪装技巧。你的${messageCount}条发言成功地混淆了AI的判断。继续保持这种风格！`;
+        } else if (rounds >= 4) {
+            return `不错的表现！你坚持了${rounds}轮，发言${messageCount}次。虽然最终怀疑度达到${suspicion}%，但你已经展现了一定的AI模仿能力。`;
+        } else if (rounds >= 2) {
+            return `你在${rounds}轮中发言${messageCount}次，虽然游戏较早结束，但这是一个好的开始。尝试更深入地理解AI的思维模式吧！`;
+        } else {
+            return `游戏刚开始就被识破了。不要气馁！多观察AI的发言风格，下次会更好。你已经迈出了第一步！`;
+        }
+    }
+    
 
     restartGame() {
         // 重置游戏状态
@@ -7096,7 +7636,12 @@ ${analysis.feedback}
             document.getElementById('playerTitle').textContent = '调试者 - ' + this.gameState.getPlayerTitle();
             
             const gameTime = Math.floor((this.gameState.gameEndTime - this.gameState.gameStartTime) / 1000);
-            document.getElementById('finalEvaluation').textContent = '调试模式结束 - 功能测试完成';
+            const finalEvaluationElement = document.getElementById('finalEvaluation');
+            if (finalEvaluationElement) {
+                finalEvaluationElement.textContent = '调试模式结束 - 功能测试完成';
+            } else {
+                console.warn('⚠️ finalEvaluation 元素未找到，跳过评价显示');
+            }
             
             // 初始化导出功能
             this.exportService.initializeExportFunction(this);
@@ -7243,7 +7788,12 @@ ${analysis.feedback}
             evaluation = '恭喜！你成功在' + this.gameState.gameMode + '模式中获得胜利！';
         }
         
-        document.getElementById('finalEvaluation').textContent = evaluation;
+        const finalEvaluationElement = document.getElementById('finalEvaluation');
+        if (finalEvaluationElement) {
+            finalEvaluationElement.textContent = evaluation;
+        } else {
+            console.warn('⚠️ finalEvaluation 元素未找到，跳过评价显示');
+        }
         
         // 初始化导出功能
         this.exportService.initializeExportFunction(this);
@@ -7278,7 +7828,12 @@ ${analysis.feedback}
         
         const gameTime = Math.floor((this.gameState.gameEndTime - this.gameState.gameStartTime) / 1000);
         const evaluation = this.getFinalEvaluation();
-        document.getElementById('finalEvaluation').textContent = evaluation;
+        const finalEvaluationElement = document.getElementById('finalEvaluation');
+        if (finalEvaluationElement) {
+            finalEvaluationElement.textContent = evaluation;
+        } else {
+            console.warn('⚠️ finalEvaluation 元素未找到，跳过评价显示');
+        }
         
         // 初始化导出功能
         this.exportService.initializeExportFunction(this);
