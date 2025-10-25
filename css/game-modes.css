@@ -477,6 +477,7 @@
 }
 
 .openmic-input-container textarea::placeholder {
+    font-size: 14px;
     color: #999;
 }
 

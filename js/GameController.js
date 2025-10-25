@@ -796,12 +796,21 @@ class GameController {
             // 显示持续的输入区域，让玩家可以随时发言
             this.showWerewolfInputArea();
             
+            // 跟踪本轮已发言的AI,避免重复
+            const spokenAIs = new Set();
+            
             // 让每个AI依次发言
             for (const ai of discussionAIs) {
                 // 检查是否被打断（玩家发言等）
                 if (!this.isGeneratingConversation) {
                     console.log('🛑 AI讨论被打断');
                     break;
+                }
+                
+                // 检查该AI是否已经发言过
+                if (spokenAIs.has(ai.name)) {
+                    console.log(`⚠️ ${ai.name} 本轮已发言，跳过`);
+                    continue;
                 }
                 
                 const msg = await this.generateWerewolfAIMessage(ai);
@@ -820,7 +829,10 @@ class GameController {
                     }
                     
                     this.addAIMessage(ai, msg, false, quotedMessage);
+                    spokenAIs.add(ai.name); // 标记该AI已发言
                     await new Promise(resolve => setTimeout(resolve, 1500));
+                } else {
+                    console.log(`⚠️ ${ai.name} 生成消息失败或被跳过`);
                 }
             }
             
@@ -852,6 +864,19 @@ class GameController {
             this.roleManager.selectTopic() : 
             topicProgression[this.gameState.currentDifficulty];
         const recentHistory = this.gameState.getRecentMessageHistory(5);
+        
+        // 检查该AI在本轮是否已经发言过（开放麦模式可以多次发言，但要避免短时间内重复）
+        const recentAIMessages = recentHistory.filter(msg => msg.author === ai.name);
+        if (recentAIMessages.length > 0) {
+            const lastMessageTime = new Date(recentAIMessages[recentAIMessages.length - 1].timestamp).getTime();
+            const timeSinceLastMessage = Date.now() - lastMessageTime;
+            
+            // 如果该AI在30秒内已经发言过，跳过
+            if (timeSinceLastMessage < 30000) {
+                console.log(`⚠️ ${ai.name} 在30秒内已经发言过，跳过重复发言`);
+                return null;
+            }
+        }
         
         // 获取该AI角色的场景，确保每轮每个AI只有一个场景
         const scenario = this.gameState.getRandomScenarioForCharacter(ai);
@@ -921,12 +946,43 @@ ${recentHistory.map(h => `${h.author}: ${h.content}`).join('\n')}
         
         console.log(`🎯 ${ai.name} 使用 ${lengthStyle.type} 风格发言 (${lengthStyle.range})`);
         
-        const response = await this.callAI(messages, {
-            maxTokens: lengthStyle.tokens,
-            temperature: 0.8
-        });
+        // 重试机制：尝试多次生成，确保不重复
+        let generatedMessage = null;
+        let attempts = 0;
+        const maxAttempts = 3;
         
-        return response?.trim();
+        while (attempts < maxAttempts && !generatedMessage) {
+            try {
+                const candidateMessage = await this.callAI(messages, {
+                    maxTokens: lengthStyle.tokens,
+                    temperature: 0.8 + (attempts * 0.1) // 每次重试增加温度
+                });
+                
+                if (candidateMessage && candidateMessage.trim()) {
+                    // 检查是否与历史消息相似
+                    const isSimilarToHistory = this.gameState.isMessageSimilarToHistory(ai.name, candidateMessage, 0.6);
+                    
+                    // 检查是否与最近消息相似
+                    const isSimilarToRecent = this.isMessageSimilar(candidateMessage, ai.name, recentHistory, 0.5);
+                    
+                    if ((isSimilarToHistory || isSimilarToRecent) && attempts < maxAttempts - 1) {
+                        console.log(`🔄 ${ai.name} 开放麦消息相似，重新生成 (尝试 ${attempts + 1}/${maxAttempts})`);
+                        attempts++;
+                        continue;
+                    }
+                    
+                    generatedMessage = candidateMessage.trim();
+                }
+            } catch (error) {
+                console.error(`❌ ${ai.name} 开放麦消息生成失败 (尝试 ${attempts + 1}):`, error);
+            }
+            
+            if (!generatedMessage) {
+                attempts++;
+            }
+        }
+        
+        return generatedMessage;
     }
     
     formatVotingSummary(votingHistory) {
@@ -967,6 +1023,13 @@ ${recentHistory.map(h => `${h.author}: ${h.content}`).join('\n')}
             // 过滤出本讨论轮次的消息（排除系统消息和投票结果）
             return msg.type !== 'system' && !msg.content?.includes('投票结果');
         }).slice(-5); // 只取最近5条
+        
+        // 检查该AI在本轮是否已经发言过
+        const aiAlreadySpoke = recentHistory.some(msg => msg.author === ai.name);
+        if (aiAlreadySpoke) {
+            console.log(`⚠️ ${ai.name} 在本轮已经发言过,跳过重复发言`);
+            return null;
+        }
         
         // 获取已淘汰玩家列表
         const eliminatedPlayers = this.gameState.gameModeConfig.werewolf.eliminatedPlayers || [];
@@ -1099,8 +1162,41 @@ currentRound >= 3 ?
 直接返回你的发言内容。` 
             }
         ];
-        const resp = await this.callAI(messages, { maxTokens: 300, temperature: 0.8 });
-        return resp?.trim();
+        
+        // 重试机制：尝试多次生成，确保不重复
+        let generatedMessage = null;
+        let attempts = 0;
+        const maxAttempts = 3;
+        
+        while (attempts < maxAttempts && !generatedMessage) {
+            try {
+                const candidateMessage = await this.callAI(messages, { maxTokens: 300, temperature: 0.8 + (attempts * 0.1) }); // 每次重试增加温度
+                
+                if (candidateMessage && candidateMessage.trim()) {
+                    // 检查是否与历史消息相似
+                    const isSimilarToHistory = this.gameState.isMessageSimilarToHistory(ai.name, candidateMessage, 0.6);
+                    
+                    // 检查是否与本轮其他消息相似
+                    const isSimilarToRecent = this.isMessageSimilar(candidateMessage, ai.name, recentHistory, 0.5);
+                    
+                    if ((isSimilarToHistory || isSimilarToRecent) && attempts < maxAttempts - 1) {
+                        console.log(`🔄 ${ai.name} 消息相似，重新生成 (尝试 ${attempts + 1}/${maxAttempts})`);
+                        attempts++;
+                        continue;
+                    }
+                    
+                    generatedMessage = candidateMessage.trim();
+                }
+            } catch (error) {
+                console.error(`❌ ${ai.name} 狼人杀消息生成失败 (尝试 ${attempts + 1}):`, error);
+            }
+            
+            if (!generatedMessage) {
+                attempts++;
+            }
+        }
+        
+        return generatedMessage;
     }
 
     addSystemMessage(message) {

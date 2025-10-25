@@ -971,12 +971,17 @@ body {
     padding: 12px;
     border: 1px solid #d0d0d0;
     border-radius: 6px;
-    font-size: 15px;
+    font-size: 14px;
     resize: vertical;
     transition: border-color 0.3s ease;
     background: #fff;
     font-family: inherit;
     line-height: 1.4;
+}
+
+.input-area textarea::placeholder {
+    font-size: 14px;
+    color: #999;
 }
 
 .input-area textarea:focus {
