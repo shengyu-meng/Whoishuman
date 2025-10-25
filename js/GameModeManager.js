@@ -758,26 +758,30 @@ class WerewolfMode extends BaseGameMode {
     }
     
     initializePlayersAndAIs() {
-        // 初始化存活玩家列表（包含所有AI + 玩家）
-        const alivePlayers = [...this.gameState.allAICharacters.map(ai => ai.name)];
-        alivePlayers.push(this.gameState.playerName);
-        
-        this.gameState.gameModeConfig.werewolf.alivePlayers = alivePlayers;
-        
+        // 初始化固定参与的AI（6个AI + 1个玩家 = 7人）
         const allAIs = this.gameState.allAICharacters || [];
         let fixedParticipants = this.gameState.gameModeConfig.werewolf.fixedParticipants;
         if (!fixedParticipants || fixedParticipants.length === 0) {
             if (allAIs.length > 0) {
                 const shuffled = [...allAIs].sort(() => 0.5 - Math.random());
-                fixedParticipants = shuffled.slice(0, Math.min(7, shuffled.length)).map(ai => ai.name);
+                // 固定选择6个AI参与，加上玩家总共7人
+                fixedParticipants = shuffled.slice(0, Math.min(6, shuffled.length)).map(ai => ai.name);
                 this.gameState.gameModeConfig.werewolf.fixedParticipants = fixedParticipants;
             } else {
                 this.gameState.gameModeConfig.werewolf.fixedParticipants = [];
                 fixedParticipants = [];
             }
         }
+        
+        // 初始化存活玩家列表（只包含固定参与的AI + 玩家）
+        const alivePlayers = [...fixedParticipants];
+        alivePlayers.push(this.gameState.playerName);
+        this.gameState.gameModeConfig.werewolf.alivePlayers = alivePlayers;
+        
+        // 设置活跃AI角色为固定参与的AI
         this.gameState.activeAICharacters = allAIs.filter(ai => fixedParticipants.includes(ai.name));
         
+        console.log('🐺 狼人杀游戏初始化：总共', alivePlayers.length, '人（6个AI + 1个玩家）');
         console.log('🐺 存活玩家:', alivePlayers);
         console.log('👥 固定参与AI:', fixedParticipants);
     }
@@ -812,12 +816,12 @@ class WerewolfMode extends BaseGameMode {
         let fixed = this.gameState.gameModeConfig.werewolf.fixedParticipants || [];
         const aliveSet = new Set(this.gameState.gameModeConfig.werewolf.alivePlayers);
         
-        // 如果固定参与者为空或不足，重新选择
+        // 如果固定参与者为空或不足，重新选择（保持6个AI）
         if (!fixed || fixed.length === 0) {
             const candidates = this.gameState.allAICharacters.filter(ai => aliveSet.has(ai.name));
             if (candidates.length > 0) {
                 const shuffled = [...candidates].sort(() => 0.5 - Math.random());
-                fixed = shuffled.slice(0, Math.min(7, shuffled.length)).map(ai => ai.name);
+                fixed = shuffled.slice(0, Math.min(6, shuffled.length)).map(ai => ai.name);
                 this.gameState.gameModeConfig.werewolf.fixedParticipants = fixed;
             }
         }
