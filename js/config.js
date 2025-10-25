@@ -78,16 +78,16 @@ const GAME_CONFIG = {
 
 // 调试模式配置
 const DEBUG_CONFIG = {
-    enabled: true,                                    // 调试模式总开关
+    enabled: false,                                   // 调试模式总开关
     
     // 调试功能开关
     features: {
-        showSkipButton: true,                        // 显示"跳过本轮"按钮
-        showEndGameButton: true,                     // 显示"结束游戏"按钮
-        showConsoleLogs: true,                       // 显示浏览器控制台日志
-        autoSaveLogs: true,                         // 自动保存对话和系统日志到文件
-        showCognitionDebug: true,                   // 显示认知增强器调试信息
-        showFullPrompts: true                       // 显示完整AI提示词
+        showSkipButton: false,                       // 显示"跳过本轮"按钮
+        showEndGameButton: false,                    // 显示"结束游戏"按钮
+        showConsoleLogs: false,                      // 显示浏览器控制台日志
+        autoSaveLogs: false,                         // 自动保存对话和系统日志到文件
+        showCognitionDebug: false,                   // 显示认知增强器调试信息
+        showFullPrompts: false                       // 显示完整AI提示词
     },
     
     // 日志保存配置
